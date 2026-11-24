@@ -1,0 +1,49 @@
+{
+  "schema": "unkawaii_ear_precedents/v0.5",
+  "updatedAt": "2026-11-24",
+  "source": "Owner blind ear-judge & Mirror Audit sessions (poidowl)",
+  "precedents": {
+    "F30_STEREO_PHASE_DISCOMFORT": {
+      "status": "orthogonal",
+      "votes": {
+        "orthogonal": 1
+      },
+      "scope": "general_audio",
+      "recordedAt": "2026-11-24",
+      "note": "Owner ear-judge 2026-11-24: neither kawaii nor unkawaii"
+    },
+    "F24_CALCULATED_PITCH_LFO": {
+      "status": "ear_overruled",
+      "votes": {
+        "original": 5,
+        "damped": 0,
+        "flat": 0
+      },
+      "pValue": "<0.01",
+      "scope": "tokiko_japanese_speech",
+      "recordedAt": "2026-11-24",
+      "evidenceDoc": "bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md",
+      "note": "Owner blind 3-choice & 2-choice Mirror Audit 2026-11-24: preferred original 5-0"
+    },
+    "F14_HELMHOLTZ_ROUGHNESS": {
+      "status": "ear_tie_observed",
+      "votes": {
+        "tie": 1
+      },
+      "scope": "tokiko_japanese_speech",
+      "recordedAt": "2026-11-24",
+      "evidenceDoc": "bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md",
+      "note": "Mirror saw a difference on #4 watashi/amae, ear saw no reason to fix"
+    },
+    "F23_ERRATIC_PITCH_WARBLE": {
+      "status": "ear_tie_observed",
+      "votes": {
+        "tie": 1
+      },
+      "scope": "tokiko_japanese_speech",
+      "recordedAt": "2026-11-24",
+      "evidenceDoc": "bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md",
+      "note": "Mirror saw a difference on #4 watashi/amae, ear saw no reason to fix"
+    }
+  }
+}

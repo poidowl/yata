@@ -14,6 +14,8 @@ import {
   computeRoughness,
   computeCepstrumComb,
   computeModulationDft,
+  computeMpsRoughness,
+  computeSubharmonicRatio,
   pearson,
   median,
   percentile,
@@ -1262,6 +1264,10 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     }
   }
 
+  // --- v0.5 Neuroscience DSP lenses: MPS roughness (30-150Hz vs 4-16Hz) & subharmonics ---
+  const mps = computeMpsRoughness(core.samples, core.sampleRate);
+  const subharmonicRatio = computeSubharmonicRatio(core.norm, core.sampleRate, f0Track, hopSize);
+
   return {
     // === 16 v0.1 backward-compatible scalar keys ===
     sampleRate: core.sampleRate,
@@ -1352,5 +1358,100 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     lowToMidTiltDb: roundTo(lowToMidTiltDb, 2),
     midHighFlatness: roundTo(midHighFlatness, 4),
     meanSpectralFlux: roundTo(meanSpectralFlux, 5),
+
+    // === v0.5 Neuroscience DSP Lenses: Arnal MPS roughness & nonlinear subharmonics ===
+    mpsSpeech4_16: roundTo(mps.mpsSpeech4_16, 4),
+    mpsRoughness30_150: roundTo(mps.mpsRoughness30_150, 4),
+    mpsRoughToSpeechRatio: roundTo(mps.mpsRoughToSpeechRatio, 3),
+    subharmonicRatio: roundTo(subharmonicRatio, 4),
+  };
+}
+
+/**
+ * Time-Segmented Mirror: divides audio into compact windows (default 0.5s) and tracks
+ * per-window Presence (voiced/HNR/coupling) vs MPS 30–150Hz Roughness vs median F0 so LLMs
+ * can inspect coexisting kawaii + unkawaii across time.
+ *
+ * @param {object|null} profile - AudioProfile from extractAudioProfile (extracted automatically if null)
+ * @param {Float32Array|ArrayLike<number>} samples
+ * @param {number} sampleRate
+ * @param {{ windowSec?: number }} [opts={ windowSec: 0.5 }]
+ */
+export function extractSegmentTimeline(profile, samples, sampleRate, opts = { windowSec: 0.5 }) {
+  const sr = Number.isFinite(sampleRate) && sampleRate > 0 ? sampleRate : (profile?.sampleRate || 24000);
+  const sig = samples ?? new Float32Array(0);
+  const n = sig.length;
+  const durationSec = n > 0 ? n / sr : finite(profile?.durationSec, 0);
+  const windowSec = Math.max(0.1, Math.min(5.0, finite(opts?.windowSec, 0.5)));
+
+  const prof = profile && Array.isArray(profile.frames)
+    ? profile
+    : extractAudioProfile(sig, sr);
+  const frames = prof.frames || [];
+
+  const segments = [];
+  if (durationSec <= 0 || n === 0) {
+    return {
+      schema: "unkawaii_timeline/v0.5",
+      windowSec: roundTo(windowSec, 3),
+      durationSec: 0,
+      sampleRate: sr,
+      segments,
+    };
+  }
+
+  const numWindows = Math.max(1, Math.ceil(durationSec / windowSec));
+  for (let w = 0; w < numWindows; w++) {
+    const startSec = w * windowSec;
+    const endSec = Math.min(durationSec, (w + 1) * windowSec);
+    if (endSec - startSec < 0.02 && w > 0) break;
+
+    const s0 = Math.max(0, Math.floor(startSec * sr));
+    const s1 = Math.min(n, Math.ceil(endSec * sr));
+    const slice = typeof sig.subarray === "function" ? sig.subarray(s0, s1) : sig.slice(s0, s1);
+    const mps = computeMpsRoughness(slice, sr);
+
+    const winFrames = frames.filter((f) => f.timeSec >= startSec && f.timeSec < endSec + (w === numWindows - 1 ? 1e-6 : 0));
+    const activeWin = winFrames.filter((f) => f.rms >= 0.03);
+    const voicedWin = activeWin.filter((f) => f.voiced && f.f0 > 0);
+    const voicedRatio = activeWin.length > 0 ? voicedWin.length / activeWin.length : 0;
+    const meanHnrDb = voicedWin.length > 0 ? meanOf(voicedWin.map((f) => f.hnrDb)) : 0;
+    const medianF0 = voicedWin.length > 0 ? median(voicedWin.map((f) => f.f0)) : 0;
+    const meanRms = winFrames.length > 0 ? meanOf(winFrames.map((f) => f.rms)) : 0;
+
+    let coupling = 0;
+    if (activeWin.length >= 3) {
+      const cHf = Math.abs(pearson(activeWin.map((f) => f.rms), activeWin.map((f) => f.hfRatio)));
+      const cF0 = voicedWin.length >= 3
+        ? Math.abs(pearson(voicedWin.map((f) => f.rms), voicedWin.map((f) => f.f0)))
+        : 0;
+      coupling = Math.max(cHf, cF0);
+    }
+
+    const hnrNorm = Math.max(0, Math.min(1, (meanHnrDb + 5) / 30));
+    const presence = activeWin.length > 0
+      ? Math.max(0, Math.min(1, 0.45 * voicedRatio + 0.35 * hnrNorm * (voicedRatio > 0 ? 1 : 0) + 0.2 * coupling))
+      : 0;
+
+    segments.push({
+      startSec: roundTo(startSec, 2),
+      endSec: roundTo(endSec, 2),
+      presence: roundTo(presence, 3),
+      voicedRatio: roundTo(voicedRatio, 3),
+      meanHnrDb: roundTo(meanHnrDb, 1),
+      coupling: roundTo(coupling, 3),
+      mpsSpeech4_16: roundTo(mps.mpsSpeech4_16, 4),
+      mpsRoughness30_150: roundTo(mps.mpsRoughness30_150, 4),
+      medianF0: roundTo(medianF0, 1),
+      rms: roundTo(meanRms, 3),
+    });
+  }
+
+  return {
+    schema: "unkawaii_timeline/v0.5",
+    windowSec: roundTo(windowSec, 3),
+    durationSec: roundTo(durationSec, 3),
+    sampleRate: sr,
+    segments,
   };
 }

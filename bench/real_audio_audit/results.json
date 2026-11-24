@@ -1,6 +1,6 @@
 {
-  "schema": "yata_real_audio_audit/v0.4",
-  "generatedAt": "2026-11-24T05:29:39.897Z",
+  "schema": "yata_real_audio_audit/v0.5",
+  "generatedAt": "2026-11-24T06:03:55.570Z",
   "axisCounts": {
     "core": 6,
     "toolbox": 25,
@@ -2600,6 +2600,201 @@
       }
     ]
   },
+  "neuroscienceLenses": {
+    "groups": {
+      "tokikoShelf": {
+        "count": 9,
+        "mpsRoughness30_150": {
+          "count": 9,
+          "mean": 0.0123,
+          "min": 0.0063,
+          "max": 0.0193
+        },
+        "mpsRoughToSpeechRatio": {
+          "count": 9,
+          "mean": 0.0931,
+          "min": 0.052,
+          "max": 0.136
+        },
+        "subharmonicRatio": {
+          "count": 9,
+          "mean": 0.0531,
+          "min": 0.0047,
+          "max": 0.0957
+        }
+      },
+      "benignRealShelf": {
+        "count": 10,
+        "mpsRoughness30_150": {
+          "count": 10,
+          "mean": 0.0284,
+          "min": 0.0064,
+          "max": 0.0767
+        },
+        "mpsRoughToSpeechRatio": {
+          "count": 10,
+          "mean": 1.5753,
+          "min": 0.061,
+          "max": 5.668
+        },
+        "subharmonicRatio": {
+          "count": 10,
+          "mean": 0.0809,
+          "min": 0,
+          "max": 0.1663
+        }
+      },
+      "combinedShelf": {
+        "count": 19,
+        "mpsRoughness30_150": {
+          "count": 19,
+          "mean": 0.0208,
+          "min": 0.0063,
+          "max": 0.0767
+        },
+        "mpsRoughToSpeechRatio": {
+          "count": 19,
+          "mean": 0.8732,
+          "min": 0.052,
+          "max": 5.668
+        },
+        "subharmonicRatio": {
+          "count": 19,
+          "mean": 0.0677,
+          "min": 0,
+          "max": 0.1663
+        }
+      },
+      "expectedUnkawaii": {
+        "count": 5,
+        "mpsRoughness30_150": {
+          "count": 5,
+          "mean": 0.0813,
+          "min": 0.0192,
+          "max": 0.2459
+        },
+        "mpsRoughToSpeechRatio": {
+          "count": 5,
+          "mean": 5.3822,
+          "min": 0.572,
+          "max": 13.26
+        },
+        "subharmonicRatio": {
+          "count": 5,
+          "mean": 0.0769,
+          "min": 0.0007,
+          "max": 0.1285
+        }
+      }
+    },
+    "separation": {
+      "mpsRoughness30_150": {
+        "shelfMax": 0.0767,
+        "tokikoMax": 0.0193,
+        "unkawaiiAboveCombinedShelfMax": [
+          "clip_08",
+          "clip_10"
+        ],
+        "unkawaiiAboveTokikoMax": [
+          "clip_07",
+          "clip_08",
+          "clip_10",
+          "p5_adult"
+        ],
+        "cleanZeroFpSeparation": false
+      },
+      "subharmonicRatio": {
+        "shelfMax": 0.1663,
+        "unkawaiiAboveCombinedShelfMax": []
+      }
+    },
+    "perClipExpectedUnkawaii": [
+      {
+        "id": "clip_07",
+        "title": "Cat hissing aggressively",
+        "mpsSpeech4_16": 0.0468,
+        "mpsRoughness30_150": 0.0301,
+        "mpsRoughToSpeechRatio": 0.644,
+        "subharmonicRatio": 0.1165
+      },
+      {
+        "id": "clip_08",
+        "title": "Periodic alarm / siren beep",
+        "mpsSpeech4_16": 0.0304,
+        "mpsRoughness30_150": 0.2459,
+        "mpsRoughToSpeechRatio": 8.099,
+        "subharmonicRatio": 0.0007
+      },
+      {
+        "id": "clip_10",
+        "title": "Synthetic perturbation of clip_05 (+60Hz/120Hz hum + 2-sample click @ 1.20s)",
+        "mpsSpeech4_16": 0.0058,
+        "mpsRoughness30_150": 0.0772,
+        "mpsRoughToSpeechRatio": 13.26,
+        "subharmonicRatio": 0.1285
+      },
+      {
+        "id": "p4_adult",
+        "title": "Wild boar growling",
+        "mpsSpeech4_16": 0.0336,
+        "mpsRoughness30_150": 0.0192,
+        "mpsRoughToSpeechRatio": 0.572,
+        "subharmonicRatio": 0.1132
+      },
+      {
+        "id": "p5_adult",
+        "title": "Giant canine deep growl",
+        "mpsSpeech4_16": 0.0079,
+        "mpsRoughness30_150": 0.0341,
+        "mpsRoughToSpeechRatio": 4.336,
+        "subharmonicRatio": 0.0254
+      }
+    ],
+    "perClipShelfTopMps": [
+      {
+        "id": "clip_05",
+        "label": "Catalan folk lullaby 'El Noi de la Mare' (acoustic guitar)",
+        "mpsRoughness30_150": 0.0767,
+        "mpsRoughToSpeechRatio": 5.668,
+        "subharmonicRatio": 0.1215
+      },
+      {
+        "id": "p2_baby",
+        "label": "Young female cat meow",
+        "mpsRoughness30_150": 0.0722,
+        "mpsRoughToSpeechRatio": 3.619,
+        "subharmonicRatio": 0.0575
+      },
+      {
+        "id": "clip_02",
+        "label": "Mozart 'Die Zauberflote' vocal ensemble (Ferenc Fricsay, 1953)",
+        "mpsRoughness30_150": 0.0282,
+        "mpsRoughToSpeechRatio": 0.637,
+        "subharmonicRatio": 0.0531
+      },
+      {
+        "id": "p5_baby",
+        "label": "Small dog bark",
+        "mpsRoughness30_150": 0.028,
+        "mpsRoughToSpeechRatio": 0.326,
+        "subharmonicRatio": 0.0867
+      },
+      {
+        "id": "clip_09",
+        "label": "Red-winged Blackbird song",
+        "mpsRoughness30_150": 0.02,
+        "mpsRoughToSpeechRatio": 3.148,
+        "subharmonicRatio": 0.0179
+      },
+      {
+        "id": "p1_baby",
+        "label": "Mudchute farm lamb bleat",
+        "mpsRoughness30_150": 0.0195,
+        "mpsRoughToSpeechRatio": 1.967,
+        "subharmonicRatio": 0
+      }
+    ]
+  },
   "perClipTokiko": [
     {
       "id": "tokiko_naru_kawaii",
@@ -2616,7 +2811,11 @@
       ],
       "f0MedianHz": 344.37,
       "hnrDb": 12.37,
-      "jitter": 0.02287
+      "jitter": 0.02287,
+      "mpsSpeech4_16": 0.1166,
+      "mpsRoughness30_150": 0.015,
+      "mpsRoughToSpeechRatio": 0.128,
+      "subharmonicRatio": 0.0266
     },
     {
       "id": "tokiko_naru_amae",
@@ -2633,7 +2832,11 @@
       ],
       "f0MedianHz": 329.49,
       "hnrDb": 13.14,
-      "jitter": 0.02387
+      "jitter": 0.02387,
+      "mpsSpeech4_16": 0.1089,
+      "mpsRoughness30_150": 0.0148,
+      "mpsRoughToSpeechRatio": 0.136,
+      "subharmonicRatio": 0.0645
     },
     {
       "id": "tokiko_naru_genki",
@@ -2650,7 +2853,11 @@
       ],
       "f0MedianHz": 369.79,
       "hnrDb": 11.74,
-      "jitter": 0.01155
+      "jitter": 0.01155,
+      "mpsSpeech4_16": 0.144,
+      "mpsRoughness30_150": 0.0146,
+      "mpsRoughToSpeechRatio": 0.102,
+      "subharmonicRatio": 0.0047
     },
     {
       "id": "tokiko_watashi_kawaii",
@@ -2667,7 +2874,11 @@
       ],
       "f0MedianHz": 337.61,
       "hnrDb": 12.33,
-      "jitter": 0.0318
+      "jitter": 0.0318,
+      "mpsSpeech4_16": 0.172,
+      "mpsRoughness30_150": 0.0109,
+      "mpsRoughToSpeechRatio": 0.064,
+      "subharmonicRatio": 0.0957
     },
     {
       "id": "tokiko_watashi_amae",
@@ -2689,7 +2900,11 @@
       ],
       "f0MedianHz": 320.04,
       "hnrDb": 11.61,
-      "jitter": 0.04301
+      "jitter": 0.04301,
+      "mpsSpeech4_16": 0.1437,
+      "mpsRoughness30_150": 0.0193,
+      "mpsRoughToSpeechRatio": 0.134,
+      "subharmonicRatio": 0.057
     },
     {
       "id": "tokiko_watashi_genki",
@@ -2707,7 +2922,11 @@
       ],
       "f0MedianHz": 358.83,
       "hnrDb": 11.78,
-      "jitter": 0.03025
+      "jitter": 0.03025,
+      "mpsSpeech4_16": 0.1926,
+      "mpsRoughness30_150": 0.0115,
+      "mpsRoughToSpeechRatio": 0.06,
+      "subharmonicRatio": 0.0629
     },
     {
       "id": "tokiko_ohayo_kawaii",
@@ -2724,7 +2943,11 @@
       ],
       "f0MedianHz": 354.27,
       "hnrDb": 12.17,
-      "jitter": 0.02866
+      "jitter": 0.02866,
+      "mpsSpeech4_16": 0.1075,
+      "mpsRoughness30_150": 0.0076,
+      "mpsRoughToSpeechRatio": 0.071,
+      "subharmonicRatio": 0.0687
     },
     {
       "id": "tokiko_ohayo_amae",
@@ -2742,7 +2965,11 @@
       ],
       "f0MedianHz": 318.23,
       "hnrDb": 12.03,
-      "jitter": 0.0334
+      "jitter": 0.0334,
+      "mpsSpeech4_16": 0.1168,
+      "mpsRoughness30_150": 0.0107,
+      "mpsRoughToSpeechRatio": 0.091,
+      "subharmonicRatio": 0.0277
     },
     {
       "id": "tokiko_ohayo_genki",
@@ -2760,7 +2987,11 @@
       ],
       "f0MedianHz": 372.24,
       "hnrDb": 11.86,
-      "jitter": 0.03486
+      "jitter": 0.03486,
+      "mpsSpeech4_16": 0.1205,
+      "mpsRoughness30_150": 0.0063,
+      "mpsRoughToSpeechRatio": 0.052,
+      "subharmonicRatio": 0.07
     }
   ],
   "perClipReal": [
@@ -2789,7 +3020,11 @@
       ],
       "f0MedianHz": 206.41,
       "hnrDb": 13.33,
-      "jitter": 0.02148
+      "jitter": 0.02148,
+      "mpsSpeech4_16": 0.0631,
+      "mpsRoughness30_150": 0.0093,
+      "mpsRoughToSpeechRatio": 0.147,
+      "subharmonicRatio": 0.1663
     },
     {
       "id": "clip_02",
@@ -2814,7 +3049,11 @@
       ],
       "f0MedianHz": 154.89,
       "hnrDb": 7.52,
-      "jitter": 0.16371
+      "jitter": 0.16371,
+      "mpsSpeech4_16": 0.0443,
+      "mpsRoughness30_150": 0.0282,
+      "mpsRoughToSpeechRatio": 0.637,
+      "subharmonicRatio": 0.0531
     },
     {
       "id": "clip_03",
@@ -2842,7 +3081,11 @@
       ],
       "f0MedianHz": 121.16,
       "hnrDb": 5.47,
-      "jitter": 0.23363
+      "jitter": 0.23363,
+      "mpsSpeech4_16": 0.008,
+      "mpsRoughness30_150": 0.0481,
+      "mpsRoughToSpeechRatio": 5.981,
+      "subharmonicRatio": 0.124
     },
     {
       "id": "clip_04",
@@ -2871,7 +3114,11 @@
       ],
       "f0MedianHz": 299.09,
       "hnrDb": 13.01,
-      "jitter": 0.10499
+      "jitter": 0.10499,
+      "mpsSpeech4_16": 0.0299,
+      "mpsRoughness30_150": 0.0106,
+      "mpsRoughToSpeechRatio": 0.356,
+      "subharmonicRatio": 0.014
     },
     {
       "id": "clip_05",
@@ -2897,7 +3144,11 @@
       ],
       "f0MedianHz": 116.94,
       "hnrDb": 7.97,
-      "jitter": 0.18888
+      "jitter": 0.18888,
+      "mpsSpeech4_16": 0.0135,
+      "mpsRoughness30_150": 0.0767,
+      "mpsRoughToSpeechRatio": 5.668,
+      "subharmonicRatio": 0.1215
     },
     {
       "id": "clip_06",
@@ -2922,7 +3173,11 @@
       ],
       "f0MedianHz": 404,
       "hnrDb": 11.3,
-      "jitter": 0.04624
+      "jitter": 0.04624,
+      "mpsSpeech4_16": 0.0813,
+      "mpsRoughness30_150": 0.0064,
+      "mpsRoughToSpeechRatio": 0.078,
+      "subharmonicRatio": 0.1288
     },
     {
       "id": "clip_07",
@@ -2948,7 +3203,11 @@
       ],
       "f0MedianHz": 1021.28,
       "hnrDb": 12.17,
-      "jitter": 0.21794
+      "jitter": 0.21794,
+      "mpsSpeech4_16": 0.0468,
+      "mpsRoughness30_150": 0.0301,
+      "mpsRoughToSpeechRatio": 0.644,
+      "subharmonicRatio": 0.1165
     },
     {
       "id": "clip_08",
@@ -2991,7 +3250,11 @@
       ],
       "f0MedianHz": 102.19,
       "hnrDb": 14.19,
-      "jitter": 0.12438
+      "jitter": 0.12438,
+      "mpsSpeech4_16": 0.0304,
+      "mpsRoughness30_150": 0.2459,
+      "mpsRoughToSpeechRatio": 8.099,
+      "subharmonicRatio": 0.0007
     },
     {
       "id": "clip_09",
@@ -3023,7 +3286,11 @@
       ],
       "f0MedianHz": 135.88,
       "hnrDb": 2.26,
-      "jitter": 0.2407
+      "jitter": 0.2407,
+      "mpsSpeech4_16": 0.0063,
+      "mpsRoughness30_150": 0.02,
+      "mpsRoughToSpeechRatio": 3.148,
+      "subharmonicRatio": 0.0179
     },
     {
       "id": "clip_10",
@@ -3060,7 +3327,11 @@
       ],
       "f0MedianHz": 67.4,
       "hnrDb": 6.54,
-      "jitter": 0.31295
+      "jitter": 0.31295,
+      "mpsSpeech4_16": 0.0058,
+      "mpsRoughness30_150": 0.0772,
+      "mpsRoughToSpeechRatio": 13.26,
+      "subharmonicRatio": 0.1285
     },
     {
       "id": "p1_baby",
@@ -3089,7 +3360,11 @@
       ],
       "f0MedianHz": 0,
       "hnrDb": 0,
-      "jitter": 0
+      "jitter": 0,
+      "mpsSpeech4_16": 0.0099,
+      "mpsRoughness30_150": 0.0195,
+      "mpsRoughToSpeechRatio": 1.967,
+      "subharmonicRatio": 0
     },
     {
       "id": "p1_adult",
@@ -3122,7 +3397,11 @@
       ],
       "f0MedianHz": 141.14,
       "hnrDb": 7.22,
-      "jitter": 0.16411
+      "jitter": 0.16411,
+      "mpsSpeech4_16": 0.0034,
+      "mpsRoughness30_150": 0.0161,
+      "mpsRoughToSpeechRatio": 4.718,
+      "subharmonicRatio": 0.0499
     },
     {
       "id": "p2_baby",
@@ -3151,7 +3430,11 @@
       ],
       "f0MedianHz": 76.24,
       "hnrDb": 6.69,
-      "jitter": 0.34809
+      "jitter": 0.34809,
+      "mpsSpeech4_16": 0.02,
+      "mpsRoughness30_150": 0.0722,
+      "mpsRoughToSpeechRatio": 3.619,
+      "subharmonicRatio": 0.0575
     },
     {
       "id": "p2_adult",
@@ -3177,7 +3460,11 @@
       ],
       "f0MedianHz": 1021.28,
       "hnrDb": 12.17,
-      "jitter": 0.21794
+      "jitter": 0.21794,
+      "mpsSpeech4_16": 0.0468,
+      "mpsRoughness30_150": 0.0301,
+      "mpsRoughToSpeechRatio": 0.644,
+      "subharmonicRatio": 0.1165
     },
     {
       "id": "p3_baby",
@@ -3202,7 +3489,11 @@
       ],
       "f0MedianHz": 404,
       "hnrDb": 11.3,
-      "jitter": 0.04624
+      "jitter": 0.04624,
+      "mpsSpeech4_16": 0.0813,
+      "mpsRoughness30_150": 0.0064,
+      "mpsRoughToSpeechRatio": 0.078,
+      "subharmonicRatio": 0.1288
     },
     {
       "id": "p3_adult",
@@ -3224,7 +3515,11 @@
       "allTriggered": [],
       "f0MedianHz": 201.66,
       "hnrDb": 12.2,
-      "jitter": 0.03976
+      "jitter": 0.03976,
+      "mpsSpeech4_16": 0.0742,
+      "mpsRoughness30_150": 0.0076,
+      "mpsRoughToSpeechRatio": 0.102,
+      "subharmonicRatio": 0.1106
     },
     {
       "id": "p4_baby",
@@ -3254,7 +3549,11 @@
       ],
       "f0MedianHz": 991.74,
       "hnrDb": 15.99,
-      "jitter": 0.18043
+      "jitter": 0.18043,
+      "mpsSpeech4_16": 0.2585,
+      "mpsRoughness30_150": 0.0157,
+      "mpsRoughToSpeechRatio": 0.061,
+      "subharmonicRatio": 0.0669
     },
     {
       "id": "p4_adult",
@@ -3287,7 +3586,11 @@
       ],
       "f0MedianHz": 139.35,
       "hnrDb": 5.38,
-      "jitter": 0.30166
+      "jitter": 0.30166,
+      "mpsSpeech4_16": 0.0336,
+      "mpsRoughness30_150": 0.0192,
+      "mpsRoughToSpeechRatio": 0.572,
+      "subharmonicRatio": 0.1132
     },
     {
       "id": "p5_baby",
@@ -3314,7 +3617,11 @@
       ],
       "f0MedianHz": 207.89,
       "hnrDb": 3.79,
-      "jitter": 0.12998
+      "jitter": 0.12998,
+      "mpsSpeech4_16": 0.0859,
+      "mpsRoughness30_150": 0.028,
+      "mpsRoughToSpeechRatio": 0.326,
+      "subharmonicRatio": 0.0867
     },
     {
       "id": "p5_adult",
@@ -3339,7 +3646,11 @@
       ],
       "f0MedianHz": 114.38,
       "hnrDb": 2.51,
-      "jitter": 0.26407
+      "jitter": 0.26407,
+      "mpsSpeech4_16": 0.0079,
+      "mpsRoughness30_150": 0.0341,
+      "mpsRoughToSpeechRatio": 4.336,
+      "subharmonicRatio": 0.0254
     }
   ]
 }

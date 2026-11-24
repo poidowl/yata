@@ -38,6 +38,63 @@ function formatWhere(where) {
   return parts.length ? ` [${parts.join(", ")}]` : "";
 }
 
+function formatPrecedentTag(prec) {
+  if (!prec || typeof prec !== "object") return "";
+  const status = String(prec.status || "").toLowerCase();
+  if (status === "ear_overruled") {
+    const v = prec.votes;
+    if (v && Number.isFinite(v.original)) {
+      const against = (Number.isFinite(v.damped) ? v.damped : 0) + (Number.isFinite(v.flat) ? v.flat : 0);
+      return `[EAR-OVERRULED ${v.original}-${against}]`;
+    }
+    return "[EAR-OVERRULED]";
+  }
+  if (status === "orthogonal") return "[ORTHOGONAL]";
+  if (status === "ear_tie_observed") return "[EAR-TIE]";
+  return status ? `[EAR:${status.toUpperCase()}]` : "";
+}
+
+/**
+ * Annotate a report with recorded human ear-judge precedents (non-mutating).
+ *
+ * @param {object} report
+ * @param {object|null} precedents - Loaded via loadEarPrecedents or plain { precedents: { [id]: {...} } } / { [id]: {...} }
+ * @returns {object}
+ */
+export function applyEarPrecedents(report, precedents) {
+  if (!report || !precedents || typeof precedents !== "object") return report;
+  const map =
+    precedents.precedents && typeof precedents.precedents === "object"
+      ? precedents.precedents
+      : precedents;
+
+  const falsifiers = Array.isArray(report.falsifiers)
+    ? report.falsifiers.map((dim) => {
+        const prec = Object.prototype.hasOwnProperty.call(map, dim.id) ? map[dim.id] : null;
+        if (!prec || typeof prec !== "object") return dim;
+        const tag = formatPrecedentTag(prec);
+        return {
+          ...dim,
+          earPrecedent: {
+            status: prec.status ?? "unknown",
+            votes: prec.votes ?? null,
+            pValue: prec.pValue ?? null,
+            scope: prec.scope ?? null,
+            note: prec.note ?? "",
+            tag,
+          },
+          earPrecedentTag: tag,
+        };
+      })
+    : [];
+
+  return {
+    ...report,
+    earPrecedentsApplied: true,
+    falsifiers,
+  };
+}
+
 /**
  * Analyze raw audio samples across all configured falsifiers.
  *
@@ -50,7 +107,8 @@ function formatWhere(where) {
  *   includeProfile?: boolean,
  *   thresholds?: Record<string, number | Record<string, number>>,
  *   policy?: "core_veto" | "veto_all" | "shelf_veto",
- *   contestedIds?: Iterable<string>
+ *   contestedIds?: Iterable<string>,
+ *   precedents?: object
  * }} [options={}]
  */
 export function analyzeSamples(samples, sampleRate, options = {}) {
@@ -130,7 +188,7 @@ export function analyzeSamples(samples, sampleRate, options = {}) {
       : `Mirror reflects: ${vetoTriggered.map((t) => `${t.id} (${t.name})`).join("; ")}.`;
   }
 
-  const report = {
+  let report = {
     schema: "unkawaii_report/v0.2",
     label,
     policy,
@@ -145,6 +203,10 @@ export function analyzeSamples(samples, sampleRate, options = {}) {
 
   if (options.includeProfile) {
     report.profile = extractAudioProfile(samples, sampleRate, featOpts);
+  }
+
+  if (options.precedents) {
+    report = applyEarPrecedents(report, options.precedents);
   }
 
   return report;
@@ -246,8 +308,9 @@ export function formatForLLM(report, opts = { verbose: false }) {
             ? "DIAG     "
             : "VETO     "
         : "clear    ";
+      const precTag = dim.earPrecedentTag ? ` ${dim.earPrecedentTag}` : "";
       lines.push(
-        `  - [${mark}] ${dim.id}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
+        `  - [${mark}] ${dim.id}${precTag}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
       );
       if (dim.triggered && dim.hint) {
         lines.push(`      hint: ${dim.hint}`);
@@ -276,8 +339,9 @@ export function formatForLLM(report, opts = { verbose: false }) {
     if (vetoTriggered.length > 0) {
       lines.push(`VETO (${vetoTriggered.length}):`);
       for (const dim of vetoTriggered) {
+        const precTag = dim.earPrecedentTag ? ` ${dim.earPrecedentTag}` : "";
         lines.push(
-          `  - ${dim.id}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
+          `  - ${dim.id}${precTag}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
         );
         if (dim.hint) {
           lines.push(`      hint: ${dim.hint}`);
@@ -291,8 +355,9 @@ export function formatForLLM(report, opts = { verbose: false }) {
       lines.push(`DIAGNOSTIC (${diagTriggered.length} ${diagLabel}):`);
       for (const dim of diagTriggered) {
         const tag = dim.contested ? " [CONTESTED]" : "";
+        const precTag = dim.earPrecedentTag ? ` ${dim.earPrecedentTag}` : "";
         lines.push(
-          `  - ${dim.id}${tag}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
+          `  - ${dim.id}${tag}${precTag}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
         );
       }
     }

@@ -40,23 +40,31 @@
 ## 現在の見張りメモ（オブザーバー引き継ぎ用・2026-11-24）
 
 - **現行安定版**: `main`（`v0.1.0` — 6次元検出器）
-- **レビュー対象ブランチ**: `dev/v0.4`（ゼロ依存純JS）
-  - **実装済み（v0.2 → v0.3 → v0.4）**:
+- **レビュー対象ブランチ**: `dev/v0.5`（ゼロ依存純JS・"The Neuroscience & Ear-Memory Mirror"）
+  - **実装済み（v0.2 → v0.3 → v0.4 → v0.5）**:
     - 32軸検出器（`F1`–`F32`）の階層分離：**Core-6（`ORIGINAL_6_FALSIFIERS`）**／**診断ツールボックス（`TOOLBOX_FALSIFIERS`: F7–F32 から直交軸を除く25軸）**／**直交軸マップ（`ORTHOGONAL_AXES`: `F30` ステレオ逆相）**
-    - **判定ポリシー（v0.4 既定 = `core_veto`）**: `--policy core_veto|shelf_veto|veto_all`
-      - `core_veto`（コード既定値と完全一致）: 基本6軸のみでハード拒否し、ツールボックス軸は診断ヒントとして非拒否で併記
+    - **判定ポリシー（既定 = `core_veto`）**: `--policy core_veto|shelf_veto|veto_all`
+      - `core_veto`（コード既定値）: 基本6軸のみでハード拒否し、ツールボックス軸は診断ヒントとして非拒否で併記
       - `shelf_veto`（`--policy shelf_veto --contested ...`）: Protected Shelf で `CONTESTED` になった軸の拒否権を自動停止し、クリア済み軸のみで判定
       - `veto_all`: 全32軸でハード拒否（研究・厳格監査向け）
-    - **Protected Shelf 監査エンジン**（`src/shelf.mjs`: `auditFalsifiersAgainstShelf` / `formatShelfAuditForLLM`）と、再現可能な実音監査レポート [bench/real_audio_audit/RESULTS.md](bench/real_audio_audit/RESULTS.md)（Wikimedia Commons 全クリップの検証済みライセンス入り `manifest.json` + ポータブル `--tokiko-dir` 対応 `run_real_audio_audit.mjs` + `results.json`）
-    - **3択ブラインド鏡審査デモ**（Observer #1 提案の v0.4 拡張）[bench/mirror_audit_demo.html](bench/mirror_audit_demo.html)（`「なる」` 3プリセットを **原音 vs 抑揚保持・揺れ弱め版 vs 完全フラット版** の3択完全ブラインドで比較＋長文3ペア、投票後のみ種明かし）
-    - **DSP / 視覚の v0.3 → v0.4 修正**: 周期ベース（cycle-to-cycle）の `jitter` 計測と `F2_PURE_ROBOT` のゼロジッタ定常ロボ音修正、`<80 Hz` ランブル F0 誤認ガード、`60 Hz` MEL 下限の v0.4 テキスト視覚拡張
-  - **オーナー耳ジャッジ結果（v0.2 合成25新軸）**: `👏 でかした/OK: 24` / `🤨 かわいくねーよ: 0` / `F30 ステレオ逆相 = 直交軸（かわいいでもかわいくないでもない）第1号`
+    - **v0.5 神経科学 DSP レンズ & 時間分割ミラー**:
+      - `computeMpsRoughness`（Arnal et al. 2015/2025: `4–16 Hz` 発話帯 vs `30–150 Hz` 粗さ帯）および `computeSubharmonicRatio`（Wilden 1998 / Fitch 2002 / Anikin 2020: 非線形サブハーモニクス $f_0/2$）を `extractFeatures` とコンパクト視覚（`MPS30-150`, `SUBH`）へ統合
+      - `extractSegmentTimeline` / `renderSegmentTimeline` / `--timeline`（`0.5s` 窓の Presence × MPS 30–150 Hz × F0 の4行スパークライン）
+    - **v0.5 永続耳判例メモリ（`--shelf` / `--precedents`）**:
+      - オーナーのブラインド3択・2択鏡審査結果（`🪞 原音派 = 5 / 🎯 抑揚あり・揺れ弱め派 = 0 / 📏 フラット派 = 0 / 🤷 どれも同じ = 1`, `p < 0.01`）を [MIRROR_AUDIT_VERDICT.md](bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md) と [ear_precedents.json](bench/real_audio_audit/ear_precedents.json) に永続化し、`loadEarPrecedents` / `applyEarPrecedents` で `[EAR-OVERRULED 5-0]` / `[ORTHOGONAL]` / `[EAR-TIE]` を LLM 出力に併記
+    - **Protected Shelf 監査 & 実音監査レポート**: [bench/real_audio_audit/RESULTS.md](bench/real_audio_audit/RESULTS.md)（Wikimedia Commons 20クリップ + `tokiko` 9クリップ）
+      - `mpsRoughness30_150`: `tokiko` 棚 mean **0.0123**（max `0.0193`）／統合保護棚19本 mean **0.0208**（max `0.0767`）vs 期待かわいくない実音5本 mean **0.0813**（max `0.2459`；`tokiko` max 超え **4/5**、統合棚 max 超え **2/5**）
+      - `subharmonicRatio`: 統合保護棚 mean **0.0677**（max `0.1663`）vs 期待かわいくない実音 mean **0.0769**（max `0.1285`；単体ゼロFP分離は 0/5 のため非拒否診断レンズとして運用）
+    - **3択ブラインド鏡審査デモ**: [bench/mirror_audit_demo.html](bench/mirror_audit_demo.html)
+    - **DSP / 視覚の v0.3–v0.4 基盤**: 周期ベース（cycle-to-cycle）の `jitter` 計測と `F2_PURE_ROBOT` のゼロジッタ定常ロボ音修正、`<80 Hz` ランブル F0 誤認ガード、`60 Hz` MEL 下限のテキスト視覚拡張
+  - **オーナー耳ジャッジ結果**:
+    - v0.2 合成25新軸: `👏 でかした/OK: 24` / `🤨 かわいくねーよ: 0` / `F30 ステレオ逆相 = 直交軸（かわいいでもかわいくないでもない）第1号`
+    - v0.4 ブラインド鏡審査（[MIRROR_AUDIT_VERDICT.md](bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md)）: `原音派 5–0`（`p < 0.01`）＋ `#4 わたし` tie → `F24` の単独拒否権を正式に否定し、耳判例メモリへ記録
   - **重要：LLM 視覚の読解力と、検出器の誤爆率（FPR）を明確に区別すること**:
-    - **LLM 視覚の読解力（目隠し視力検査・ラベル全隠し）**: 一般実音10本で **v0.1（数値のみ）25/100 → v0.2（コンパクト視覚）80/100**、動物・子ども vs 大人5ペアで **v0.1 3/5 → v0.2 4/5**。これは「LLM が音声視覚テキストから音の構造を読める」証拠であり、**検出器32軸の誤爆率の低さを意味しない**。
+    - **LLM 視覚の読解力（目隠し視力検査・ラベル全隠し）**: 一般実音10本で **v0.1（数値のみ）25/100 → v0.2（コンパクト視覚）80/100**、動物・子ども vs 大人5ペアで **v0.1 3/5 → v0.2 4/5**。
     - **検出器の誤爆率（実音＋`tokiko` 保護棚19本の再現監査: [RESULTS.md](bench/real_audio_audit/RESULTS.md)）**:
-      - `core_veto`（F1–F6・v0.4既定）: 保護棚生存率 **68.4%（13/19）**（`tokiko` 単体 **88.9% = 8/9**）／期待かわいくない実音再現率 **60.0%（3/5）**
-      - `shelf_veto`（棚クリア19軸）: インサンプル保護棚生存率 **100.0%（19/19）**／**アウトオブサンプル汎化: LOO 78.9%（15/19）、Cross-Domain Real→`tokiko` 66.7%（6/9）、`tokiko`→Real 30.0%（3/10）**／期待かわいくない実音再現率 **60.0%（3/5、LOO 3–4/5；`F25` 無声ヒス誤爆修正後）**
-      - `veto_all`（F1–F32）: 保護棚生存率 **5.3%（1/19）**（`tokiko` 単体 **0.0% = 0/9**）／期待かわいくない実音再現率 **100.0%（5/5）** — `F24`（57.9%）、`F23`（47.4%）、`F14`（36.8%）など計 **13軸が `CONTESTED`**。
-      - この事実に基づき、v0.4 では `core_veto` をコード既定とし、`shelf_veto` + Protected Shelf 監査 + 3択ブラインド鏡審査（[mirror_audit_demo.html](bench/mirror_audit_demo.html)）で鏡自身を耳で検証する運用を確立した。
+      - `core_veto`（F1–F6・既定）: 保護棚生存率 **68.4%（13/19）**（`tokiko` 単体 **88.9% = 8/9**）／期待かわいくない実音再現率 **60.0%（3/5）**
+      - `shelf_veto`（棚クリア19軸）: インサンプル **100.0%（19/19）**／**アウトオブサンプル汎化: LOO 78.9%（15/19）、Real→`tokiko` 66.7%（6/9）、`tokiko`→Real 30.0%（3/10）**／期待かわいくない実音再現率 **60.0%（3/5、LOO 3–4/5）**
+      - `veto_all`（F1–F32）: 保護棚生存率 **5.3%（1/19）**（`tokiko` 単体 **0.0% = 0/9**）／期待かわいくない実音再現率 **100.0%（5/5）** — 計 **13軸が `CONTESTED`**。
 - **番人への申し送り**: オーナーが疲れているときは細かい設計論議を振らず、**「耳で聴ける A/B デモ」と「3行サマリー」** だけ差し出すこと。
 

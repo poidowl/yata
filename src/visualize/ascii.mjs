@@ -402,7 +402,9 @@ function computeSummaryStats(prof, rep) {
     hnrs.length ? hnrs.reduce((a, b) => a + b, 0) / hnrs.length : 0
   );
   const meanHf = finite(rep.features?.meanHfRatio, frames.length ? hfSum / frames.length : 0);
-  return { peak, rmsDb, medF0, meanHnr, meanHf };
+  const mpsRough = finite(rep.features?.mpsRoughness30_150, 0);
+  const subh = finite(rep.features?.subharmonicRatio, 0);
+  return { peak, rmsDb, medF0, meanHnr, meanHf, mpsRough, subh };
 }
 
 function formatWhere(where) {
@@ -478,7 +480,7 @@ export function renderTextVision(profile, report = null, opts = {}) {
       ? ` ZOOM ${fmtNum(win.startSec, 2)}..${fmtNum(win.endSec, 2)}s(${win.reason})`
       : "";
     lines.push(
-      `YATA [${rep.label}] ${rep.verdict} (${rep.triggeredCount}/${rep.totalFalsifiers}) ${fmtNum(prof.durationSec, 2)}s ${prof.sampleRate}Hz pk=${fmtNum(stats.peak, 2)} F0=${Math.round(stats.medF0)}Hz${zoomTag}`
+      `YATA [${rep.label}] ${rep.verdict} (${rep.triggeredCount}/${rep.totalFalsifiers}) ${fmtNum(prof.durationSec, 2)}s ${prof.sampleRate}Hz pk=${fmtNum(stats.peak, 2)} F0=${Math.round(stats.medF0)}Hz MPS30-150=${fmtNum(stats.mpsRough, 2)} SUBH=${fmtNum(stats.subh, 2)}${zoomTag}`
     );
     lines.push(`ENV ${vSep}${envLine}${vSep}`);
     lines.push(`F0  ${vSep}${f0Line}${vSep}`);
@@ -520,7 +522,7 @@ export function renderTextVision(profile, report = null, opts = {}) {
     const lines = [];
     lines.push(`=== YATA VISION [${rep.label}] ===`);
     lines.push(
-      `VERDICT: ${rep.verdict} (${rep.triggeredCount}/${rep.totalFalsifiers}) | dur=${fmtNum(prof.durationSec, 2)}s sr=${prof.sampleRate}Hz | pk=${fmtNum(stats.peak, 2)} rms=${fmtNum(stats.rmsDb, 1)}dB F0=${Math.round(stats.medF0)}Hz HNR=${fmtNum(stats.meanHnr, 1)}dB`
+      `VERDICT: ${rep.verdict} (${rep.triggeredCount}/${rep.totalFalsifiers}) | dur=${fmtNum(prof.durationSec, 2)}s sr=${prof.sampleRate}Hz | pk=${fmtNum(stats.peak, 2)} rms=${fmtNum(stats.rmsDb, 1)}dB F0=${Math.round(stats.medF0)}Hz HNR=${fmtNum(stats.meanHnr, 1)}dB MPS30-150=${fmtNum(stats.mpsRough, 2)} SUBH=${fmtNum(stats.subh, 2)}`
     );
     lines.push(
       win.active
@@ -592,7 +594,7 @@ export function renderTextVision(profile, report = null, opts = {}) {
     `VERDICT: ${rep.verdict} (${rep.triggeredCount}/${rep.totalFalsifiers}) | dur=${fmtNum(prof.durationSec, 3)}s | sr=${prof.sampleRate}Hz | frames=${prof.frames.length}`
   );
   lines.push(
-    `STATS: peak=${fmtNum(stats.peak, 3)} | rms=${fmtNum(stats.rmsDb, 1)}dB | F0=${Math.round(stats.medF0)}Hz | HNR=${fmtNum(stats.meanHnr, 1)}dB | meanHF=${fmtNum(stats.meanHf, 3)}`
+    `STATS: peak=${fmtNum(stats.peak, 3)} | rms=${fmtNum(stats.rmsDb, 1)}dB | F0=${Math.round(stats.medF0)}Hz | HNR=${fmtNum(stats.meanHnr, 1)}dB | meanHF=${fmtNum(stats.meanHf, 3)} | MPS30-150=${fmtNum(stats.mpsRough, 3)} | SUBH=${fmtNum(stats.subh, 3)}`
   );
   lines.push(
     win.active
@@ -772,4 +774,52 @@ export function renderTextDiff(profileA, profileB, reportA = null, reportB = nul
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Ultra-compact 3-track time-segmented mirror renderer (Presence vs MPS 30–150Hz Roughness vs F0).
+ * Designed to fit in 4 lines (header + 3 tracks) for low-token LLM inspection of coexisting
+ * kawaii + unkawaii segments across time.
+ *
+ * @param {object} timeline - Output of extractSegmentTimeline
+ * @param {{ charset?: "ascii" | "unicode", width?: number }} [opts={}]
+ * @returns {string}
+ */
+export function renderSegmentTimeline(timeline, opts = {}) {
+  const segs = Array.isArray(timeline?.segments) ? timeline.segments : [];
+  const dur = finite(timeline?.durationSec, 0);
+  const winSec = finite(timeline?.windowSec, 0.5);
+  const unicode = opts?.charset === "unicode";
+  const ramp = unicode ? SPARK_UNICODE : SPARK_ASCII;
+  const vSep = unicode ? "│" : "|";
+
+  if (segs.length === 0) {
+    return `[YATA TIMELINE] dur=${fmtNum(dur, 2)}s win=${fmtNum(winSec, 2)}s (0 segs — empty/silent)`;
+  }
+
+  const width = clamp(Math.floor(finite(opts?.width, Math.max(segs.length * 2, 16))), segs.length, 64);
+  const presVals = segs.map((s) => finite(s.presence, 0));
+  const mpsVals = segs.map((s) => finite(s.mpsRoughness30_150, 0));
+  const f0Vals = segs.map((s) => finite(s.medianF0, 0));
+
+  const maxMps = Math.max(0.25, ...mpsVals);
+  const maxF0 = Math.max(400, ...f0Vals);
+
+  const presSpark = renderSparkline(presVals, width, 0, 1, ramp);
+  const mpsSpark = renderSparkline(mpsVals, width, 0, maxMps, ramp);
+  const f0Spark = renderSparkline(f0Vals, width, 0, maxF0, ramp);
+
+  const maxInline = 8;
+  const shown = segs.slice(0, maxInline);
+  const suffix = segs.length > maxInline ? ` +${segs.length - maxInline}` : "";
+  const presSummary = shown.map((s) => `${fmtNum(s.startSec, 1)}s:${fmtNum(s.presence, 2)}`).join(" ");
+  const mpsSummary = shown.map((s) => `${fmtNum(s.startSec, 1)}s:${fmtNum(s.mpsRoughness30_150, 2)}`).join(" ");
+  const f0Summary = shown.map((s) => `${Math.round(finite(s.medianF0, 0))}Hz`).join(" ");
+
+  return [
+    `[YATA TIMELINE] dur=${fmtNum(dur, 2)}s win=${fmtNum(winSec, 2)}s (${segs.length} segs)`,
+    `PRES      ${vSep}${presSpark}${vSep} ${presSummary}${suffix}`,
+    `MPS30-150 ${vSep}${mpsSpark}${vSep} ${mpsSummary}${suffix}`,
+    `F0        ${vSep}${f0Spark}${vSep} ${f0Summary}${suffix}`,
+  ].join("\n");
 }

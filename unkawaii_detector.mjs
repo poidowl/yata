@@ -24,7 +24,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { decodeWavBuffer, encodeWavBuffer } from "./src/wav.mjs";
-import { extractFeatures, extractAudioProfile } from "./src/features.mjs";
+import { extractFeatures, extractAudioProfile, extractSegmentTimeline } from "./src/features.mjs";
 import {
   ORIGINAL_6_FALSIFIERS,
   DEFAULT_FALSIFIERS,
@@ -33,10 +33,16 @@ import {
   createFalsifiers,
 } from "./src/falsifiers/index.mjs";
 import { analyzeSamples, compareReports, formatForLLM, formatCompareForLLM } from "./src/report.mjs";
-import { auditFalsifiersAgainstShelf, formatShelfAuditForLLM } from "./src/shelf.mjs";
+import {
+  auditFalsifiersAgainstShelf,
+  formatShelfAuditForLLM,
+  loadEarPrecedents,
+  applyEarPrecedents,
+} from "./src/shelf.mjs";
 import {
   renderTextVision,
   renderTextDiff,
+  renderSegmentTimeline,
   renderSvgVision,
   renderSvgDiff,
   renderPngVision,
@@ -46,7 +52,7 @@ import { buildCorpus } from "./src/synth.mjs";
 import { runDiscoveryLoop, formatDiscoveryForLLM } from "./src/discovery.mjs";
 
 // ============================================================================
-// Public Programmatic API (v0.1 backward-compatible + v0.2/v0.3 extensions)
+// Public Programmatic API (v0.1 backward-compatible + v0.2/v0.3/v0.5 extensions)
 // ============================================================================
 export {
   // v0.1 core exports
@@ -76,6 +82,11 @@ export {
   TOOLBOX_FALSIFIERS,
   auditFalsifiersAgainstShelf,
   formatShelfAuditForLLM,
+  // v0.5 extensions
+  extractSegmentTimeline,
+  renderSegmentTimeline,
+  loadEarPrecedents,
+  applyEarPrecedents,
 };
 
 // ============================================================================
@@ -84,11 +95,13 @@ export {
 const USAGE = `Usage:
   node unkawaii_detector.mjs <file.wav> [--format llm|json] [--verbose] [--falsifiers all|core]
                                         [--policy core_veto|veto_all|shelf_veto] [--contested <ID1,ID2,...>]
-                                        [--view [micro|compact|full]] [--zoom [auto|<t0>..<t1>]]
+                                        [--precedents <path.json> | --shelf <path.json>]
+                                        [--view [micro|compact|full]] [--zoom [auto|<t0>..<t1>]] [--timeline]
                                         [--charset ascii|unicode] [--width <N>]
                                         [--svg <out.svg>] [--png <out.png>]
   node unkawaii_detector.mjs --compare <a.wav> <b.wav> [--format llm|json] [--verbose] [--falsifiers all|core]
                                                        [--policy core_veto|veto_all|shelf_veto] [--contested <ID1,ID2,...>]
+                                                       [--precedents <path.json> | --shelf <path.json>]
                                                        [--view [micro|compact|full]] [--svg <out.svg>] [--png <out.png>]
   node unkawaii_detector.mjs --diff <a.wav> <b.wav> [--falsifiers all|core] [--policy core_veto|veto_all|shelf_veto]
                                                     [--contested <ID1,ID2,...>]
@@ -123,6 +136,8 @@ function parseCliArgs(argv) {
     falsifiersSet: "all",
     policy: "core_veto",
     contestedIds: [],
+    precedentsPath: null,
+    timeline: false,
     view: null, // null | "micro" | "compact" | "full"
     zoom: null, // null | "auto" | { startSec, endSec }
     charset: "ascii",
@@ -218,6 +233,20 @@ function parseCliArgs(argv) {
       continue;
     }
 
+    if (arg === "--precedents" || arg === "--shelf") {
+      const val = argv[++i];
+      if (!val || val.startsWith("-")) {
+        throw new Error(`${arg} requires a JSON file path`);
+      }
+      opts.precedentsPath = val;
+      continue;
+    }
+
+    if (arg === "--timeline") {
+      opts.timeline = true;
+      continue;
+    }
+
     if (arg === "--view") {
       const next = argv[i + 1];
       if (next && VIEW_MODES.has(next)) {
@@ -306,6 +335,7 @@ function runCli(argv) {
   }
 
   const falsifiers = opts.falsifiersSet === "core" ? ORIGINAL_6_FALSIFIERS : DEFAULT_FALSIFIERS;
+  const precedentsOpt = opts.precedentsPath ? { precedents: loadEarPrecedents(opts.precedentsPath) } : {};
 
   if (opts.mode === "list") {
     const list = falsifiers.map((f) => ({ id: f.id, domain: f.domain, name: f.name }));
@@ -350,6 +380,7 @@ function runCli(argv) {
       falsifiers,
       policy: opts.policy,
       ...contestedOpt,
+      ...precedentsOpt,
       ...chA,
     });
     const repB = analyzeSamples(wavB.samples, wavB.sampleRate, {
@@ -357,6 +388,7 @@ function runCli(argv) {
       falsifiers,
       policy: opts.policy,
       ...contestedOpt,
+      ...precedentsOpt,
       ...chB,
     });
 
@@ -413,11 +445,18 @@ function runCli(argv) {
     falsifiers,
     policy: opts.policy,
     ...contestedOpt,
+    ...precedentsOpt,
     ...chOpt,
   });
 
-  const needProfile = Boolean(opts.view) || Boolean(opts.zoom) || Boolean(opts.svgOut) || Boolean(opts.pngOut);
+  const needProfile =
+    Boolean(opts.view) ||
+    Boolean(opts.zoom) ||
+    Boolean(opts.timeline) ||
+    Boolean(opts.svgOut) ||
+    Boolean(opts.pngOut);
   const profile = needProfile ? extractAudioProfile(wav.samples, wav.sampleRate, chOpt) : null;
+  const timeline = opts.timeline ? extractSegmentTimeline(profile, wav.samples, wav.sampleRate) : null;
 
   if (opts.svgOut) {
     fs.writeFileSync(opts.svgOut, renderSvgVision(profile, rep), "utf8");
@@ -427,18 +466,27 @@ function runCli(argv) {
   }
 
   if (opts.format === "json") {
-    console.log(JSON.stringify(rep, null, 2));
+    const outObj = timeline ? { ...rep, timeline } : rep;
+    console.log(JSON.stringify(outObj, null, 2));
   } else if (opts.view || opts.zoom) {
-    console.log(
+    const parts = [
       renderTextVision(profile, rep, {
         mode: opts.view || "compact",
         width: opts.width,
         charset: opts.charset,
         zoom: opts.zoom,
-      })
-    );
+      }),
+    ];
+    if (timeline) {
+      parts.push("", renderSegmentTimeline(timeline, { charset: opts.charset }));
+    }
+    console.log(parts.join("\n"));
   } else {
-    console.log(formatForLLM(rep, { verbose: opts.verbose }));
+    const parts = [formatForLLM(rep, { verbose: opts.verbose })];
+    if (timeline) {
+      parts.push("", renderSegmentTimeline(timeline, { charset: opts.charset }));
+    }
+    console.log(parts.join("\n"));
   }
 }
 

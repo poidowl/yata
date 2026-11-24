@@ -9,6 +9,8 @@ import {
   computeRoughness,
   computeCepstrumComb,
   computeModulationDft,
+  computeMpsRoughness,
+  computeSubharmonicRatio,
 } from "../src/dsp.mjs";
 import { extractAudioProfile, extractFeatures } from "../src/features.mjs";
 import { extractFeatures as extractFeaturesV01 } from "../unkawaii_detector.mjs";
@@ -117,6 +119,10 @@ const EXPECTED_NEW_KEYS = [
   "lowToMidTiltDb",
   "midHighFlatness",
   "meanSpectralFlux",
+  "mpsSpeech4_16",
+  "mpsRoughness30_150",
+  "mpsRoughToSpeechRatio",
+  "subharmonicRatio",
 ];
 
 test("fftRadix2: Parseval energy conservation < 1e-6 and pure sine peak > 40 dB SNR", () => {
@@ -581,4 +587,87 @@ test("performance: 2s 44.1kHz feature extraction completes well under 150ms", ()
 
   assert.ok(feat.frameCount > 180);
   assert.ok(medianMs < 150, `Expected median < 150ms for 2s 44.1kHz WAV, got ${medianMs.toFixed(1)}ms (${times.map((t) => t.toFixed(1)).join(", ")})`);
+});
+
+test("v0.5 computeMpsRoughness: 70 Hz AM scream/alarm roughness >> 5 Hz speech-modulated voice", () => {
+  const sr = 24000;
+  const dur = 1.0;
+  const n = Math.round(sr * dur);
+
+  // Normal speech-modulated voice (5 Hz syllabic amplitude modulation)
+  const speech = new Float32Array(n);
+  // Rough 70 Hz AM scream/alarm signal (Arnal 30-150 Hz niche)
+  const rough = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const carrier = 0.65 * Math.sin(2 * Math.PI * 340 * t) + 0.25 * Math.sin(2 * Math.PI * 680 * t);
+    speech[i] = 0.5 * (1 + 0.85 * Math.sin(2 * Math.PI * 5 * t)) * carrier;
+    rough[i] = 0.5 * (1 + 0.9 * Math.sin(2 * Math.PI * 70 * t)) * carrier;
+  }
+
+  const mpsSpeech = computeMpsRoughness(speech, sr);
+  const mpsRough = computeMpsRoughness(rough, sr);
+
+  assert.ok(
+    mpsSpeech.mpsSpeech4_16 > 0.08 && mpsSpeech.mpsRoughness30_150 < 0.02,
+    `Expected speech to dominate 4-16 Hz, got ${JSON.stringify(mpsSpeech)}`
+  );
+  assert.ok(
+    mpsRough.mpsRoughness30_150 > mpsSpeech.mpsRoughness30_150 * 8 && mpsRough.mpsRoughness30_150 > 0.12,
+    `Expected 70 Hz AM roughness (${mpsRough.mpsRoughness30_150}) >> 5 Hz speech (${mpsSpeech.mpsRoughness30_150})`
+  );
+  assert.ok(
+    mpsRough.mpsRoughToSpeechRatio > mpsSpeech.mpsRoughToSpeechRatio * 20,
+    `Expected rough/speech ratio separation, got rough=${mpsRough.mpsRoughToSpeechRatio} vs speech=${mpsSpeech.mpsRoughToSpeechRatio}`
+  );
+
+  // Edge cases: silence and 15ms clip stay finite
+  const sil = computeMpsRoughness(new Float32Array(sr * 0.5), sr);
+  const tiny = computeMpsRoughness(makeSine(300, 0.015, sr, 0.5), sr);
+  for (const res of [sil, tiny]) {
+    assert.ok(Number.isFinite(res.mpsSpeech4_16));
+    assert.ok(Number.isFinite(res.mpsRoughness30_150));
+    assert.ok(Number.isFinite(res.mpsRoughToSpeechRatio));
+  }
+});
+
+test("v0.5 computeSubharmonicRatio: period-doubled (f0 + f0/2) growl > clean harmonic voice", () => {
+  const sr = 24000;
+  const dur = 0.6;
+  const n = Math.round(sr * dur);
+  const f0 = 240;
+
+  const clean = new Float32Array(n);
+  const growl = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const base =
+      0.62 * Math.sin(2 * Math.PI * f0 * t) +
+      0.28 * Math.sin(2 * Math.PI * 2 * f0 * t) +
+      0.11 * Math.sin(2 * Math.PI * 3 * f0 * t);
+    clean[i] = 0.5 * base;
+    // Period-doubling subharmonics at f0/2 and 3*f0/2
+    const sub =
+      0.32 * Math.sin(2 * Math.PI * 0.5 * f0 * t) +
+      0.16 * Math.sin(2 * Math.PI * 1.5 * f0 * t);
+    growl[i] = 0.45 * (base + sub);
+  }
+
+  const hopSize = Math.round(sr * 0.01);
+  const f0Track = new Float32Array(Math.floor(n / hopSize)).fill(f0);
+
+  const cleanDirect = computeSubharmonicRatio(clean, sr, f0Track, hopSize);
+  const growlDirect = computeSubharmonicRatio(growl, sr, f0Track, hopSize);
+  assert.ok(
+    growlDirect > cleanDirect + 0.15,
+    `Expected period-doubled growl subharmonicRatio (${growlDirect}) >> clean (${cleanDirect})`
+  );
+
+  // Also verify via full extractFeatures pipeline (where F0 tracker may lock onto f0 or f0/2)
+  const cleanFeat = extractFeatures(clean, sr);
+  const growlFeat = extractFeatures(growl, sr);
+  assert.ok(
+    growlFeat.subharmonicRatio > cleanFeat.subharmonicRatio + 0.1,
+    `Expected extractFeatures.subharmonicRatio growl (${growlFeat.subharmonicRatio}) > clean (${cleanFeat.subharmonicRatio})`
+  );
 });

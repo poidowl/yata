@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import zlib from "node:zlib";
 
-import { extractAudioProfile } from "../src/features.mjs";
+import { extractAudioProfile, extractSegmentTimeline } from "../src/features.mjs";
+import { encodeWavBuffer } from "../src/wav.mjs";
 import { crc32 } from "../src/visualize/png_encoder.mjs";
 import {
   renderPngDiff,
@@ -11,6 +16,7 @@ import {
   renderSvgVision,
   renderTextDiff,
   renderTextVision,
+  renderSegmentTimeline,
 } from "../src/visualize/index.mjs";
 
 const SR = 24000;
@@ -255,5 +261,69 @@ describe("M3: LLM Audio Vision (Text / SVG / PNG)", () => {
       lowestHz >= 45 && lowestHz <= 90,
       `Expected lowest MEL row label around ~60 Hz (45..90 Hz), got ${lowestHz} Hz`
     );
+  });
+
+  it("v0.5: surfaces MPS30-150 and SUBH in compact/micro headers within line budgets", () => {
+    const richRep = {
+      ...cleanReport,
+      features: { ...cleanReport.features, mpsRoughness30_150: 0.24, subharmonicRatio: 0.31 },
+    };
+    const micro = renderTextVision(warmProfile, richRep, { mode: "micro", charset: "ascii" });
+    const compact = renderTextVision(warmProfile, richRep, { mode: "compact", charset: "ascii" });
+    assert.ok(countLines(micro) <= 15);
+    assert.ok(countLines(compact) <= 32);
+    assert.match(micro, /MPS30-150=0\.24/);
+    assert.match(micro, /SUBH=0\.31/);
+    assert.match(compact, /MPS30-150=0\.24/);
+    assert.match(compact, /SUBH=0\.31/);
+  });
+
+  it("v0.5: extractSegmentTimeline, renderSegmentTimeline, and CLI --timeline distinguish clean first half vs rough 70 Hz AM second half", () => {
+    const dur = 2.0;
+    const n = Math.round(SR * dur);
+    const half = n >> 1;
+    const mixed = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      if (i < half) {
+        // Clean warm voice modulated gently at 4 Hz (speech rhythm)
+        const env = 0.75 + 0.25 * Math.sin(2 * Math.PI * 4 * t);
+        mixed[i] = 0.45 * env * (0.7 * Math.sin(2 * Math.PI * 330 * t) + 0.25 * Math.sin(2 * Math.PI * 660 * t));
+      } else {
+        // Rough 70 Hz AM scream/alarm roughness in second half
+        const am = 0.5 * (1 + 0.95 * Math.sin(2 * Math.PI * 70 * t));
+        mixed[i] = 0.55 * am * (0.6 * Math.sin(2 * Math.PI * 820 * t) + 0.4 * Math.sin(2 * Math.PI * 1240 * t));
+      }
+    }
+
+    const prof = extractAudioProfile(mixed, SR);
+    const tl = extractSegmentTimeline(prof, mixed, SR, { windowSec: 0.5 });
+    assert.equal(tl.segments.length, 4);
+
+    const firstHalfMps = 0.5 * (tl.segments[0].mpsRoughness30_150 + tl.segments[1].mpsRoughness30_150);
+    const secondHalfMps = 0.5 * (tl.segments[2].mpsRoughness30_150 + tl.segments[3].mpsRoughness30_150);
+    assert.ok(
+      secondHalfMps > firstHalfMps * 4 && secondHalfMps > 0.12,
+      `Expected rough second half MPS (${secondHalfMps}) >> clean first half MPS (${firstHalfMps})`
+    );
+
+    const rendered = renderSegmentTimeline(tl, { charset: "ascii" });
+    assert.equal(countLines(rendered), 4, "Segment timeline should be ultra-compact 4 lines");
+    assert.match(rendered, /\[YATA TIMELINE\]/);
+    assert.match(rendered, /PRES/);
+    assert.match(rendered, /MPS30-150/);
+
+    // Verify CLI --timeline flag
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "yata-tl-"));
+    try {
+      const wavPath = path.join(tmpDir, "two_half.wav");
+      fs.writeFileSync(wavPath, encodeWavBuffer(mixed, SR));
+      const cliPath = path.resolve("unkawaii_detector.mjs");
+      const out = execFileSync(process.execPath, [cliPath, wavPath, "--timeline"], { encoding: "utf8" });
+      assert.match(out, /\[YATA TIMELINE\]/);
+      assert.match(out, /MPS30-150/);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });

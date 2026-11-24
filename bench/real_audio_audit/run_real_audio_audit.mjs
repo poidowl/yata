@@ -246,6 +246,10 @@ function analyzePolicies(samples, sampleRate, label, contestedIds = []) {
     f0MedianHz: repAll.features?.medianF0 ?? 0,
     hnrDb: repAll.features?.meanVoicedHnrDb ?? 0,
     jitter: repAll.features?.jitter ?? 0,
+    mpsSpeech4_16: repAll.features?.mpsSpeech4_16 ?? 0,
+    mpsRoughness30_150: repAll.features?.mpsRoughness30_150 ?? 0,
+    mpsRoughToSpeechRatio: repAll.features?.mpsRoughToSpeechRatio ?? 0,
+    subharmonicRatio: repAll.features?.subharmonicRatio ?? 0,
   };
 }
 
@@ -357,6 +361,97 @@ function computeGeneralization(tokikoAudit, benignRealAudit, combinedShelfAudit,
   };
 }
 
+function summarizeMetric(items, key) {
+  const vals = items.map((it) => Number(it?.[key] ?? 0)).filter((v) => Number.isFinite(v));
+  if (vals.length === 0) return { count: 0, mean: 0, min: 0, max: 0 };
+  const sum = vals.reduce((a, b) => a + b, 0);
+  return {
+    count: vals.length,
+    mean: Number((sum / vals.length).toFixed(4)),
+    min: Number(Math.min(...vals).toFixed(4)),
+    max: Number(Math.max(...vals).toFixed(4)),
+  };
+}
+
+function computeNeuroscienceLensSummary(perClipTokiko, benignRealEntries, expectedUnkawaiiEntries) {
+  const combinedShelf = [...perClipTokiko, ...benignRealEntries];
+  const groups = {
+    tokikoShelf: {
+      count: perClipTokiko.length,
+      mpsRoughness30_150: summarizeMetric(perClipTokiko, "mpsRoughness30_150"),
+      mpsRoughToSpeechRatio: summarizeMetric(perClipTokiko, "mpsRoughToSpeechRatio"),
+      subharmonicRatio: summarizeMetric(perClipTokiko, "subharmonicRatio"),
+    },
+    benignRealShelf: {
+      count: benignRealEntries.length,
+      mpsRoughness30_150: summarizeMetric(benignRealEntries, "mpsRoughness30_150"),
+      mpsRoughToSpeechRatio: summarizeMetric(benignRealEntries, "mpsRoughToSpeechRatio"),
+      subharmonicRatio: summarizeMetric(benignRealEntries, "subharmonicRatio"),
+    },
+    combinedShelf: {
+      count: combinedShelf.length,
+      mpsRoughness30_150: summarizeMetric(combinedShelf, "mpsRoughness30_150"),
+      mpsRoughToSpeechRatio: summarizeMetric(combinedShelf, "mpsRoughToSpeechRatio"),
+      subharmonicRatio: summarizeMetric(combinedShelf, "subharmonicRatio"),
+    },
+    expectedUnkawaii: {
+      count: expectedUnkawaiiEntries.length,
+      mpsRoughness30_150: summarizeMetric(expectedUnkawaiiEntries, "mpsRoughness30_150"),
+      mpsRoughToSpeechRatio: summarizeMetric(expectedUnkawaiiEntries, "mpsRoughToSpeechRatio"),
+      subharmonicRatio: summarizeMetric(expectedUnkawaiiEntries, "subharmonicRatio"),
+    },
+  };
+
+  const shelfMaxMps = groups.combinedShelf.mpsRoughness30_150.max;
+  const tokikoMaxMps = groups.tokikoShelf.mpsRoughness30_150.max;
+  const unkawaiiAboveShelfMaxMps = expectedUnkawaiiEntries.filter(
+    (c) => c.mpsRoughness30_150 > shelfMaxMps
+  );
+  const unkawaiiAboveTokikoMaxMps = expectedUnkawaiiEntries.filter(
+    (c) => c.mpsRoughness30_150 > tokikoMaxMps
+  );
+
+  const shelfMaxSubh = groups.combinedShelf.subharmonicRatio.max;
+  const unkawaiiAboveShelfMaxSubh = expectedUnkawaiiEntries.filter(
+    (c) => c.subharmonicRatio > shelfMaxSubh
+  );
+
+  return {
+    groups,
+    separation: {
+      mpsRoughness30_150: {
+        shelfMax: shelfMaxMps,
+        tokikoMax: tokikoMaxMps,
+        unkawaiiAboveCombinedShelfMax: unkawaiiAboveShelfMaxMps.map((c) => c.id),
+        unkawaiiAboveTokikoMax: unkawaiiAboveTokikoMaxMps.map((c) => c.id),
+        cleanZeroFpSeparation: unkawaiiAboveShelfMaxMps.length === expectedUnkawaiiEntries.length,
+      },
+      subharmonicRatio: {
+        shelfMax: shelfMaxSubh,
+        unkawaiiAboveCombinedShelfMax: unkawaiiAboveShelfMaxSubh.map((c) => c.id),
+      },
+    },
+    perClipExpectedUnkawaii: expectedUnkawaiiEntries.map((c) => ({
+      id: c.id,
+      title: c.title,
+      mpsSpeech4_16: c.mpsSpeech4_16,
+      mpsRoughness30_150: c.mpsRoughness30_150,
+      mpsRoughToSpeechRatio: c.mpsRoughToSpeechRatio,
+      subharmonicRatio: c.subharmonicRatio,
+    })),
+    perClipShelfTopMps: [...combinedShelf]
+      .sort((a, b) => b.mpsRoughness30_150 - a.mpsRoughness30_150)
+      .slice(0, 6)
+      .map((c) => ({
+        id: c.id,
+        label: c.title || `${c.preset}:${c.utterance}`,
+        mpsRoughness30_150: c.mpsRoughness30_150,
+        mpsRoughToSpeechRatio: c.mpsRoughToSpeechRatio,
+        subharmonicRatio: c.subharmonicRatio,
+      })),
+  };
+}
+
 function buildMarkdownReport(summary) {
   const {
     generatedAt,
@@ -369,17 +464,18 @@ function buildMarkdownReport(summary) {
     shelfVetoSummary,
     generalization,
     expectedUnkawaiiSummary,
+    neuroscienceLenses,
     perClipReal,
     perClipTokiko,
   } = summary;
 
   const lines = [];
-  lines.push("# yata v0.4 — Reproducible Real-Audio & Protected Shelf Audit (`RESULTS.md`)");
+  lines.push("# yata v0.5 — Reproducible Real-Audio & Protected Shelf Audit (`RESULTS.md`)");
   lines.push("");
   lines.push(`Generated: \`${generatedAt}\` by \`node bench/real_audio_audit/run_real_audio_audit.mjs\``);
   lines.push(`Manifest: [\`manifest.json\`](./manifest.json) (${realClipCount} trimmed 24kHz mono clips from 16 Wikimedia Commons sources with verified licenses + ${tokikoCount} \`tokiko-axis\` clips).`);
   lines.push("");
-  lines.push("> **Brutal Honesty First**: On synthetic unit tests, all 32 falsifiers pass 100%. On **real human/animal recordings and `tokiko-axis` Japanese speech**, running all 32 axes with unilateral veto power (`--policy veto_all`) causes a high false-positive rate. This report quantifies that exact gap across **`core_veto`** (v0.4 default), **`shelf_veto`** (suspends veto on shelf-contested axes), and **`veto_all`**, reports **out-of-sample Leave-One-Out (LOO) & cross-domain generalization** (not just in-sample 100%), lists every `CONTESTED` axis, and separates **LLM visual readability** from **detector precision/recall**.");
+  lines.push("> **Brutal Honesty First**: On synthetic unit tests, all 32 falsifiers pass 100%. On **real human/animal recordings and `tokiko-axis` Japanese speech**, running all 32 axes with unilateral veto power (`--policy veto_all`) causes a high false-positive rate. This report quantifies that exact gap across **`core_veto`** (default), **`shelf_veto`** (suspends veto on shelf-contested axes), and **`veto_all`**, reports **out-of-sample Leave-One-Out (LOO) & cross-domain generalization**, lists every `CONTESTED` axis, separates **LLM visual readability** from **detector precision/recall**, and evaluates the **v0.5 neuroscience DSP lenses** (Arnal `30–150 Hz` MPS roughness & nonlinear subharmonics) honestly on real audio.");
   lines.push("");
 
   // Section A
@@ -441,7 +537,7 @@ function buildMarkdownReport(summary) {
     lines.push(`| \`${c.id}\` | ${c.title} | ${coreTxt} | ${shelfTxt} | ${allTxt} |`);
   }
   lines.push("");
-  lines.push("This confirms why v0.4 makes **`--policy core_veto`** the default (Core-6 hard veto + `TOOLBOX_FALSIFIERS` F7–F32 as non-vetoing diagnostics, `F30` in `ORTHOGONAL_AXES`), and provides **`--policy shelf_veto --contested ...`** to automatically suspend veto power on every axis marked `CONTESTED` by the Protected Shelf.");
+  lines.push("This confirms why **`--policy core_veto`** is the default (Core-6 hard veto + `TOOLBOX_FALSIFIERS` F7–F32 as non-vetoing diagnostics, `F30` in `ORTHOGONAL_AXES`), and why **`--policy shelf_veto --contested ...`** plus persistent ear-precedent memory ([`ear_precedents.json`](./ear_precedents.json)) are provided.");
   lines.push("");
 
   // Section B
@@ -472,25 +568,25 @@ function buildMarkdownReport(summary) {
   // Per-clip breakdown tables
   lines.push("### Per-Clip Breakdown: `tokiko-axis` Speech (9 clips)");
   lines.push("");
-  lines.push("| Clip ID | Utterance | Preset | `core_veto` | `shelf_veto` | `veto_all` Triggered Axes | F0 med | Jitter |");
-  lines.push("| :--- | :--- | :--- | :--- | :--- | :--- | ---: | ---: |");
+  lines.push("| Clip ID | Utterance | Preset | `core_veto` | `shelf_veto` | `veto_all` Triggered Axes | F0 med | Jitter | MPS 30–150 | Subh |");
+  lines.push("| :--- | :--- | :--- | :--- | :--- | :--- | ---: | ---: | ---: | ---: |");
   for (const c of perClipTokiko) {
     const coreTxt = c.coreTriggered.length ? c.coreTriggered.map(shortAxisId).join(", ") : "PASS";
     const shelfTxt = c.shelfTriggered.length ? c.shelfTriggered.map(shortAxisId).join(", ") : "PASS";
     const allTxt = c.allTriggered.length ? c.allTriggered.map(shortAxisId).join(", ") : "CLEAN";
-    lines.push(`| \`${c.id}\` | ${c.utterance} | \`${c.preset}\` | ${coreTxt} | ${shelfTxt} | ${allTxt} | ${c.f0MedianHz} Hz | ${c.jitter} |`);
+    lines.push(`| \`${c.id}\` | ${c.utterance} | \`${c.preset}\` | ${coreTxt} | ${shelfTxt} | ${allTxt} | ${c.f0MedianHz} Hz | ${c.jitter} | ${c.mpsRoughness30_150} | ${c.subharmonicRatio} |`);
   }
   lines.push("");
 
   lines.push("### Per-Clip Breakdown: Real Wikimedia Commons Audio (20 clips)");
   lines.push("");
-  lines.push("| Clip ID | Suite | Group | Title | License | SHA-256 | `core_veto` | `shelf_veto` | `veto_all` Triggered Axes |");
-  lines.push("| :--- | :--- | :--- | :--- | :--- | :---: | :--- | :--- | :--- |");
+  lines.push("| Clip ID | Suite | Group | Title | License | SHA-256 | `core_veto` | `shelf_veto` | `veto_all` Triggered Axes | MPS 30–150 | Subh |");
+  lines.push("| :--- | :--- | :--- | :--- | :--- | :---: | :--- | :--- | :--- | ---: | ---: |");
   for (const c of perClipReal) {
     const coreTxt = c.coreTriggered.length ? c.coreTriggered.map(shortAxisId).join(", ") : "PASS";
     const shelfTxt = c.shelfTriggered.length ? c.shelfTriggered.map(shortAxisId).join(", ") : "PASS";
     const allTxt = c.allTriggered.length ? c.allTriggered.map(shortAxisId).join(", ") : "CLEAN";
-    lines.push(`| \`${c.id}\` | ${c.suite} | \`${c.auditGroup}\` | ${c.title} | ${c.license} | ${c.sha256Match ? "✅" : "⚠️"} | ${coreTxt} | ${shelfTxt} | ${allTxt} |`);
+    lines.push(`| \`${c.id}\` | ${c.suite} | \`${c.auditGroup}\` | ${c.title} | ${c.license} | ${c.sha256Match ? "✅" : "⚠️"} | ${coreTxt} | ${shelfTxt} | ${allTxt} | ${c.mpsRoughness30_150} | ${c.subharmonicRatio} |`);
   }
   lines.push("");
 
@@ -514,6 +610,33 @@ function buildMarkdownReport(summary) {
   lines.push("  - *Prompt*: `For each pair (Pair_1..Pair_5), decide whether A or B is the BABY/SMALL/FRIENDLY voice and which is the ADULT/LARGE/MENACING voice.` (A/B order randomized per pair; filenames stripped).");
   lines.push("  - *Rubric*: 1 point per pair (5 total), binary accuracy against ground truth.");
   lines.push("");
+
+  // Section D: v0.5 Neuroscience Lenses
+  if (neuroscienceLenses) {
+    const g = neuroscienceLenses.groups;
+    const sep = neuroscienceLenses.separation;
+    const fmtStats = (s) => `mean **${s.mean}** (min ${s.min}, max ${s.max})`;
+    lines.push("## D. Neuroscience DSP Lenses (v0.5): Arnal MPS 30–150 Hz Roughness & Nonlinear Subharmonics");
+    lines.push("");
+    lines.push("Honest real-audio evaluation of `mpsRoughness30_150` & `mpsRoughToSpeechRatio` (Arnal et al. 2015/2025) and `subharmonicRatio` (Wilden et al. 1998 / Fitch et al. 2002 / Anikin 2020) across the 19 Protected Shelf clips vs 5 Expected-Unkawaii clips:");
+    lines.push("");
+    lines.push("| Group | Clips | `mpsRoughness30_150` | `mpsRoughToSpeechRatio` | `subharmonicRatio` |");
+    lines.push("| :--- | ---: | :--- | :--- | :--- |");
+    lines.push(`| **\`tokiko-axis\` Speech Shelf** | ${g.tokikoShelf.count} | ${fmtStats(g.tokikoShelf.mpsRoughness30_150)} | ${fmtStats(g.tokikoShelf.mpsRoughToSpeechRatio)} | ${fmtStats(g.tokikoShelf.subharmonicRatio)} |`);
+    lines.push(`| **Benign Real Wikimedia Shelf** | ${g.benignRealShelf.count} | ${fmtStats(g.benignRealShelf.mpsRoughness30_150)} | ${fmtStats(g.benignRealShelf.mpsRoughToSpeechRatio)} | ${fmtStats(g.benignRealShelf.subharmonicRatio)} |`);
+    lines.push(`| **Combined Protected Shelf** | ${g.combinedShelf.count} | ${fmtStats(g.combinedShelf.mpsRoughness30_150)} | ${fmtStats(g.combinedShelf.mpsRoughToSpeechRatio)} | ${fmtStats(g.combinedShelf.subharmonicRatio)} |`);
+    lines.push(`| **Expected-Unkawaii Real Audio** | ${g.expectedUnkawaii.count} | ${fmtStats(g.expectedUnkawaii.mpsRoughness30_150)} | ${fmtStats(g.expectedUnkawaii.mpsRoughToSpeechRatio)} | ${fmtStats(g.expectedUnkawaii.subharmonicRatio)} |`);
+    lines.push("");
+    lines.push(`- **Zero-FP Separation Check (\`mpsRoughness30_150\`)**: Combined Protected Shelf max = \`${sep.mpsRoughness30_150.shelfMax}\` (\`tokiko\` max = \`${sep.mpsRoughness30_150.tokikoMax}\`). Expected-Unkawaii clips strictly above combined shelf max: **${sep.mpsRoughness30_150.unkawaiiAboveCombinedShelfMax.length}/${expectedUnkawaiiCount}** (${sep.mpsRoughness30_150.unkawaiiAboveCombinedShelfMax.length ? sep.mpsRoughness30_150.unkawaiiAboveCombinedShelfMax.map((id) => `\`${id}\``).join(", ") : "none"}); strictly above \`tokiko\` max: **${sep.mpsRoughness30_150.unkawaiiAboveTokikoMax.length}/${expectedUnkawaiiCount}** (${sep.mpsRoughness30_150.unkawaiiAboveTokikoMax.length ? sep.mpsRoughness30_150.unkawaiiAboveTokikoMax.map((id) => `\`${id}\``).join(", ") : "none"}).`);
+    lines.push(`- **Zero-FP Separation Check (\`subharmonicRatio\`)**: Combined Protected Shelf max = \`${sep.subharmonicRatio.shelfMax}\`. Expected-Unkawaii clips strictly above combined shelf max: **${sep.subharmonicRatio.unkawaiiAboveCombinedShelfMax.length}/${expectedUnkawaiiCount}** (${sep.subharmonicRatio.unkawaiiAboveCombinedShelfMax.length ? sep.subharmonicRatio.unkawaiiAboveCombinedShelfMax.map((id) => `\`${id}\``).join(", ") : "none"}).`);
+    lines.push("");
+    lines.push("| Expected-Unkawaii Clip | Title | `mpsSpeech4_16` | `mpsRoughness30_150` | `mpsRoughToSpeechRatio` | `subharmonicRatio` |");
+    lines.push("| :--- | :--- | ---: | ---: | ---: | ---: |");
+    for (const c of neuroscienceLenses.perClipExpectedUnkawaii) {
+      lines.push(`| \`${c.id}\` | ${c.title} | ${c.mpsSpeech4_16} | ${c.mpsRoughness30_150} | ${c.mpsRoughToSpeechRatio} | ${c.subharmonicRatio} |`);
+    }
+    lines.push("");
+  }
 
   return lines.join("\n");
 }
@@ -681,9 +804,17 @@ async function main() {
     expectedUnkawaiiEntries
   );
 
+  // Deduplicated benign real entries for v0.5 neuroscience lens evaluation
+  const benignRealEntries = perClipReal.filter((c) => benignShelfIds.has(c.id));
+  const neuroscienceLenses = computeNeuroscienceLensSummary(
+    perClipTokiko,
+    benignRealEntries,
+    expectedUnkawaiiEntries
+  );
+
   const generatedAt = new Date().toISOString();
   const resultsObj = {
-    schema: "yata_real_audio_audit/v0.4",
+    schema: "yata_real_audio_audit/v0.5",
     generatedAt,
     axisCounts: {
       core: ORIGINAL_6_FALSIFIERS.length,
@@ -701,6 +832,7 @@ async function main() {
     shelfVetoSummary,
     generalization,
     expectedUnkawaiiSummary,
+    neuroscienceLenses,
     perClipTokiko,
     perClipReal,
   };

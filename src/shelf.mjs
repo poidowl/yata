@@ -8,16 +8,46 @@
  * Exports:
  *   - auditFalsifiersAgainstShelf(shelfItems, falsifiers = DEFAULT_FALSIFIERS)
  *   - formatShelfAuditForLLM(audit)
+ *   - loadEarPrecedents(filePath)
+ *   - applyEarPrecedents(report, precedents)
  *
  * Zero external dependencies. Pure ES Module.
  */
 
+import fs from "node:fs";
 import {
   ORIGINAL_6_FALSIFIERS,
   DEFAULT_FALSIFIERS,
   ORTHOGONAL_AXES,
 } from "./falsifiers/index.mjs";
-import { analyzeSamples } from "./report.mjs";
+import { analyzeSamples, applyEarPrecedents } from "./report.mjs";
+
+export { applyEarPrecedents };
+
+/**
+ * Load persistent ear-judge precedents from a JSON file.
+ *
+ * @param {string} filePath
+ * @returns {{ schema: string, updatedAt: string | null, precedents: Record<string, object> }}
+ */
+export function loadEarPrecedents(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    throw new Error(`Ear precedents file not found: ${filePath}`);
+  }
+  const raw = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  if (!raw || typeof raw !== "object") {
+    throw new Error(`Invalid ear precedents JSON in ${filePath}`);
+  }
+  const precedents =
+    raw.precedents && typeof raw.precedents === "object"
+      ? raw.precedents
+      : raw;
+  return {
+    schema: typeof raw.schema === "string" ? raw.schema : "unkawaii_ear_precedents/v0.5",
+    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : null,
+    precedents,
+  };
+}
 
 const CORE_ID_SET = new Set(ORIGINAL_6_FALSIFIERS.map((f) => f.id));
 const ORTHOGONAL_ID_SET = new Set(ORTHOGONAL_AXES.map((a) => a.id));

@@ -10,6 +10,8 @@
  *   - computeRoughness(mag, sampleRate, fftSize, topK)
  *   - computeCepstrumComb(meanLogMag, sampleRate, fftSize, medianF0)
  *   - computeModulationDft(series, hopSec, minHz, maxHz)
+ *   - computeMpsRoughness(samples, sampleRate)
+ *   - computeSubharmonicRatio(samples, sampleRate, f0Track, hopSize)
  *   - pearson(xs, ys)
  *   - median(arr)
  *   - percentile(arr, p)
@@ -835,6 +837,318 @@ export function computeModulationDft(series, hopSec, minHz, maxHz) {
   const sinusoidality = Math.max(0, Math.min(1, ((2 * bestMagSq) / n) / totalEnergy));
 
   return { depth, sinusoidality, freqHz: bestFreq };
+}
+
+/**
+ * Modulation Power Spectrum (MPS) roughness lens (30–150 Hz vs 4–16 Hz speech rhythm).
+ *
+ * Academic references:
+ *   - Arnal, L. H., Flinker, A., Kleinschmidt, A., Giraud, A.-L., & Poeppel, D. (2015).
+ *     "Human screams occupy a privileged niche in the communication soundscape."
+ *     Current Biology, 25(15), 2051–2056.
+ *   - Arnal, L. H., & Gonçalves, A. (2025).
+ *     Philosophical Transactions of the Royal Society B.
+ *
+ * Normal speech & singing modulate amplitude primarily in 4–16 Hz, whereas human screams,
+ * animal distress/threat calls, and artificial alarms occupy a conserved 30–150 Hz roughness
+ * niche. Computes the rectified amplitude envelope downsampled to ~600 Hz (Nyquist ~300 Hz)
+ * and measures Welch-averaged Hann-windowed modulation power in 4–16 Hz and 30–150 Hz.
+ *
+ * @param {Float32Array|ArrayLike<number>} samples
+ * @param {number} sampleRate
+ * @returns {{ mpsSpeech4_16: number, mpsRoughness30_150: number, mpsRoughToSpeechRatio: number }}
+ */
+export function computeMpsRoughness(samples, sampleRate) {
+  const n = samples?.length ?? 0;
+  if (n < 32 || !Number.isFinite(sampleRate) || sampleRate <= 0) {
+    return { mpsSpeech4_16: 0, mpsRoughness30_150: 0, mpsRoughToSpeechRatio: 0 };
+  }
+
+  let mean = 0;
+  for (let i = 0; i < n; i++) {
+    const x = samples[i];
+    if (Number.isFinite(x)) mean += x;
+  }
+  mean /= n;
+
+  // Box-average decimate rectified envelope to ~600 Hz (Nyquist ~300 Hz > 150 Hz)
+  const dec = Math.max(1, Math.round(sampleRate / 600));
+  const envSr = sampleRate / dec;
+  const envLen = Math.floor(n / dec);
+  if (envLen < 16 || envSr <= 160) {
+    return { mpsSpeech4_16: 0, mpsRoughness30_150: 0, mpsRoughToSpeechRatio: 0 };
+  }
+
+  const env = new Float32Array(envLen);
+  const invDec = 1 / dec;
+  let globalEnvSum = 0;
+  for (let i = 0; i < envLen; i++) {
+    let s = 0;
+    const base = i * dec;
+    for (let k = 0; k < dec; k++) {
+      const x = samples[base + k];
+      s += Math.abs((Number.isFinite(x) ? x : 0) - mean);
+    }
+    const v = s * invDec;
+    env[i] = v;
+    globalEnvSum += v;
+  }
+
+  if (globalEnvSum / envLen < 1e-6) {
+    return { mpsSpeech4_16: 0, mpsRoughness30_150: 0, mpsRoughToSpeechRatio: 0 };
+  }
+
+  const blockLen = envLen >= 512 ? 512 : envLen;
+  const hop = envLen >= 512 ? 256 : blockLen;
+  let fftLen = 32;
+  while (fftLen < blockLen) fftLen <<= 1;
+
+  const win = hannWindow(blockLen);
+  let winSqSum = 0;
+  for (let i = 0; i < blockLen; i++) winSqSum += win[i] * win[i];
+  if (winSqSum <= 1e-12) {
+    return { mpsSpeech4_16: 0, mpsRoughness30_150: 0, mpsRoughToSpeechRatio: 0 };
+  }
+
+  const re = new Float64Array(fftLen);
+  const im = new Float64Array(fftLen);
+  const half = fftLen >> 1;
+  const binHz = envSr / fftLen;
+  const scale = 2 / (fftLen * winSqSum);
+
+  let speechNormSum = 0;
+  let roughNormSum = 0;
+  let validBlocks = 0;
+
+  for (let start = 0; start + blockLen <= envLen; start += hop) {
+    let bMean = 0;
+    for (let i = 0; i < blockLen; i++) bMean += env[start + i];
+    bMean /= blockLen;
+    const dcPow = bMean * bMean;
+    if (dcPow < 1e-12) continue;
+
+    for (let i = 0; i < blockLen; i++) {
+      re[i] = (env[start + i] - bMean) * win[i];
+      im[i] = 0;
+    }
+    for (let i = blockLen; i < fftLen; i++) {
+      re[i] = 0;
+      im[i] = 0;
+    }
+
+    fftRadix2(re, im);
+
+    let acPow = 0;
+    let speechPow = 0;
+    let roughPow = 0;
+    for (let k = 1; k < half; k++) {
+      const p = (re[k] * re[k] + im[k] * im[k]) * scale;
+      acPow += p;
+      const hz = k * binHz;
+      if (hz >= 4 && hz <= 16) speechPow += p;
+      else if (hz >= 30 && hz <= 150) roughPow += p;
+    }
+
+    const totalPow = dcPow + acPow;
+    if (totalPow > 1e-12) {
+      speechNormSum += Math.min(1, speechPow / totalPow);
+      roughNormSum += Math.min(1, roughPow / totalPow);
+      validBlocks++;
+    }
+  }
+
+  if (validBlocks === 0) {
+    return { mpsSpeech4_16: 0, mpsRoughness30_150: 0, mpsRoughToSpeechRatio: 0 };
+  }
+
+  const mpsSpeech4_16 = Math.max(0, Math.min(1, speechNormSum / validBlocks));
+  const mpsRoughness30_150 = Math.max(0, Math.min(1, roughNormSum / validBlocks));
+  const mpsRoughToSpeechRatio = mpsRoughness30_150 / (mpsSpeech4_16 + 1e-6);
+
+  return { mpsSpeech4_16, mpsRoughness30_150, mpsRoughToSpeechRatio };
+}
+
+/**
+ * Nonlinear vocal subharmonic ratio (period-doubling f0/2 detector) on voiced frames.
+ *
+ * Academic references:
+ *   - Wilden, I., Herzel, H., Peters, G., & Tembrock, G. (1998).
+ *     "Subharmonics, biphonation, and deterministic chaos in mammal vocalization." Bioacoustics.
+ *   - Fitch, W. T., Neubauer, J., & Herzel, H. (2002).
+ *     "Calls out of chaos: the adaptive significance of nonlinear phenomena in mammalian
+ *     vocal production." Animal Behaviour, 63(3), 407–418.
+ *   - Anikin, A. (2020).
+ *     "A sound synthesizer for studies of emotion and animal communication." Behavior Research Methods.
+ *
+ * Compares normalized autocorrelation at period 2*T0 vs T0 (and T0/2 when the F0 tracker has
+ * already octave-locked onto f0/2) together with Hann-windowed spectral energy at half-integer
+ * harmonics (k+0.5)*f0 vs integer harmonics k*f0 (with quarter-harmonic noise floor subtraction).
+ *
+ * @param {Float32Array|ArrayLike<number>} samples
+ * @param {number} sampleRate
+ * @param {ArrayLike<number>} f0Track - Per-frame F0 in Hz (<= 0 for unvoiced frames)
+ * @param {number} hopSize - Samples per frame hop
+ * @returns {number} Subharmonic ratio in [0, 1]
+ */
+export function computeSubharmonicRatio(samples, sampleRate, f0Track, hopSize) {
+  const n = samples?.length ?? 0;
+  const numFrames = f0Track?.length ?? 0;
+  if (n < 64 || !Number.isFinite(sampleRate) || sampleRate <= 0 || numFrames === 0 || !Number.isFinite(hopSize) || hopSize <= 0) {
+    return 0;
+  }
+
+  const voicedFrames = [];
+  for (let f = 0; f < numFrames; f++) {
+    const hz = f0Track[f];
+    if (Number.isFinite(hz) && hz >= 55 && hz <= 1000) {
+      voicedFrames.push(f);
+    }
+  }
+  if (voicedFrames.length === 0) return 0;
+
+  const stride = Math.max(1, Math.floor(voicedFrames.length / 24));
+
+  const normAutocorr = (buf, len, lag) => {
+    if (lag < 2 || lag >= len - 2) return 0;
+    let num = 0;
+    let sqA = 0;
+    let sqB = 0;
+    const m = len - lag;
+    for (let i = 0; i < m; i++) {
+      const a = buf[i];
+      const b = buf[i + lag];
+      num += a * b;
+      sqA += a * a;
+      sqB += b * b;
+    }
+    const den = Math.sqrt(sqA * sqB);
+    return den > 1e-12 ? num / den : 0;
+  };
+
+  const maxAutocorrAround = (buf, len, centerLag, radius) => {
+    let best = -1;
+    const lo = Math.max(2, centerLag - radius);
+    const hi = Math.min(len - 3, centerLag + radius);
+    for (let lag = lo; lag <= hi; lag++) {
+      const c = normAutocorr(buf, len, lag);
+      if (c > best) best = c;
+    }
+    return best > -1 ? best : 0;
+  };
+
+  const tonePower = (buf, len, win, freqHz, sr) => {
+    if (freqHz <= 0 || freqHz >= sr * 0.48) return 0;
+    const omega = (2 * Math.PI * freqHz) / sr;
+    const cosW = Math.cos(omega);
+    const sinW = Math.sin(omega);
+    let c = 1;
+    let s = 0;
+    let re = 0;
+    let im = 0;
+    for (let i = 0; i < len; i++) {
+      const x = buf[i] * win[i];
+      re += x * c;
+      im -= x * s;
+      const nc = c * cosW - s * sinW;
+      s = s * cosW + c * sinW;
+      c = nc;
+    }
+    return re * re + im * im;
+  };
+
+  let subSum = 0;
+  let validCount = 0;
+
+  for (let idx = 0; idx < voicedFrames.length; idx += stride) {
+    const f = voicedFrames[idx];
+    const f0 = f0Track[f];
+    const t0 = sampleRate / f0;
+
+    // Need at least ~2.5*T0 to evaluate lag 2*T0 cleanly
+    const targetLen = Math.min(n, Math.max(256, Math.min(2048, Math.ceil(3.0 * t0))));
+    if (targetLen < 2.2 * t0) continue;
+
+    const center = Math.round((f + 0.5) * hopSize);
+    const start = Math.max(0, Math.min(n - targetLen, center - (targetLen >> 1)));
+
+    // Decimate 2x for >= 32 kHz to keep inner loops fast without losing subharmonic harmonics
+    const dec = sampleRate >= 32000 && targetLen >= 512 ? 2 : 1;
+    const sr = sampleRate / dec;
+    const len = Math.floor(targetLen / dec);
+    const buf = new Float32Array(len);
+    let mean = 0;
+    for (let i = 0; i < len; i++) {
+      const v = dec === 2
+        ? 0.5 * (samples[start + (i << 1)] + samples[start + (i << 1) + 1])
+        : samples[start + i];
+      const safe = Number.isFinite(v) ? v : 0;
+      buf[i] = safe;
+      mean += safe;
+    }
+    mean /= len;
+
+    let sq = 0;
+    for (let i = 0; i < len; i++) {
+      buf[i] -= mean;
+      sq += buf[i] * buf[i];
+    }
+    if (Math.sqrt(sq / len) < 1e-5) continue;
+
+    const t0Dec = sr / f0;
+    const lagT0 = Math.round(t0Dec);
+    const lag2T0 = Math.round(2 * t0Dec);
+    const lagHalfT0 = Math.round(0.5 * t0Dec);
+
+    const rT0 = maxAutocorrAround(buf, len, lagT0, 2);
+    const r2T0 = lag2T0 < len - 4 ? maxAutocorrAround(buf, len, lag2T0, 3) : 0;
+    const rHalfT0 = lagHalfT0 >= 4 ? maxAutocorrAround(buf, len, lagHalfT0, 2) : 0;
+
+    const win = hannWindow(len);
+
+    // Case 1: F0 tracked true f0; look for subharmonics at (k + 0.5) * f0 vs integer k * f0
+    let eInt = 0;
+    let eHalfExcess = 0;
+    for (let k = 1; k <= 5; k++) {
+      const fh = k * f0;
+      if (fh < sr * 0.45) eInt += tonePower(buf, len, win, fh, sr);
+      const fSub = (k - 0.5) * f0;
+      if (fSub >= 25 && fSub < sr * 0.45) {
+        const pSub = tonePower(buf, len, win, fSub, sr);
+        const pFloor = tonePower(buf, len, win, (k - 0.25) * f0, sr);
+        eHalfExcess += Math.max(0, pSub - pFloor);
+      }
+    }
+    const acSub1 = r2T0 > 0.25 ? Math.max(0, r2T0 - rT0) : 0;
+    const specSub1 = eInt + eHalfExcess > 1e-12
+      ? (eHalfExcess / (eInt + eHalfExcess)) * Math.max(0, Math.min(1, r2T0))
+      : 0;
+    const sub1 = 0.5 * Math.min(1, acSub1 * 2.0) + 0.5 * specSub1;
+
+    // Case 2: Strong period-doubling caused F0 tracker to lock onto f0_true / 2
+    // Then odd harmonics of tracked f0 (1,3,5*f0) are the subharmonics and even (2,4,6*f0) are the main harmonics.
+    let sub2 = 0;
+    if (lagHalfT0 >= 4 && rHalfT0 >= 0.35 && rT0 > rHalfT0 + 0.03) {
+      let eOdd = 0;
+      let eEven = 0;
+      for (let m = 1; m <= 3; m++) {
+        const fOdd = (2 * m - 1) * f0;
+        const fEven = 2 * m * f0;
+        if (fOdd < sr * 0.45) eOdd += tonePower(buf, len, win, fOdd, sr);
+        if (fEven < sr * 0.45) eEven += tonePower(buf, len, win, fEven, sr);
+      }
+      if (eEven > eOdd * 1.05 && eEven + eOdd > 1e-12) {
+        const acSub2 = Math.max(0, rT0 - rHalfT0);
+        const specSub2 = eOdd / (eEven + eOdd);
+        sub2 = 0.5 * Math.min(1, acSub2 * 1.8) + 0.5 * specSub2;
+      }
+    }
+
+    subSum += Math.max(0, Math.min(1, Math.max(sub1, sub2)));
+    validCount++;
+  }
+
+  if (validCount === 0) return 0;
+  return Math.max(0, Math.min(1, subSum / validCount));
 }
 
 /**
