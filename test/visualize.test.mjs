@@ -322,8 +322,43 @@ describe("M3: LLM Audio Vision (Text / SVG / PNG)", () => {
       const out = execFileSync(process.execPath, [cliPath, wavPath, "--timeline"], { encoding: "utf8" });
       assert.match(out, /\[YATA TIMELINE\]/);
       assert.match(out, /MPS30-150/);
+      assert.match(out, /%\)/, "Expected active% percentage inline beside PRES");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+
+  it("extractSegmentTimeline activeRatio distinguishes continuous 0.5s tone from 0.05s brief blip + 0.45s silence", () => {
+    const n = Math.round(SR * 0.5);
+    const continuous = new Float32Array(n);
+    const brief = new Float32Array(n);
+    const briefSamples = Math.round(SR * 0.05);
+    for (let i = 0; i < n; i++) {
+      const v = 0.5 * Math.sin((2 * Math.PI * 220 * i) / SR);
+      continuous[i] = v;
+      brief[i] = i < briefSamples ? v : 0;
+    }
+
+    const tlCont = extractSegmentTimeline(extractAudioProfile(continuous, SR), continuous, SR, { windowSec: 0.5 });
+    const tlBrief = extractSegmentTimeline(extractAudioProfile(brief, SR), brief, SR, { windowSec: 0.5 });
+
+    assert.equal(tlCont.segments.length, 1);
+    assert.equal(tlBrief.segments.length, 1);
+    assert.ok(
+      tlCont.segments[0].activeRatio >= 0.85,
+      `Expected continuous tone activeRatio >= 0.85, got ${tlCont.segments[0].activeRatio}`
+    );
+    assert.ok(
+      tlBrief.segments[0].activeRatio <= 0.25,
+      `Expected 0.05s blip activeRatio <= 0.25, got ${tlBrief.segments[0].activeRatio}`
+    );
+    assert.ok(tlCont.segments[0].activeRatio > tlBrief.segments[0].activeRatio * 3);
+
+    const renderedCont = renderSegmentTimeline(tlCont, { charset: "ascii" });
+    const renderedBrief = renderSegmentTimeline(tlBrief, { charset: "ascii" });
+    assert.equal(countLines(renderedCont), 4);
+    assert.equal(countLines(renderedBrief), 4);
+    assert.match(renderedCont, /\((9\d|100)%\)/);
+    assert.match(renderedBrief, /\((1?\d|2[0-5])%\)/);
   });
 });

@@ -39,10 +39,10 @@
 - **`--policy shelf_veto --contested ...`**: Protected Shelf 監査（`auditFalsifiersAgainstShelf`）で `CONTESTED` になった軸の拒否権を自動停止します。全32軸ハード拒否が必要な場合のみ `--policy veto_all` を明示指定します。
 - **v0.5 神経科学 DSP レンズ & 時間分割ミラー（`--timeline`）**:
   - **Arnal MPS 30–150 Hz 粗さ**（`mpsRoughness30_150` / `mpsSpeech4_16` / `mpsRoughToSpeechRatio` — Arnal et al. 2015/2025）と **非線形サブハーモニクス**（`subharmonicRatio` — Fitch et al. 2002 / Anikin 2020）を純 JS で実装し、コンパクトテキスト視覚（`MPS30-150`, `SUBH`）へ統合。
-  - `extractSegmentTimeline` / `renderSegmentTimeline` / `--timeline` により、`0.5s` 窓ごとの存在感（Presence）× MPS 30–150 Hz 粗さ × F0 を4行で一覧表示。
-- **v0.5 耳判例メモリ（`--shelf` / `--precedents`）**:
-  - オーナーのブラインド3択・2択鏡審査結果（`🪞 原音派 5–0`, `p < 0.01`, `#4 tie`）を [`bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md`](bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md) および [`bench/real_audio_audit/ear_precedents.json`](bench/real_audio_audit/ear_precedents.json) に永続化。
-  - `--shelf bench/real_audio_audit/ear_precedents.json` を渡すと、`F24_CALCULATED_PITCH_LFO [EAR-OVERRULED 5-0]` や `[ORTHOGONAL]` 等の耳判例タグを LLM レポートに自動併記します。
+  - `extractSegmentTimeline` / `renderSegmentTimeline` / `--timeline` により、`0.5s` 窓ごとの存在感 `PRES(active%)`（有声・連動の質＋その半秒で音が鳴っていた割合）× MPS 30–150 Hz 粗さ × F0 を4行で一覧表示。
+- **v0.5 耳判例メモリ（`--shelf` / `--precedents` + `--scope`）**:
+  - オーナーのブラインド3択・2択鏡審査結果（コミット `245ed15` 版での `🪞 原音派 5–0`、独立等確率のもとで全5回原音になる単純確率 `1/108 ≈ 0.0093`、`#4 tie`）を [`bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md`](bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md) および [`bench/real_audio_audit/ear_precedents.json`](bench/real_audio_audit/ear_precedents.json) に永続化。
+  - `--shelf bench/real_audio_audit/ear_precedents.json --scope tokiko_japanese_speech` のように適用範囲（`--scope`）を明示した場合のみスコープ付き判例（`[EAR-OVERRULED 5-0 @ tokiko_japanese_speech (245ed15)]` 等）が適用され、別ドメインの音への誤適用を防ぎます（`general_audio` の `[ORTHOGONAL]` のみ常時適用）。
 - **鏡の耳審査 & 実音監査**:
   - 3択ブラインド「なる」鏡審査デモ（原音 vs 抑揚保持・揺れ弱め vs 完全フラット）: [`bench/mirror_audit_demo.html`](bench/mirror_audit_demo.html)
   - 再現可能な実音・保護棚監査レポート（MPS / サブハーモニクス実音評価含む）: [`bench/real_audio_audit/RESULTS.md`](bench/real_audio_audit/RESULTS.md)
@@ -57,7 +57,7 @@ Node.js v18+ があれば外部パッケージなしでそのまま動きます�
 # 1. 基本解析（既定は --policy core_veto：基本6軸で判定＋ツールボックス軸を診断併記）
 node unkawaii_detector.mjs sample.wav
 node unkawaii_detector.mjs sample.wav --format json
-node unkawaii_detector.mjs sample.wav --shelf bench/real_audio_audit/ear_precedents.json
+node unkawaii_detector.mjs sample.wav --shelf bench/real_audio_audit/ear_precedents.json --scope tokiko_japanese_speech
 node unkawaii_detector.mjs sample.wav --policy shelf_veto --contested F24_CALCULATED_PITCH_LFO,F23_ERRATIC_PITCH_WARBLE
 node unkawaii_detector.mjs sample.wav --policy veto_all    # 全32軸でハード拒否
 node unkawaii_detector.mjs sample.wav --falsifiers core   # v0.1 の6軸のみで検証

@@ -812,12 +812,14 @@ export function renderSegmentTimeline(timeline, opts = {}) {
   const maxInline = 8;
   const shown = segs.slice(0, maxInline);
   const suffix = segs.length > maxInline ? ` +${segs.length - maxInline}` : "";
-  const presSummary = shown.map((s) => `${fmtNum(s.startSec, 1)}s:${fmtNum(s.presence, 2)}`).join(" ");
+  const presSummary = shown
+    .map((s) => `${fmtNum(s.startSec, 1)}s:${fmtNum(s.presence, 2)}(${Math.round(finite(s.activeRatio, 0) * 100)}%)`)
+    .join(" ");
   const mpsSummary = shown.map((s) => `${fmtNum(s.startSec, 1)}s:${fmtNum(s.mpsRoughness30_150, 2)}`).join(" ");
   const f0Summary = shown.map((s) => `${Math.round(finite(s.medianF0, 0))}Hz`).join(" ");
 
   return [
-    `[YATA TIMELINE] dur=${fmtNum(dur, 2)}s win=${fmtNum(winSec, 2)}s (${segs.length} segs)`,
+    `[YATA TIMELINE] dur=${fmtNum(dur, 2)}s win=${fmtNum(winSec, 2)}s (${segs.length} segs; PRES shows presence(active%))`,
     `PRES      ${vSep}${presSpark}${vSep} ${presSummary}${suffix}`,
     `MPS30-150 ${vSep}${mpsSpark}${vSep} ${mpsSummary}${suffix}`,
     `F0        ${vSep}${f0Spark}${vSep} ${f0Summary}${suffix}`,

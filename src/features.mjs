@@ -1413,6 +1413,7 @@ export function extractSegmentTimeline(profile, samples, sampleRate, opts = { wi
 
     const winFrames = frames.filter((f) => f.timeSec >= startSec && f.timeSec < endSec + (w === numWindows - 1 ? 1e-6 : 0));
     const activeWin = winFrames.filter((f) => f.rms >= 0.03);
+    const activeRatio = winFrames.length > 0 ? activeWin.length / winFrames.length : 0;
     const voicedWin = activeWin.filter((f) => f.voiced && f.f0 > 0);
     const voicedRatio = activeWin.length > 0 ? voicedWin.length / activeWin.length : 0;
     const meanHnrDb = voicedWin.length > 0 ? meanOf(voicedWin.map((f) => f.hnrDb)) : 0;
@@ -1437,6 +1438,7 @@ export function extractSegmentTimeline(profile, samples, sampleRate, opts = { wi
       startSec: roundTo(startSec, 2),
       endSec: roundTo(endSec, 2),
       presence: roundTo(presence, 3),
+      activeRatio: roundTo(activeRatio, 3),
       voicedRatio: roundTo(voicedRatio, 3),
       meanHnrDb: roundTo(meanHnrDb, 1),
       coupling: roundTo(coupling, 3),
