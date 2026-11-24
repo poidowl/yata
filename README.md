@@ -33,13 +33,17 @@
 
 全軸の一覧は `node unkawaii_detector.mjs --list-falsifiers` で確認できます。
 
-### 判定ポリシーと v0.4–v0.7 の主な改善
+### 判定ポリシーと v0.4–v0.8 の主な改善
 
 - **既定ポリシー = `core_veto`**: `F1`–`F6`（`ORIGINAL_6_FALSIFIERS`）のみでハード拒否を行い、`F7`–`F32`（`TOOLBOX_FALSIFIERS`）は非拒否の診断ヒント、`F30`（ステレオ逆相）は直交軸（`ORTHOGONAL_AXES`）として分離します。
 - **`--policy shelf_veto --contested ...`**: Protected Shelf 監査（`auditFalsifiersAgainstShelf`）で `CONTESTED` になった軸の拒否権を自動停止します。全32軸ハード拒否が必要な場合のみ `--policy veto_all` を明示指定します。
+- **v0.8 Core-6 実音キャリブレーション、F5 観測可否（`observed` / `[UNOBSERVED]`）& 未見 PD/CC0 ホールドアウト評価**:
+  - **Core-6 物理修正**: `F5_ABRUPT_TAIL` が録音末尾 15ms に音が残る途中切り出し（`tailTruncatedAtEof`）を誤爆せず `observed: false`（`[UNOBSERVED]`）として「自然な余韻（`observed: true, score: 0`）」と明確に分離。`F3_PURE_NOISE` にスペクトル平坦度ガード（`>= 0.25`）、`F4_NO_COMMON_CAUSE` に RMS×重心相関、`F1_HARSH_EDGE` に無声ラフヒス／非周期ラフうなり検出を追加。
+  - **未見 PD/CC0 ホールドアウト評価（ゼロ調整）**: 閾値調整に一切使っていない Public Domain / CC0 音源 9 本（人間の「しーっ」・ささやき・発話・子犬・怒ったトラ・路面電車警告音・食洗機）での実測を [`bench/real_audio_audit/HELDOUT_RESULTS.md`](bench/real_audio_audit/HELDOUT_RESULTS.md) に公開。
+  - **Voice Compass 物理補正 & 重み出典明記**: 途中切り出しペナルティ撤廃・文献由来の帯域/尺度とヒューリスティック重みをコード内に明記。
 - **v0.7 過剰整えレンズ、2トラック関係対話ミラー & 生きた息の余韻モード（*"The Unpolished & Relational Mirror"*）**:
   - **過剰整え / 生きている不完全さレンズ（`computeSanitizationIndex`・非拒否診断）**: 「完璧じゃない　きれいに整えようとしてない」（[`docs/PHILOSOPHY.md`](docs/PHILOSOPHY.md) 第9節）に基づき、微細揺らぎ消去・ピッチ平坦/階段化・ダイナミクス平坦化・リズム/スペクトル硬直の4手がかりから `sanitizationScore`（`[0, 1]`）と `imperfectionLabel`（`alive_unpolished` / `balanced` / `over_sanitized` / `silent`）を算出。`renderTextVision`（`SAN=0.XX`）へ併記し、`--compare` では B が過剰に整えられた場合に `OVER-SANITIZATION WARNING` を通知。
-  - **2トラック関係対話ミラー（`src/dialogue.mjs` / `--dialogue <a.wav> <b.wav>`）**: 第5領域「関係の断絶・間」を実装。2トラックを 10ms RMS 枠で整列し、`turnCount`・`overlapRatio`・`meanTurnGapSec`・`mutualSilenceRatio`・`relationLabel`（`responsive_dialogue` / `overlapping_clash` / `disconnected_monologue` / `silent_void`）を5行のコンパクト地図（`renderDialogueMap`）で可視化。
+  - **2トラック関係対話ミラー（`src/dialogue.mjs` / `--dialogue <a.wav> <b.wav>`）**: 第5領域「関係の断絶・間」を実装。2トラックを 10ms RMS 枠で整列し、相づち（`backch`）・重なり交代（`ovHandoff`）・無音からの同時発話（`simStart`）・`active_listening` を区別しつつ5行のコンパクト地図（`renderDialogueMap`）で可視化。
   - **生きた息の余韻反事実モード（`--cf-mode breath_tail`）**: ぶつ切り語尾にクリックゼロの柔らかな指数減衰＋微かな有機的呼気尾（`~0.18s`）を局所付加し、死んだ無音カットオフと生きた抜けを耳で比較可能に。
 - **v0.6 呼吸・間プロファイル、Voice Compass、窓別タイムライン差分 & 最小反事実オーディオミラー**:
   - **呼吸・間プロファイル（`computeBreathPauseProfile`）**: `activeDutyCycle` / `pauseCount` / `meanPauseSec` / `longestContinuousSec` / `breathlessWallRatio` / `cadenceLabel`（`silent` / `brief_glance` / `phrased_breath` / `continuous_wall`）を `extractFeatures` と `extractSegmentTimeline` へ統合し、`renderSegmentTimeline` のヘッダ（4行枠維持）に `duty=XX% pauses=N maxRun=X.Xs [cadenceLabel]` を表示。

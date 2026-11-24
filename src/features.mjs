@@ -619,14 +619,20 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
       Math.abs(frames[i + 1].rms - 2 * frames[i].rms + frames[i - 1].rms) / normMaxRms;
   }
 
-  // Tail window (exact v0.1 formula) + EOF truncation guard
+  // Tail window (exact v0.1 formula) + EOF truncation guard (raw final-15ms PCM energy)
   let tailDecaySec = 0;
   let tailStartSec = 0;
   let tailEndSec = 0;
   let tailTruncatedAtEof = 0;
   if (activeIndices.length >= 3) {
     const lastActive = activeIndices[activeIndices.length - 1];
-    if (frames.length > 0 && lastActive >= frames.length - 2) {
+    const tailCheckLen = Math.min(n, Math.max(1, Math.round(sampleRate * 0.015)));
+    let tailEndSq = 0;
+    for (let i = n - tailCheckLen; i < n; i++) {
+      tailEndSq += norm[i] * norm[i];
+    }
+    const tailEndRms = Math.sqrt(tailEndSq / tailCheckLen);
+    if (tailEndRms >= activeThresh) {
       tailTruncatedAtEof = 1;
     }
     let highIdx = lastActive;
@@ -1698,6 +1704,13 @@ export function computeVoiceCompass(frames, features = null, breathProfile = nul
 
   // =========================================================================
   // Axis 1: respiratoryScore ("呼吸器を使ったもの" — Finite-Lung Signature)
+  // Provenance note:
+  //   - Literature-derived acoustic scales:
+  //       * Breath-group phrasing 0.15s–2.5s (Lieberman 1967; Fuchs et al. 2013)
+  //       * Natural vocal micro-variation (jitter/shimmer, Titze 1994)
+  //   - Sub-component blend weights (0.28/0.36/0.36, 0.25/0.35/0.18/0.22,
+  //     0.45/0.25/0.30) are heuristic v0.6–v0.8 engineering weights (not trained
+  //     by regression); this axis is strictly a non-vetoing diagnostic lens.
   // =========================================================================
   const longestRun = Math.max(0, finite(breath.longestContinuousSec, 0));
   const breathlessWallRatio = clamp01(breath.breathlessWallRatio);
@@ -1754,6 +1767,10 @@ export function computeVoiceCompass(frames, features = null, breathProfile = nul
 
   // =========================================================================
   // Axis 2: directnessScore ("誰かに聞かせるために出した音" — Communicative Directness)
+  // Provenance note:
+  //   - 300–3500 Hz communicative speech band (ITU-T G.711 / P.56)
+  //   - 4–16 Hz syllabic/call modulation vs 30–150 Hz roughness (Arnal et al. 2015)
+  //   - Blend weights (0.34/0.34/0.32) are heuristic v0.6 engineering weights.
   // =========================================================================
   // 2a. Communicative band focus (300–3500 Hz intelligibility share vs rumble / hiss)
   let midOnlyRatio;

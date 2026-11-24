@@ -195,10 +195,12 @@ export const ORIGINAL_6_FALSIFIERS = [
           : activeFrameCount >= 5 && tailDecaySec < minTailSec;
       return {
         triggered,
+        observed: !tailTruncated,
+        observability: tailTruncated ? "unobservable" : "observed",
         score,
         threshold,
         evidence: tailTruncated
-          ? `tailTruncatedAtEof (sound still active at clip end; tailDecay=${tailDecaySec}s)`
+          ? `unobservable: tailTruncatedAtEof (sound still active in final 15ms; tailDecay=${tailDecaySec}s)`
           : `tailDecay=${tailDecaySec}s (from ${tailStartSec}s)`,
         hint: "Allow phrase tail to release gradually with breath/tension decay instead of hard cut-off.",
         where: {

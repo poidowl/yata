@@ -967,4 +967,50 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
     });
     assert.equal(plosiveRes.triggered, false);
   });
+
+  it("v0.8 regression: F5 distinguishes unobservable EOF truncation (0ms pad) from observed abrupt cutoff (20ms/50ms pad) across tone, sawtooth, noise, and vibrato", () => {
+    // 1. 220 Hz 0.5s tone with 0ms / 20ms / 50ms trailing silence
+    const makePadded = (durSec, padMs, sampleFn) => {
+      const nTone = Math.round(SR * durSec);
+      const nPad = Math.round(SR * (padMs / 1000));
+      const buf = new Float32Array(nTone + nPad);
+      for (let i = 0; i < nTone; i++) buf[i] = sampleFn(i, i / SR);
+      return buf;
+    };
+
+    const s0 = makePadded(0.5, 0, (_i, t) => 0.5 * Math.sin(2 * Math.PI * 220 * t));
+    const rep0 = analyzeSamples(s0, SR, { label: "tone_0ms", policy: "core_veto" });
+    const f5_0 = getFalsifierResult(rep0, "F5_ABRUPT_TAIL");
+    assert.equal(f5_0.triggered, false);
+    assert.equal(f5_0.observed, false);
+    assert.equal(f5_0.observability, "unobservable");
+    assert.equal(f5_0.score, 0);
+    assert.match(formatForLLM(rep0), /UNOBSERVED \(1\): F5_ABRUPT_TAIL/);
+    assert.match(formatForLLM(rep0, { verbose: true }), /\[UNOBSERVED\] F5_ABRUPT_TAIL/);
+
+    for (const padMs of [20, 50]) {
+      const sPad = makePadded(0.5, padMs, (_i, t) => 0.5 * Math.sin(2 * Math.PI * 220 * t));
+      const repPad = analyzeSamples(sPad, SR, { label: `tone_${padMs}ms`, policy: "core_veto" });
+      const f5Pad = getFalsifierResult(repPad, "F5_ABRUPT_TAIL");
+      assert.equal(f5Pad.triggered, true, `Expected F5 triggered for ${padMs}ms pad`);
+      assert.equal(f5Pad.observed, true);
+      assert.equal(f5Pad.observability, "observed");
+    }
+
+    // 2. Sawtooth, broadband noise, and sine+vibrato abruptly cut with 50ms trailing silence MUST trigger F5
+    const saw = makePadded(0.5, 50, (_i, t) => 0.4 * (2 * ((220 * t) % 1) - 1));
+    const rand = mulberry32(999);
+    const noise = makePadded(0.5, 50, () => 0.35 * (rand() * 2 - 1));
+    let phVib = 0;
+    const vib = makePadded(0.5, 50, (_i, t) => {
+      phVib += (2 * Math.PI * (260 + 12 * Math.sin(2 * Math.PI * 5 * t))) / SR;
+      return 0.45 * Math.sin(phVib);
+    });
+    for (const [name, sig] of [["sawtooth", saw], ["noise", noise], ["sine_vibrato", vib]]) {
+      const r = analyzeSamples(sig, SR, { label: name, policy: "core_veto" });
+      const f5 = getFalsifierResult(r, "F5_ABRUPT_TAIL");
+      assert.equal(f5.triggered, true, `Expected F5 triggered on ${name} with 50ms trailing silence`);
+      assert.equal(f5.observed, true);
+    }
+  });
 });

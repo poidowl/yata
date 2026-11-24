@@ -170,11 +170,14 @@ export function analyzeSamples(samples, sampleRate, options = {}) {
         : undefined;
     const out = fn.detect(features, override) || {};
     const isTriggered = Boolean(out.triggered);
+    const isObserved = out.observed !== false;
     const entry = {
       id: fn.id,
       domain: fn.domain,
       name: fn.name,
       triggered: isTriggered,
+      observed: isObserved,
+      observability: isObserved ? "observed" : "unobservable",
       score: round3(out.score),
       threshold: Number.isFinite(out.threshold) ? out.threshold : 0.5,
       evidence: typeof out.evidence === "string" ? out.evidence : "",
@@ -358,7 +361,9 @@ export function formatForLLM(report, opts = { verbose: false }) {
           : dim.diagnostic
             ? "DIAG     "
             : "VETO     "
-        : "clear    ";
+        : dim.observed === false
+          ? "UNOBSERVED"
+          : "clear    ";
       const precTag = dim.earPrecedentTag ? ` ${dim.earPrecedentTag}` : "";
       lines.push(
         `  - [${mark}] ${dim.id}${precTag}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
@@ -373,12 +378,13 @@ export function formatForLLM(report, opts = { verbose: false }) {
   // Compact triggered-first summary
   const vetoTriggered = all.filter((d) => d.triggered && !d.diagnostic).sort((a, b) => b.score - a.score);
   const diagTriggered = all.filter((d) => d.triggered && d.diagnostic).sort((a, b) => b.score - a.score);
-  const clearCount = all.length - vetoTriggered.length - diagTriggered.length;
+  const unobservedDims = all.filter((d) => !d.triggered && d.observed === false);
+  const clearCount = all.length - vetoTriggered.length - diagTriggered.length - unobservedDims.length;
 
   if (vetoTriggered.length === 0 && diagTriggered.length === 0) {
-    lines.push(`VETO: none (all ${all.length} dimensions clear)`);
+    lines.push(`VETO: none (${clearCount}/${all.length} dimensions clear)`);
     const nearMiss = all
-      .filter((d) => d.score > 0)
+      .filter((d) => d.score > 0 && d.observed !== false)
       .sort((a, b) => b.score - a.score)
       .slice(0, 3);
     if (nearMiss.length > 0) {
@@ -413,6 +419,12 @@ export function formatForLLM(report, opts = { verbose: false }) {
       }
     }
     lines.push(`CLEAR: ${clearCount}/${all.length} dimensions clear (pass { verbose: true } for full dump)`);
+  }
+
+  if (unobservedDims.length > 0) {
+    lines.push(
+      `UNOBSERVED (${unobservedDims.length}): ${unobservedDims.map((d) => `${d.id} (${d.evidence})`).join(" | ")}`
+    );
   }
 
   return lines.join("\n");
