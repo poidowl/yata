@@ -588,17 +588,20 @@ export function renderTextVision(profile, report = null, opts = {}) {
         lines.push(`  (~) ${f.id} score=${fmtNum(f.score, 2)}/${fmtNum(f.threshold, 2)} ${truncate(f.evidence, 44)}`);
       }
     } else {
-      lines.push(`FALSIFIERS (${rep.triggeredCount} triggered):`);
+      const nDiag = rep.triggered.filter((f) => f.diagnostic).length;
+      lines.push(`FALSIFIERS (${rep.triggeredCount} veto, ${nDiag + (rep.quarantinedHidden || 0)} diagnostic):`);
       const maxShown = Math.max(1, remaining - 2);
-      const shown = rep.triggered.slice(0, maxShown);
+      const vetoes = rep.triggered.filter((f) => !f.diagnostic);
+      const shown = [...vetoes, ...rep.triggered.filter((f) => f.diagnostic).slice(0, 3)].slice(0, maxShown);
       for (const f of shown) {
         const w = formatWhere(f.where);
         lines.push(
-          `  [!] ${f.id} ${fmtNum(f.score, 2)}/${fmtNum(f.threshold, 2)} ${w ? `${w} ` : ""}| ${truncate(f.evidence, 46)}`
+          `  [${f.diagnostic ? "d" : "!"}] ${f.id} ${fmtNum(f.score, 2)}/${fmtNum(f.threshold, 2)} ${w ? `${w} ` : ""}| ${truncate(f.evidence, 46)}`
         );
       }
-      if (rep.triggered.length > shown.length) {
-        lines.push(`  ... +${rep.triggered.length - shown.length} more triggered`);
+      const q = rep.quarantinedHidden ? `, ${rep.quarantinedHidden} quarantined hidden` : "";
+      if (rep.triggered.length > shown.length || q) {
+        lines.push(`  ... +${rep.triggered.length - shown.length} more${q} (--format json for all)`);
       }
     }
 
