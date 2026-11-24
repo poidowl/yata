@@ -130,10 +130,10 @@ function getFalsifierResult(report, id) {
   return found;
 }
 
-describe("M2: 36-Axis Falsifier Registry & Report Engine", () => {
-  it("exports ORIGINAL_6_FALSIFIERS (6) and DEFAULT_FALSIFIERS (36) in exact F1..F36 order with unique IDs", () => {
+describe("M2: 40-Axis Falsifier Registry & Report Engine", () => {
+  it("exports ORIGINAL_6_FALSIFIERS (6) and DEFAULT_FALSIFIERS (40) in exact F1..F40 order with unique IDs", () => {
     assert.equal(ORIGINAL_6_FALSIFIERS.length, 6);
-    assert.equal(DEFAULT_FALSIFIERS.length, 36);
+    assert.equal(DEFAULT_FALSIFIERS.length, 40);
 
     const expectedCoreIds = [
       "F1_HARSH_EDGE",
@@ -149,7 +149,7 @@ describe("M2: 36-Axis Falsifier Registry & Report Engine", () => {
     );
 
     const seen = new Set();
-    for (let i = 0; i < 36; i++) {
+    for (let i = 0; i < 40; i++) {
       const f = DEFAULT_FALSIFIERS[i];
       assert.ok(f.id.startsWith(`F${i + 1}_`), `Index ${i} expected F${i + 1}_*, got ${f.id}`);
       assert.equal(typeof f.domain, "string");
@@ -160,7 +160,7 @@ describe("M2: 36-Axis Falsifier Registry & Report Engine", () => {
     }
   });
 
-  it("clean pleasant positive controls survive 0/36 (warm voice, sasayaki whisper, warm chime, clean stereo)", () => {
+  it("clean pleasant positive controls survive 0/40 (warm voice, sasayaki whisper, warm chime, clean stereo)", () => {
     const positives = [
       { label: "warm_voice", samples: genWarmVoice(0.65, 101) },
       { label: "sasayaki_whisper", samples: genSasayakiWhisper(0.65, 202) },
@@ -173,12 +173,12 @@ describe("M2: 36-Axis Falsifier Registry & Report Engine", () => {
       assert.equal(
         rep.verdict,
         "SURVIVED_KAWAII_CANDIDATE",
-        `${item.label} should survive 0/36, but triggered: ${triggered
+        `${item.label} should survive 0/40, but triggered: ${triggered
           .map((t) => `${t.id}(score=${t.score}, ${t.evidence})`)
           .join("; ")}`
       );
       assert.equal(rep.triggeredCount, 0);
-      assert.equal(rep.totalFalsifiers, 36);
+      assert.equal(rep.totalFalsifiers, 40);
       for (const f of rep.falsifiers) {
         assert.ok(Number.isFinite(f.score) && f.score >= 0 && f.score <= 1, `${f.id} score invalid`);
       }
@@ -739,7 +739,7 @@ describe("M2: 36-Axis Falsifier Registry & Report Engine", () => {
       ["short15ms", shortClip],
     ]) {
       const rep = analyzeSamples(buf, SR, { label });
-      assert.equal(rep.totalFalsifiers, 36);
+      assert.equal(rep.totalFalsifiers, 40);
       for (const f of rep.falsifiers) {
         assert.ok(
           Number.isFinite(f.score) && f.score >= 0 && f.score <= 1,
@@ -785,12 +785,12 @@ describe("M2: 36-Axis Falsifier Registry & Report Engine", () => {
 
     const repCore = analyzeSamples(warm, SR, { label: "core6", falsifiers: ORIGINAL_6_FALSIFIERS });
     const repAll = analyzeSamples(dc, SR, {
-      label: "all36_reversed",
+      label: "all40_reversed",
       falsifiers: [...DEFAULT_FALSIFIERS].reverse(),
     });
 
     const cmp = compareReports(repCore, repAll);
-    assert.equal(cmp.deltas.length, 36);
+    assert.equal(cmp.deltas.length, 40);
 
     const d1 = cmp.deltas.find((d) => d.id === "F1_HARSH_EDGE");
     assert.ok(d1 && d1.aScore !== null && d1.bScore !== null && d1.deltaBMinusA !== null);
@@ -813,7 +813,7 @@ describe("M2: 36-Axis Falsifier Registry & Report Engine", () => {
     const compactClean = formatForLLM(repClean);
     const verboseClean = formatForLLM(repClean, { verbose: true });
     assert.ok(compactClean.split("\n").length <= 10, `Compact clean too long: ${compactClean.split("\n").length}`);
-    assert.ok(verboseClean.split("\n").length > 36, "Verbose dump should include all 36 falsifiers");
+    assert.ok(verboseClean.split("\n").length > 40, "Verbose dump should include all 40 falsifiers");
 
     const repBad = analyzeSamples(dc, SR, { label: "dc_bad" });
     const compactBad = formatForLLM(repBad);
@@ -1162,5 +1162,49 @@ describe("M2: 36-Axis Falsifier Registry & Report Engine", () => {
     });
     assert.equal(smoothLive.triggered, false);
     assert.equal(smoothLive.score, 0);
+
+    // F37: Decoupled HF exciter (midHiCorr < 0) fails; coupled live/VOICEVOX speech (+0.27..+0.81) passes
+    const f37 = DEFAULT_FALSIFIERS.find((x) => x.id === "F37_DECOUPLED_HF_EXCITER");
+    assert.equal(
+      f37.detect({ activeFrameCount: 200, voicedRatio: 0.8, durationSec: 3.0, midHiCorr: -0.22, activeMpsSpeech4_16: 0.14 }).triggered,
+      true
+    );
+    assert.equal(
+      f37.detect({ activeFrameCount: 200, voicedRatio: 0.8, durationSec: 3.0, midHiCorr: 0.45, activeMpsSpeech4_16: 0.14 }).triggered,
+      false
+    );
+
+    // F38: Broad dull spectral skirt fails when specKurtMean is low with smeared HF; focused harmonics pass
+    const f38 = DEFAULT_FALSIFIERS.find((x) => x.id === "F38_SPECTRUM_PEAK_DULLNESS");
+    assert.equal(
+      f38.detect({ activeFrameCount: 200, voicedRatio: 0.8, durationSec: 3.0, specKurtMean: 42, hf4500_7000Db: -19, activeMpsSpeech4_16: 0.14 }).triggered,
+      true
+    );
+    assert.equal(
+      f38.detect({ activeFrameCount: 200, voicedRatio: 0.8, durationSec: 3.0, specKurtMean: 240, hf4500_7000Db: -22, activeMpsSpeech4_16: 0.14 }).triggered,
+      false
+    );
+
+    // F39: Rigid isochronous syllable cadence fails; elastic natural cadence passes
+    const f39 = DEFAULT_FALSIFIERS.find((x) => x.id === "F39_RIGID_SYLLABLE_CADENCE");
+    assert.equal(
+      f39.detect({ activeFrameCount: 200, voicedRatio: 0.8, durationSec: 2.5, syllPeakCount: 10, syllIoiCv: 0.12, activeMpsSpeech4_16: 0.14 }).triggered,
+      true
+    );
+    assert.equal(
+      f39.detect({ activeFrameCount: 200, voicedRatio: 0.8, durationSec: 2.5, syllPeakCount: 10, syllIoiCv: 0.58, activeMpsSpeech4_16: 0.14 }).triggered,
+      false
+    );
+
+    // F40: Symmetric spiky glottal pulse fails; warm asymmetric organic pulse passes
+    const f40 = DEFAULT_FALSIFIERS.find((x) => x.id === "F40_SYMMETRIC_GLOTTAL_SPIKE");
+    assert.equal(
+      f40.detect({ activeFrameCount: 200, voicedRatio: 0.8, durationSec: 3.0, frameCrestMean: 3.15, waveSkewMean: 0.21, activeMpsSpeech4_16: 0.14 }).triggered,
+      true
+    );
+    assert.equal(
+      f40.detect({ activeFrameCount: 200, voicedRatio: 0.8, durationSec: 3.0, frameCrestMean: 2.55, waveSkewMean: 0.39, activeMpsSpeech4_16: 0.14 }).triggered,
+      false
+    );
   });
 });

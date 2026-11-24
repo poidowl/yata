@@ -69,7 +69,7 @@ function makeWarmVoice(dur = 0.65, seed = 101) {
 describe("v0.3: ORTHOGONAL_AXES, Protected Shelf Audit, and core_veto Policy", () => {
   it("exports ORTHOGONAL_AXES (with F30) and TOOLBOX_FALSIFIERS (F7..F32 minus orthogonal) without altering DEFAULT_FALSIFIERS", () => {
     assert.equal(ORIGINAL_6_FALSIFIERS.length, 6);
-    assert.equal(DEFAULT_FALSIFIERS.length, 36);
+    assert.equal(DEFAULT_FALSIFIERS.length, 40);
     assert.ok(Array.isArray(ORTHOGONAL_AXES) && ORTHOGONAL_AXES.length >= 1);
 
     const f30Meta = ORTHOGONAL_AXES.find((a) => a.id === "F30_STEREO_PHASE_DISCOMFORT");
@@ -79,7 +79,7 @@ describe("v0.3: ORTHOGONAL_AXES, Protected Shelf Audit, and core_veto Policy", (
 
     const coreIds = new Set(ORIGINAL_6_FALSIFIERS.map((f) => f.id));
     const orthoIds = new Set(ORTHOGONAL_AXES.map((a) => a.id));
-    assert.equal(TOOLBOX_FALSIFIERS.length, 36 - coreIds.size - orthoIds.size);
+    assert.equal(TOOLBOX_FALSIFIERS.length, 40 - coreIds.size - orthoIds.size);
     for (const f of TOOLBOX_FALSIFIERS) {
       assert.ok(!coreIds.has(f.id), `Core axis ${f.id} should not be in TOOLBOX_FALSIFIERS`);
       assert.ok(!orthoIds.has(f.id), `Orthogonal axis ${f.id} should not be in TOOLBOX_FALSIFIERS`);
@@ -100,9 +100,9 @@ describe("v0.3: ORTHOGONAL_AXES, Protected Shelf Audit, and core_veto Policy", (
     ]);
 
     assert.equal(cleanAudit.shelfSize, 1);
-    assert.equal(cleanAudit.totalFalsifiers, 36);
+    assert.equal(cleanAudit.totalFalsifiers, 40);
     assert.equal(cleanAudit.contestedCount, 0);
-    assert.equal(cleanAudit.clearedCount, 36);
+    assert.equal(cleanAudit.clearedCount, 40);
     assert.equal(cleanAudit.shelfSurvivalRate.core6, 1);
     assert.equal(cleanAudit.shelfSurvivalRate.full, 1);
 

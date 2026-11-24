@@ -575,6 +575,157 @@ export const SPECTRAL_EXTRA_FALSIFIERS = [
       };
     },
   },
+  {
+    id: "F37_DECOUPLED_HF_EXCITER",
+    domain: "absence_of_presence",
+    name: "Decoupled HF Exciter / Uncoupled Mid-High Speech Source",
+    detect(f, override) {
+      const activeFrameCount = num(f.activeFrameCount);
+      const voicedRatio = num(f.voicedRatio);
+      const durationSec = num(f.durationSec);
+      const midHiCorr = num(f.midHiCorr, 1);
+      const activeMpsSpeech4_16 = num(f.activeMpsSpeech4_16, num(f.mpsSpeech4_16, 0));
+      const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.5);
+      const minVoiced = num(opts?.minVoicedRatio, 0.4);
+      const minDur = num(opts?.minDurationSec, 0.8);
+      const minSpeechMod = num(opts?.minSpeechMod, 0.04);
+
+      const eligible =
+        activeFrameCount >= 20 &&
+        voicedRatio >= minVoiced &&
+        durationSec >= minDur &&
+        activeMpsSpeech4_16 >= minSpeechMod;
+
+      let score = 0;
+      if (eligible) {
+        score = round3(clamp01((0.22 - midHiCorr) / 0.35));
+      }
+      const triggered = isNumericOverride ? eligible && score >= threshold : eligible && score >= threshold;
+
+      return {
+        triggered,
+        score,
+        threshold,
+        evidence: `midHiCorr=${midHiCorr}, mps4_16=${activeMpsSpeech4_16}`,
+        hint: "Couple high-frequency breath/consonant excitation to the same lung-pressure and vocal-tract envelope as the mid-band voice.",
+      };
+    },
+  },
+  {
+    id: "F38_SPECTRUM_PEAK_DULLNESS",
+    domain: "hollowness",
+    name: "Broad Dull Spectral Skirt (Low Harmonic Concentration)",
+    detect(f, override) {
+      const activeFrameCount = num(f.activeFrameCount);
+      const voicedRatio = num(f.voicedRatio);
+      const durationSec = num(f.durationSec);
+      const specKurtMean = num(f.specKurtMean, 200);
+      const hf4500_7000Db = num(f.hf4500_7000Db, -90);
+      const activeMpsSpeech4_16 = num(f.activeMpsSpeech4_16, num(f.mpsSpeech4_16, 0));
+      const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.5);
+      const minVoiced = num(opts?.minVoicedRatio, 0.4);
+      const minDur = num(opts?.minDurationSec, 0.8);
+      const minSpeechMod = num(opts?.minSpeechMod, 0.04);
+
+      // Guard: voiced speech with smeared HF floor (excludes clean pure-tone chimes & marimba)
+      const eligible =
+        activeFrameCount >= 20 &&
+        voicedRatio >= minVoiced &&
+        durationSec >= minDur &&
+        activeMpsSpeech4_16 >= minSpeechMod &&
+        hf4500_7000Db >= -25;
+
+      let score = 0;
+      if (eligible) {
+        score = round3(clamp01((95 - specKurtMean) / 65));
+      }
+      const triggered = isNumericOverride ? eligible && score >= threshold : eligible && score >= threshold;
+
+      return {
+        triggered,
+        score,
+        threshold,
+        evidence: `specKurtMean=${specKurtMean}, hf4.5_7k=${hf4500_7000Db}dB`,
+        hint: "Focus vocal harmonics cleanly instead of spreading dull broadband skirt energy around formant peaks.",
+      };
+    },
+  },
+  {
+    id: "F39_RIGID_SYLLABLE_CADENCE",
+    domain: "prosody_rhythm",
+    name: "Rigid / Isochronous Syllable Peak Cadence",
+    detect(f, override) {
+      const activeFrameCount = num(f.activeFrameCount);
+      const voicedRatio = num(f.voicedRatio);
+      const durationSec = num(f.durationSec);
+      const syllPeakCount = num(f.syllPeakCount, 0);
+      const syllIoiCv = num(f.syllIoiCv, 1);
+      const activeMpsSpeech4_16 = num(f.activeMpsSpeech4_16, num(f.mpsSpeech4_16, 0));
+      const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.5);
+      const minPeaks = num(opts?.minSyllPeaks, 5);
+      const maxCv = num(opts?.maxSyllIoiCv, 0.22);
+
+      const eligible =
+        activeFrameCount >= 20 &&
+        voicedRatio >= 0.4 &&
+        durationSec >= 1.0 &&
+        activeMpsSpeech4_16 >= 0.04 &&
+        syllPeakCount >= minPeaks;
+
+      let score = 0;
+      if (eligible) {
+        score = round3(clamp01((maxCv * 1.4 - syllIoiCv) / (maxCv * 0.8)));
+      }
+      const triggered = isNumericOverride ? eligible && score >= threshold : eligible && score >= threshold;
+
+      return {
+        triggered,
+        score,
+        threshold,
+        evidence: `syllIoiCv=${syllIoiCv} (peaks=${syllPeakCount})`,
+        hint: "Allow natural elastic timing across morae and phrase boundaries instead of evenly-spaced mechanical syllable beats.",
+      };
+    },
+  },
+  {
+    id: "F40_SYMMETRIC_GLOTTAL_SPIKE",
+    domain: "waveform_dynamics",
+    name: "Symmetric Spiky Glottal Pulse (Missing Fold Asymmetry)",
+    detect(f, override) {
+      const activeFrameCount = num(f.activeFrameCount);
+      const voicedRatio = num(f.voicedRatio);
+      const durationSec = num(f.durationSec);
+      const frameCrestMean = num(f.frameCrestMean, 0);
+      const waveSkewMean = num(f.waveSkewMean, 1);
+      const activeMpsSpeech4_16 = num(f.activeMpsSpeech4_16, num(f.mpsSpeech4_16, 0));
+      const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.5);
+      const minVoiced = num(opts?.minVoicedRatio, 0.4);
+      const minDur = num(opts?.minDurationSec, 0.8);
+      const minSpeechMod = num(opts?.minSpeechMod, 0.04);
+
+      const eligible =
+        activeFrameCount >= 20 &&
+        voicedRatio >= minVoiced &&
+        durationSec >= minDur &&
+        activeMpsSpeech4_16 >= minSpeechMod;
+
+      let score = 0;
+      if (eligible) {
+        const sCrest = clamp01((frameCrestMean - 2.65) / 0.45);
+        const sSkew = clamp01((0.35 - waveSkewMean) / 0.13);
+        score = round3(sCrest * sSkew);
+      }
+      const triggered = isNumericOverride ? eligible && score >= threshold : eligible && score >= threshold;
+
+      return {
+        triggered,
+        score,
+        threshold,
+        evidence: `frameCrestMean=${frameCrestMean}, waveSkewMean=${waveSkewMean}`,
+        hint: "Soften glottal closure spikiness and preserve natural opening/closing waveform asymmetry of organic vocal folds.",
+      };
+    },
+  },
 ];
 
 export const SPECTRAL_FALSIFIERS = [...SPECTRAL_CORE_FALSIFIERS, ...SPECTRAL_EXTRA_FALSIFIERS];

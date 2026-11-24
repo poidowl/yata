@@ -343,6 +343,7 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
   for (let start = 0; start + frameSize <= n; start += hopSize) {
     let sumSq = 0;
     let rawSumSq = 0;
+    let rawSumCube = 0;
     let zcr = 0;
     let diffSq = 0;
     let peakPos = -Infinity;
@@ -355,6 +356,7 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
       const raw = samples[idx];
       sumSq += x * x;
       rawSumSq += raw * raw;
+      rawSumCube += raw * raw * raw;
       if (raw > peakPos) peakPos = raw;
       if (raw < peakNeg) peakNeg = raw;
       if (raw >= 0.995 || raw <= -0.995) clipped = true;
@@ -368,6 +370,9 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
 
     const rms = Math.sqrt(sumSq / frameSize);
     const rawRms = Math.sqrt(rawSumSq / frameSize);
+    const rawAbsPeak = Math.max(Math.abs(peakPos), Math.abs(peakNeg));
+    const frameCrest = rawRms > 1e-6 ? rawAbsPeak / rawRms : 0;
+    const frameSkew = rawRms > 1e-6 ? Math.abs(rawSumCube / frameSize / (rawRms * rawRms * rawRms)) : 0;
     const rmsDb = 20 * Math.log10(Math.max(rms, 1e-6));
     const zcrRate = zcr / frameSize;
     const hfRatio = sumSq > 1e-8 ? Math.min(1, diffSq / (sumSq * 2.0)) : 0;
@@ -497,6 +502,25 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
     const hiBand2800_11000Db =
       10 * Math.log10((powPrefix[b11000 + 1] - powPrefix[b2800]) / band80_11kPow + 1e-9);
 
+    // v0.9 F38 spectral kurtosis over 80–10000 Hz
+    let specKurtosis = 0;
+    const band80_10kPow = powPrefix[b10000 + 1] - powPrefix[b80];
+    if (band80_10kPow > 1e-18) {
+      let sumFP = 0;
+      for (let b = b80; b <= b10000; b++) sumFP += b * binHz * pow[b];
+      const pCent = sumFP / band80_10kPow;
+      let varF = 0;
+      let m4F = 0;
+      for (let b = b80; b <= b10000; b++) {
+        const pn = pow[b] / band80_10kPow;
+        const df = b * binHz - pCent;
+        const df2 = df * df;
+        varF += df2 * pn;
+        m4F += df2 * df2 * pn;
+      }
+      if (varF > 1) specKurtosis = Math.min(2000, m4F / (varF * varF));
+    }
+
     // Top-1 peak energy share (domBin ± 2) for F20 STERILE_PURE_TONE
     const top1Lo = Math.max(1, domBin - 2);
     const top1Hi = Math.min(halfBins - 1, domBin + 2);
@@ -615,6 +639,9 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
       bodyBand80_200Db,
       hf4500_7000Db,
       hiBand2800_11000Db,
+      frameCrest,
+      frameSkew,
+      specKurtosis,
     });
   }
 
@@ -1081,14 +1108,17 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
   const activeHiBandDb = activeIndices.map((i) => frameExtras[i].hiBand2800_11000Db);
   const hiBand2800_11000StdDb = activeCount ? stdOf(activeHiBandDb, meanOf(activeHiBandDb)) : 0;
 
-  // --- F36: Coarticulation seam / loudness-invariant Mel spectral-shape switching ---
+  // --- F36–F37: Coarticulation seam & mid-high band coupling from dbMatrix ---
   const dbMat = profile.spectrogram?.dbMatrix;
   let hiToMidStdDb = 0;
   let relMelFluxStdDb = 0;
+  let midHiCorr = 1;
   if (Array.isArray(dbMat) && dbMat.length === frames.length && frames.length > 0 && dbMat[0].length >= 46) {
     const seamThr = Math.max(0.03, maxRms * 0.08);
     const hiToMidVals = [];
     const relFluxVals = [];
+    const midBandVals = [];
+    const hiBandVals = [];
     let currShape = new Float32Array(40);
     let prevShape = new Float32Array(40);
     let hasPrev = false;
@@ -1109,6 +1139,13 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
       for (let m = 14; m <= 25; m++) mid += col[m];
       hiToMidVals.push(hi / 16 - mid / 12);
 
+      let midC = 0;
+      let hiC = 0;
+      for (let m = 16; m <= 25; m++) midC += col[m];
+      for (let m = 30; m <= 43; m++) hiC += col[m];
+      midBandVals.push(midC / 10);
+      hiBandVals.push(hiC / 14);
+
       if (hasPrev) {
         let d = 0;
         for (let k = 0; k < 40; k++) d += Math.abs(currShape[k] - prevShape[k]);
@@ -1121,7 +1158,37 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     }
     if (hiToMidVals.length >= 4) hiToMidStdDb = stdOf(hiToMidVals, meanOf(hiToMidVals));
     if (relFluxVals.length >= 4) relMelFluxStdDb = stdOf(relFluxVals, meanOf(relFluxVals));
+    if (midBandVals.length >= 8) midHiCorr = pearson(midBandVals, hiBandVals);
   }
+
+  // --- F38 & F40: Active-frame spectral kurtosis, frame crest, waveform skewness ---
+  const specKurtMean = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].specKurtosis)) : 0;
+  const frameCrestMean = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].frameCrest)) : 0;
+  const waveSkewMean = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].frameSkew)) : 0;
+
+  // --- F39: Syllable peak cadence elasticity ---
+  const syllPeakTimes = [];
+  const syllPeakThr = maxRms * 0.25;
+  for (let i = 2; i + 2 < frames.length; i++) {
+    const r = frames[i].rms;
+    if (
+      r >= syllPeakThr &&
+      r > frames[i - 1].rms &&
+      r >= frames[i + 1].rms &&
+      r > frames[i - 2].rms &&
+      r >= frames[i + 2].rms
+    ) {
+      const t = frames[i].timeSec;
+      if (syllPeakTimes.length === 0 || t - syllPeakTimes[syllPeakTimes.length - 1] >= 0.08) {
+        syllPeakTimes.push(t);
+      }
+    }
+  }
+  const syllPeakCount = syllPeakTimes.length;
+  const syllIois = [];
+  for (let i = 1; i < syllPeakCount; i++) syllIois.push(syllPeakTimes[i] - syllPeakTimes[i - 1]);
+  const meanSyllIoi = meanOf(syllIois);
+  const syllIoiCv = syllIois.length >= 2 && meanSyllIoi > 1e-4 ? stdOf(syllIois, meanSyllIoi) / meanSyllIoi : 0;
 
   const lowBandRatio = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].lowBandRatio)) : 0;
   const subBassRatio = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].subBassRatio)) : 0;
@@ -1459,13 +1526,19 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     breathlessWallRatio: breath.breathlessWallRatio,
     tailTruncatedAtEof,
 
-    // === v0.9 Anti-Fog Live-vs-Synthetic Dynamics (F35–F36) ===
+    // === v0.9 Anti-Fog Live-vs-Synthetic Dynamics (F35–F40) ===
     bodyBand80_200Db: roundTo(bodyBand80_200Db, 2),
     hf4500_7000Db: roundTo(hf4500_7000Db, 2),
     hiBand2800_11000StdDb: roundTo(hiBand2800_11000StdDb, 2),
     centroidStdHz: roundTo(centroidStdHz, 1),
     hiToMidStdDb: roundTo(hiToMidStdDb, 2),
     relMelFluxStdDb: roundTo(relMelFluxStdDb, 2),
+    midHiCorr: roundTo(midHiCorr, 3),
+    specKurtMean: roundTo(specKurtMean, 1),
+    syllPeakCount,
+    syllIoiCv: roundTo(syllIoiCv, 3),
+    frameCrestMean: roundTo(frameCrestMean, 3),
+    waveSkewMean: roundTo(waveSkewMean, 3),
   };
 
   // --- v0.6 Voice Compass ("sound produced to be heard by someone, using a respiratory organ") ---
