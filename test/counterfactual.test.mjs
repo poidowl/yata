@@ -357,5 +357,38 @@ describe("v0.6: Breath & Pause Profile, Timeline Diff & Minimal Counterfactual M
     assert.match(compact, /RESP=\d\.\d\d DIR=\d\.\d\d \[addressed_breath\]/);
     assert.match(full, /VOICE COMPASS: RESP=\d\.\d\d DIR=\d\.\d\d \[addressed_breath\]/);
   });
+
+  it("computeVoiceCompass is bit-exact across extractFeatures vs extractSegmentTimeline and invariant to trailing silence", () => {
+    // 1. Entrypoint parity on 2s 1kHz 2Hz-AM tone (Observer #1 exact repro)
+    const n2 = Math.round(SR * 2.0);
+    const amTone = new Float32Array(n2);
+    for (let i = 0; i < n2; i++) {
+      const t = i / SR;
+      const env = 0.5 * (1 + Math.sin(2 * Math.PI * 2 * t));
+      amTone[i] = 0.45 * env * Math.sin(2 * Math.PI * 1000 * t);
+    }
+    const feat = yata.extractFeatures(amTone, SR);
+    const prof = yata.extractAudioProfile(amTone, SR);
+    const tl = yata.extractSegmentTimeline(prof, amTone, SR);
+    assert.equal(tl.voiceCompass.respiratoryScore, feat.respiratoryScore);
+    assert.equal(tl.voiceCompass.directnessScore, feat.directnessScore);
+
+    // 2. Trailing silence invariance: 0.5s constant tone vs 0.5s tone + 1.5s trailing silence
+    const nHalf = Math.round(SR * 0.5);
+    const bare = new Float32Array(nHalf);
+    const padded = new Float32Array(n2);
+    for (let i = 0; i < nHalf; i++) {
+      const v = 0.45 * Math.sin((2 * Math.PI * 440 * i) / SR);
+      bare[i] = v;
+      padded[i] = v;
+    }
+    const bareFeat = yata.extractFeatures(bare, SR);
+    const padFeat = yata.extractFeatures(padded, SR);
+    const diffDir = Math.abs(padFeat.directnessScore - bareFeat.directnessScore);
+    assert.ok(
+      diffDir < 0.05,
+      `Expected trailing silence not to inflate directnessScore: bare=${bareFeat.directnessScore}, padded=${padFeat.directnessScore}, diff=${diffDir}`
+    );
+  });
 });
 

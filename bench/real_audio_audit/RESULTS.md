@@ -1,6 +1,6 @@
 # yata v0.6 — Reproducible Real-Audio & Protected Shelf Audit (`RESULTS.md`)
 
-Generated: `2026-11-24T06:48:40.327Z` by `node bench/real_audio_audit/run_real_audio_audit.mjs`
+Generated: `2026-11-24T07:01:18.749Z` by `node bench/real_audio_audit/run_real_audio_audit.mjs`
 Manifest: [`manifest.json`](./manifest.json) (20 trimmed 24kHz mono clips from 16 Wikimedia Commons sources with verified licenses + 9 `tokiko-axis` clips).
 
 > **Brutal Honesty First**: On synthetic unit tests, all 32 falsifiers pass 100%. On **real human/animal recordings and `tokiko-axis` Japanese speech**, running all 32 axes with unilateral veto power (`--policy veto_all`) causes a high false-positive rate. This report quantifies that exact gap across **`core_veto`** (default), **`shelf_veto`** (suspends veto on shelf-contested axes), and **`veto_all`**, reports **out-of-sample Leave-One-Out (LOO) & cross-domain generalization**, lists every `CONTESTED` axis, separates **LLM visual readability** from **detector precision/recall**, and evaluates the **v0.5 neuroscience DSP lenses** (Arnal `30–150 Hz` MPS roughness & nonlinear subharmonics) honestly on real audio.
@@ -168,16 +168,16 @@ Honest real-audio evaluation of `mpsRoughness30_150` & `mpsRoughToSpeechRatio` (
 
 | Group | Clips | `respiratoryScore` | `directnessScore` | Quadrant Counts |
 | :--- | ---: | :--- | :--- | :--- |
-| **`tokiko-axis` Speech** | 9 | mean **0.9969** (min 0.9895, max 1) | mean **0.9983** (min 0.9967, max 0.9996) | `addressed_breath`: 9 |
-| **Benign Real Wikimedia** | 10 | mean **0.8119** (min 0.5962, max 1) | mean **0.7187** (min 0.3736, max 0.9989) | `addressed_breath`: 7, `distant_or_private_breath`: 3 |
-| **Historical Recordings** | 2 | mean **0.7296** (min 0.474, max 0.9853) | mean **0.8216** (min 0.751, max 0.8922) | `addressed_breath`: 1, `non_breath_signal`: 1 |
-| **Expected-Unkawaii Real** | 5 | mean **0.7734** (min 0.3382, max 0.9719) | mean **0.6452** (min 0.3371, max 0.8607) | `addressed_breath`: 3, `distant_or_private_breath`: 1, `non_breath_signal`: 1 |
+| **`tokiko-axis` Speech** | 9 | mean **0.9969** (min 0.9895, max 1) | mean **0.9857** (min 0.9565, max 0.9992) | `addressed_breath`: 9 |
+| **Benign Real Wikimedia** | 10 | mean **0.8119** (min 0.5962, max 1) | mean **0.7145** (min 0.3736, max 0.9913) | `addressed_breath`: 7, `distant_or_private_breath`: 3 |
+| **Historical Recordings** | 2 | mean **0.7296** (min 0.474, max 0.9853) | mean **0.801** (min 0.7097, max 0.8922) | `addressed_breath`: 1, `non_breath_signal`: 1 |
+| **Expected-Unkawaii Real** | 5 | mean **0.7734** (min 0.3382, max 0.9719) | mean **0.6405** (min 0.3371, max 0.8607) | `addressed_breath`: 3, `distant_or_private_breath`: 1, `non_breath_signal`: 1 |
 
 | Clip ID | Group | Title / Utterance | `RESP` | `DIR` | Quadrant (`voiceCompassLabel`) |
 | :--- | :--- | :--- | ---: | ---: | :--- |
-| `tokiko_naru_kawaii` | `tokiko` | kawaii:なる | 1.00 | 1.00 | `addressed_breath` |
-| `tokiko_naru_amae` | `tokiko` | amae:なる | 1.00 | 1.00 | `addressed_breath` |
-| `tokiko_naru_genki` | `tokiko` | genki:なる | 1.00 | 1.00 | `addressed_breath` |
+| `tokiko_naru_kawaii` | `tokiko` | kawaii:なる | 1.00 | 0.96 | `addressed_breath` |
+| `tokiko_naru_amae` | `tokiko` | amae:なる | 1.00 | 0.96 | `addressed_breath` |
+| `tokiko_naru_genki` | `tokiko` | genki:なる | 1.00 | 0.96 | `addressed_breath` |
 | `tokiko_watashi_kawaii` | `tokiko` | kawaii:わたし、にほんご、ちょっとしゃべれます | 1.00 | 1.00 | `addressed_breath` |
 | `tokiko_watashi_amae` | `tokiko` | amae:わたし、にほんご、ちょっとしゃべれます | 0.99 | 1.00 | `addressed_breath` |
 | `tokiko_watashi_genki` | `tokiko` | genki:わたし、にほんご、ちょっとしゃべれます | 0.99 | 1.00 | `addressed_breath` |
@@ -186,21 +186,21 @@ Honest real-audio evaluation of `mpsRoughness30_150` & `mpsRoughToSpeechRatio` (
 | `tokiko_ohayo_genki` | `tokiko` | genki:おはよう、きょうは、いいてんきだね | 1.00 | 1.00 | `addressed_breath` |
 | `clip_01` | `benign_real_audio` | Georgian polyphonic folk song 'Chakrulo' (1957) | 0.79 | 0.97 | `addressed_breath` |
 | `clip_02` | `benign_real_audio` | Mozart 'Die Zauberflote' vocal ensemble (Ferenc Fricsay, 1953) | 0.98 | 0.77 | `addressed_breath` |
-| `clip_03` | `historical_recording` | Metropolitan Quartet 'Darling Nellie Gray' (1909 78rpm) | 0.99 | 0.75 | `addressed_breath` |
+| `clip_03` | `historical_recording` | Metropolitan Quartet 'Darling Nellie Gray' (1909 78rpm) | 0.99 | 0.71 | `addressed_breath` |
 | `clip_04` | `historical_recording` | Au Clair de la Lune (1860 phonautogram, oldest human voice) | 0.47 | 0.89 | `non_breath_signal` |
 | `clip_05` | `benign_real_audio` | Catalan folk lullaby 'El Noi de la Mare' (acoustic guitar) | 0.77 | 0.53 | `addressed_breath` |
-| `clip_06` | `benign_real_audio` | Real baby laughing | 0.88 | 1.00 | `addressed_breath` |
+| `clip_06` | `benign_real_audio` | Real baby laughing | 0.88 | 0.99 | `addressed_breath` |
 | `clip_07` | `expected_unkawaii` | Cat hissing aggressively | 0.97 | 0.54 | `addressed_breath` |
 | `clip_08` | `expected_unkawaii` | Periodic alarm / siren beep | 0.34 | 0.74 | `non_breath_signal` |
-| `clip_09` | `benign_real_audio` | Red-winged Blackbird song | 0.65 | 0.39 | `distant_or_private_breath` |
+| `clip_09` | `benign_real_audio` | Red-winged Blackbird song | 0.65 | 0.38 | `distant_or_private_breath` |
 | `clip_10` | `expected_unkawaii` | Synthetic perturbation of clip_05 (+60Hz/120Hz hum + 2-sample click @ 1.20s) | 0.83 | 0.34 | `distant_or_private_breath` |
 | `p1_baby` | `benign_real_audio` | Mudchute farm lamb bleat | 0.60 | 0.75 | `addressed_breath` |
-| `p1_adult` | `neutral_adult_animal` | Mudchute farm adult sheep bleat | 0.93 | 0.72 | `addressed_breath` |
+| `p1_adult` | `neutral_adult_animal` | Mudchute farm adult sheep bleat | 0.93 | 0.67 | `addressed_breath` |
 | `p2_baby` | `benign_real_audio` | Young female cat meow | 0.72 | 0.37 | `distant_or_private_breath` |
 | `p2_adult` | `expected_unkawaii` | Cat hissing aggressively | 0.97 | 0.54 | `addressed_breath` |
-| `p3_baby` | `benign_real_audio` | Real baby laughing | 0.88 | 1.00 | `addressed_breath` |
+| `p3_baby` | `benign_real_audio` | Real baby laughing | 0.88 | 0.99 | `addressed_breath` |
 | `p3_adult` | `benign_real_audio` | Adult male Georgian folk singing ('Chakrulo', 1957) | 1.00 | 0.98 | `addressed_breath` |
 | `p4_baby` | `benign_real_audio` | Three-striped palm squirrel chirping | 0.73 | 0.47 | `distant_or_private_breath` |
 | `p4_adult` | `expected_unkawaii` | Wild boar growling | 0.76 | 0.86 | `addressed_breath` |
-| `p5_baby` | `benign_real_audio` | Small dog bark | 1.00 | 0.94 | `addressed_breath` |
-| `p5_adult` | `expected_unkawaii` | Giant canine deep growl | 0.97 | 0.75 | `addressed_breath` |
+| `p5_baby` | `benign_real_audio` | Small dog bark | 1.00 | 0.93 | `addressed_breath` |
+| `p5_adult` | `expected_unkawaii` | Giant canine deep growl | 0.97 | 0.73 | `addressed_breath` |

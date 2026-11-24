@@ -1723,7 +1723,28 @@ export function computeVoiceCompass(frames, features = null, breathProfile = nul
   const rumblePenalty = 1 - 0.55 * clamp01((subBassRatio - 0.20) / 0.50);
   const bandFocus = clamp01(clamp01(midOnlyRatio / 0.50) * rumblePenalty);
 
+  // Trim leading/trailing silence so forgetting to stop recording never inflates figure-ground or modulation scores
+  let firstActiveIdx = -1;
+  let lastActiveIdx = -1;
+  for (let i = 0; i < fList.length; i++) {
+    if (finite(fList[i]?.rms, 0) >= activeThresh) {
+      if (firstActiveIdx < 0) firstActiveIdx = i;
+      lastActiveIdx = i;
+    }
+  }
+  const trimmedSpan =
+    firstActiveIdx >= 0 && lastActiveIdx >= firstActiveIdx
+      ? fList.slice(firstActiveIdx, lastActiveIdx + 1)
+      : activeFrames;
+  const trimmedRms = trimmedSpan.map((fr) => finite(fr.rms, 0));
+  const meanTrimmedRms = meanOf(trimmedRms);
+  const trimmedRmsCv = meanTrimmedRms > 1e-6 ? stdOf(trimmedRms, meanTrimmedRms) / meanTrimmedRms : 0;
+
   // 2b. Syllabic / call modulation clarity (4–16 Hz speech/call band vs 30–150 Hz harshness & diffuse noise)
+  // Guard against trailing-silence step edges mimicking 4–16 Hz modulation on a flat constant tone
+  const internalModGate = clamp01(
+    Math.max((trimmedRmsCv - 0.06) / 0.14, finite(breath.pauseCount, 0) > 0 ? 1 : 0)
+  );
   const mpsSpeech = Math.max(0, finite(feat.mpsSpeech4_16, 0));
   const mpsRough = Math.max(0, finite(feat.mpsRoughness30_150, 0));
   const mpsRatio =
@@ -1731,9 +1752,9 @@ export function computeVoiceCompass(frames, features = null, breathProfile = nul
       ? mpsSpeech / (mpsSpeech + mpsRough * 1.5 + 0.015)
       : clamp01(activeRmsCv / 0.35) * 0.6;
   const nonDiffuse = 1 - clamp01((meanSpectralFlatness - 0.15) / 0.55);
-  const modClarity = clamp01(clamp01(mpsRatio / 0.75) * nonDiffuse);
+  const modClarity = clamp01(clamp01(mpsRatio / 0.75) * nonDiffuse * internalModGate);
 
-  // 2c. Figure-ground clarity (audibility + active-vs-floor dynamic contrast + tonal SNR)
+  // 2c. Figure-ground clarity (audibility + internal trimmed-span dynamic contrast + tonal SNR)
   let peak = Number.isFinite(feat.peak) ? Math.max(0, feat.peak) : 0;
   if (!Number.isFinite(feat.peak)) {
     for (const fr of fList) {
@@ -1743,9 +1764,8 @@ export function computeVoiceCompass(frames, features = null, breathProfile = nul
     if (peak <= 0) peak = maxRms;
   }
   const audibility = clamp01(peak / 0.12);
-  const allRms = fList.map((fr) => finite(fr.rms, 0));
-  const p90Rms = allRms.length > 0 ? percentile(allRms, 0.9) : maxRms;
-  const p10Rms = allRms.length > 0 ? percentile(allRms, 0.1) : 0;
+  const p90Rms = trimmedRms.length > 0 ? percentile(trimmedRms, 0.9) : maxRms;
+  const p10Rms = trimmedRms.length > 0 ? percentile(trimmedRms, 0.1) : 0;
   const envContrast = p90Rms > 1e-6 ? clamp01((p90Rms - p10Rms) / p90Rms) : 0;
   const meanHnrDb = Number.isFinite(feat.meanVoicedHnrDb)
     ? feat.meanVoicedHnrDb
@@ -1864,43 +1884,12 @@ export function extractSegmentTimeline(profile, samples, sampleRate, opts = { wi
     });
   }
 
-  // Lightweight full-clip summary for consistent Voice Compass on timeline
-  const fullMps = computeMpsRoughness(sig, sr);
-  let sigPeak = 0;
-  for (let i = 0; i < n; i++) {
-    const a = Math.abs(finite(sig[i], 0));
-    if (a > sigPeak) sigPeak = a;
-  }
-  let midOnlyRatio;
-  let subBassRatio;
-  const sFreqs = prof?.spectralSlice?.freqsHz;
-  const sDb = prof?.spectralSlice?.meanDb;
-  if (Array.isArray(sFreqs) && Array.isArray(sDb) && sFreqs.length === sDb.length && sFreqs.length > 0) {
-    let totalP = 0;
-    let midP = 0;
-    let subP = 0;
-    for (let i = 0; i < sFreqs.length; i++) {
-      const p = Math.pow(10, Math.max(-100, finite(sDb[i], -100)) / 10);
-      totalP += p;
-      if (sFreqs[i] >= 300 && sFreqs[i] <= 3400) midP += p;
-      if (sFreqs[i] >= 20 && sFreqs[i] <= 90) subP += p;
-    }
-    if (totalP > 1e-12) {
-      midOnlyRatio = midP / totalP;
-      subBassRatio = subP / totalP;
-    }
-  }
-  const voiceCompass = computeVoiceCompass(
-    frames,
-    {
-      durationSec,
-      peak: sigPeak,
-      mpsSpeech4_16: fullMps.mpsSpeech4_16,
-      mpsRoughness30_150: fullMps.mpsRoughness30_150,
-      ...(midOnlyRatio !== undefined ? { midOnlyRatio, subBassRatio } : {}),
-    },
-    breath
-  );
+  // Share exact full-clip features so Voice Compass matches extractFeatures bit-for-bit
+  const fullFeatures =
+    opts?.features && typeof opts.features === "object"
+      ? opts.features
+      : extractFeatures(sig, sr);
+  const voiceCompass = computeVoiceCompass(frames, fullFeatures, breath);
 
   return {
     schema: "unkawaii_timeline/v0.5",
