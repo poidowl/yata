@@ -133,7 +133,7 @@ function getFalsifierResult(report, id) {
 describe("M2: 64-Axis Falsifier Registry & Report Engine", () => {
   it("exports ORIGINAL_6_FALSIFIERS (6) and DEFAULT_FALSIFIERS (64) in exact F1..F64 order with unique IDs", () => {
     assert.equal(ORIGINAL_6_FALSIFIERS.length, 6);
-    assert.equal(DEFAULT_FALSIFIERS.length, 64);
+    assert.equal(DEFAULT_FALSIFIERS.length, 65);
 
     const expectedCoreIds = [
       "F1_HARSH_EDGE",
@@ -149,7 +149,7 @@ describe("M2: 64-Axis Falsifier Registry & Report Engine", () => {
     );
 
     const seen = new Set();
-    for (let i = 0; i < 64; i++) {
+    for (let i = 0; i < 65; i++) {
       const f = DEFAULT_FALSIFIERS[i];
       assert.ok(f.id.startsWith(`F${i + 1}_`), `Index ${i} expected F${i + 1}_*, got ${f.id}`);
       assert.equal(typeof f.domain, "string");
@@ -178,7 +178,7 @@ describe("M2: 64-Axis Falsifier Registry & Report Engine", () => {
           .join("; ")}`
       );
       assert.equal(rep.triggeredCount, 0);
-      assert.equal(rep.totalFalsifiers, 64);
+      assert.equal(rep.totalFalsifiers, 65);
       for (const f of rep.falsifiers) {
         assert.ok(Number.isFinite(f.score) && f.score >= 0 && f.score <= 1, `${f.id} score invalid`);
       }
@@ -739,7 +739,7 @@ describe("M2: 64-Axis Falsifier Registry & Report Engine", () => {
       ["short15ms", shortClip],
     ]) {
       const rep = analyzeSamples(buf, SR, { label });
-      assert.equal(rep.totalFalsifiers, 64);
+      assert.equal(rep.totalFalsifiers, 65);
       for (const f of rep.falsifiers) {
         assert.ok(
           Number.isFinite(f.score) && f.score >= 0 && f.score <= 1,
@@ -790,7 +790,7 @@ describe("M2: 64-Axis Falsifier Registry & Report Engine", () => {
     });
 
     const cmp = compareReports(repCore, repAll);
-    assert.equal(cmp.deltas.length, 64);
+    assert.equal(cmp.deltas.length, 65);
 
     const d1 = cmp.deltas.find((d) => d.id === "F1_HARSH_EDGE");
     assert.ok(d1 && d1.aScore !== null && d1.bScore !== null && d1.deltaBMinusA !== null);
@@ -813,7 +813,7 @@ describe("M2: 64-Axis Falsifier Registry & Report Engine", () => {
     const compactClean = formatForLLM(repClean);
     const verboseClean = formatForLLM(repClean, { verbose: true });
     assert.ok(compactClean.split("\n").length <= 10, `Compact clean too long: ${compactClean.split("\n").length}`);
-    assert.ok(verboseClean.split("\n").length > 64, "Verbose dump should include all 64 falsifiers");
+    assert.ok(verboseClean.split("\n").length > 65, "Verbose dump should include all 64 falsifiers");
 
     const repBad = analyzeSamples(dc, SR, { label: "dc_bad" });
     const compactBad = formatForLLM(repBad);
@@ -1284,5 +1284,7 @@ describe("M2: 64-Axis Falsifier Registry & Report Engine", () => {
     assert.equal(byId("F62_REGISTER_BREAK_JUMP").detect({ ...cleanSpeech, maxIntraRunF0JumpSemi: 11.0 }).triggered, true);
     assert.equal(byId("F63_MICRO_TREMOR_STRESS").detect({ ...cleanSpeech, stressTremorDepth: 0.42 }).triggered, true);
     assert.equal(byId("F64_EAR_CANAL_FATIGUE_INDEX").detect({ ...cleanSpeech, earFatigueDensity: 0.55 }).triggered, true);
+    assert.equal(byId("F65_HF_PHASE_GRAININESS").detect({ ...cleanSpeech, hfBandWaveKurt: 3.12 }).triggered, false);
+    assert.equal(byId("F65_HF_PHASE_GRAININESS").detect({ ...cleanSpeech, hfBandWaveKurt: 3.78 }).triggered, true);
   });
 });

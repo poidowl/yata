@@ -1463,6 +1463,54 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
       )
     : 0;
   const waveKurtMean = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].frameKurt)) : 0;
+  // F65: High-frequency auditory-filter phase graininess (Patterson 1987 / Kohlrausch 1995)
+  // Measures time-domain waveform kurtosis inside 1.2–4.5 kHz bandpass (2400 Hz, Q=0.8).
+  // Phase-dispersed natural voices cluster near Gaussian (~3.0–3.2), whereas phase-locked
+  // pulse trains ("machine-gun graininess") exceed 3.50 even when broadband waveKurtMean is normal.
+  let hfBandWaveKurt = 3.0;
+  if (n >= 512 && sampleRate >= 8000 && maxRms > 1e-4) {
+    const fc = 2400;
+    const Q = 0.8;
+    const w0 = (2 * Math.PI * fc) / sampleRate;
+    const alpha = Math.sin(w0) / (2 * Q);
+    const a0 = 1 + alpha;
+    const b0 = alpha / a0;
+    const b2 = -alpha / a0;
+    const a1 = (-2 * Math.cos(w0)) / a0;
+    const a2 = (1 - alpha) / a0;
+    const bp = new Float32Array(n);
+    let bx1 = 0, bx2 = 0, by1 = 0, by2 = 0;
+    for (let i = 0; i < n; i++) {
+      const xi = samples[i];
+      const yi = b0 * xi + b2 * bx2 - a1 * by1 - a2 * by2;
+      bp[i] = yi;
+      bx2 = bx1; bx1 = xi; by2 = by1; by1 = yi;
+    }
+    const win = 512;
+    const step = 256;
+    const hfRmsThr = Math.max(0.012, maxRms * 0.04);
+    let kSum = 0;
+    let kCnt = 0;
+    for (let s = 0; s + win <= n; s += step) {
+      let e = 0;
+      for (let i = 0; i < win; i++) {
+        const v = bp[s + i];
+        e += v * v;
+      }
+      const r = Math.sqrt(e / win);
+      if (r < hfRmsThr) continue;
+      const invR = 1 / r;
+      let m4 = 0;
+      for (let i = 0; i < win; i++) {
+        const z = bp[s + i] * invR;
+        const z2 = z * z;
+        m4 += z2 * z2;
+      }
+      kSum += m4 / win;
+      kCnt++;
+    }
+    if (kCnt >= 4) hfBandWaveKurt = kSum / kCnt;
+  }
   const proximityBoomRatio = activeCount
     ? meanOf(activeIndices.map((i) => frameExtras[i].proximityBoomRatio))
     : 0;
@@ -1968,6 +2016,9 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     maxIntraRunF0JumpSemi: roundTo(maxIntraRunF0JumpSemi, 2),
     stressTremorDepth: roundTo(stressTremorDepth, 4),
     earFatigueDensity: roundTo(earFatigueDensity, 4),
+
+    // === v0.11 High-Frequency Auditory-Filter Phase Graininess (F65) ===
+    hfBandWaveKurt: roundTo(hfBandWaveKurt, 3),
   };
 
   // --- v0.6 Voice Compass ("sound produced to be heard by someone, using a respiratory organ") ---

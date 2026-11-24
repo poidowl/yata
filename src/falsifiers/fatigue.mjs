@@ -231,4 +231,32 @@ export const FATIGUE_FALSIFIERS = [
       };
     },
   },
+  {
+    id: "F65_HF_PHASE_GRAININESS",
+    domain: "waveform_dynamics",
+    name: "High-Frequency Phase-Locked Graininess (1.2–4.5 kHz)",
+    detect(f, override) {
+      const hfBandWaveKurt = num(f.hfBandWaveKurt, 3.0);
+      const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.5);
+      const minKurt = num(opts?.minHfWaveKurt, 3.5);
+      // Applies to voiced speech/tonal audio with sufficient active frames and speech modulation
+      const eligible =
+        num(f.activeFrameCount) >= 20 &&
+        num(f.voicedRatio) >= 0.45 &&
+        num(f.durationSec) >= 0.8 &&
+        num(f.activeMpsSpeech4_16, num(f.mpsSpeech4_16, 0)) >= 0.04;
+
+      const score = eligible ? round3(clamp01((hfBandWaveKurt - (minKurt - 0.35)) / 0.7)) : 0;
+      const triggered = isNumericOverride ? eligible && score >= threshold : eligible && score >= threshold;
+
+      return {
+        triggered,
+        score,
+        threshold,
+        evidence: `hfBandWaveKurt(1.2-4.5kHz)=${hfBandWaveKurt}`,
+        hint: "Disperse high-order harmonic phase alignment (group-delay dispersion) so 1.2–4.5 kHz sounds smooth rather than pulse-grainy.",
+        where: { freqHz: 2400 },
+      };
+    },
+  },
 ];
