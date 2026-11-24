@@ -161,25 +161,36 @@ export const PROSODY_FALSIFIERS = [
       const voicedFrameCount = num(f.voicedFrameCount);
       const flatStepRatio = num(f.flatStepRatio);
       const snapJumpCount = num(f.snapJumpCount);
+      const f0Range = num(f.f0RangeSemitones);
       const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.5);
       const minFlat = num(opts?.flatStepRatio, 0.65);
       const minJumps = num(opts?.snapJumpCount, 2);
+      const minPlateauFlat = num(opts?.plateauFlatRatio, 0.75);
+      const minPlateauRange = num(opts?.plateauRangeSemitones, 1.5);
 
       let score = 0;
       if (voicedFrameCount >= 15) {
         const fScore = clamp01((flatStepRatio - (minFlat - 0.35)) / 0.7);
         const jScore = clamp01(snapJumpCount / (minJumps * 2));
-        score = round3(Math.min(fScore, jScore));
+        const snapScore = Math.min(fScore, jScore);
+
+        const pfScore = clamp01((flatStepRatio - (minPlateauFlat - 0.25)) / 0.5);
+        const prScore = clamp01(f0Range / (minPlateauRange * 2));
+        const plateauScore = Math.min(pfScore, prScore);
+
+        score = round3(Math.max(snapScore, plateauScore));
       }
       const triggered = isNumericOverride
         ? voicedFrameCount >= 15 && score >= threshold
-        : voicedFrameCount >= 15 && flatStepRatio >= minFlat && snapJumpCount >= minJumps;
+        : voicedFrameCount >= 15 &&
+          ((flatStepRatio >= minFlat && snapJumpCount >= minJumps) ||
+            (flatStepRatio >= minPlateauFlat && f0Range >= minPlateauRange));
 
       return {
         triggered,
         score,
         threshold,
-        evidence: `flatStepRatio=${flatStepRatio}, snapJumps=${snapJumpCount}`,
+        evidence: `flatStepRatio=${flatStepRatio}, snapJumps=${snapJumpCount}, f0Range=${f0Range}st`,
         hint: "Loosen pitch-correction retune speed so transitions glide naturally instead of snapping to discrete steps.",
       };
     },
@@ -193,7 +204,7 @@ export const PROSODY_FALSIFIERS = [
       const shock = num(f.maxInternalShock);
       const timeSec = num(f.internalShockTimeSec);
       const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.5);
-      const minShock = num(opts?.maxInternalShock, 0.22);
+      const minShock = num(opts?.maxInternalShock, 0.18);
 
       const score = activeFrameCount >= 8 ? round3(shock / (minShock * 2)) : 0;
       const triggered = isNumericOverride

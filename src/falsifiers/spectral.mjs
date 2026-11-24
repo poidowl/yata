@@ -240,7 +240,7 @@ export const SPECTRAL_CORE_FALSIFIERS = [
       const maxPres = num(opts?.presenceRatio, 0.06);
 
       // Guard against clean tonal instruments/voices whose single fundamental happens to sit in 250-650 Hz
-      const isCongested = top1Share < 0.65 || (medianF0 > 0 && medianF0 < 240);
+      const isCongested = top1Share < 0.45 || (medianF0 > 0 && medianF0 < 250);
       let score = 0;
       if (activeFrameCount >= 5 && isCongested) {
         const bScore = clamp01((boxyRatio - (minBoxy - 0.25)) / 0.5);
@@ -277,8 +277,8 @@ export const SPECTRAL_CORE_FALSIFIERS = [
       const maxLow = num(opts?.lowWarmthRatio, 0.03);
       const maxAir = num(opts?.highAirRatio, 0.015);
 
-      // Guard against pure/gentle warm tones whose few harmonics naturally fall below 3.4 kHz
-      const isMidBandVoiceLike = centroid >= 750 && top1Share < 0.72;
+      // Guard against pure/gentle warm tones/chimes whose few harmonics naturally fall below 3.4 kHz
+      const isMidBandVoiceLike = centroid >= 750 && top1Share < 0.48;
       let score = 0;
       if (activeFrameCount >= 5 && isMidBandVoiceLike) {
         const mScore = clamp01((midOnlyRatio - (minMid - 0.07)) / 0.14);

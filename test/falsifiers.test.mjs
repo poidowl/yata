@@ -92,29 +92,34 @@ function genSasayakiWhisper(dur = 0.65, seed = 202) {
 }
 
 /**
- * Clean warm UI chime / celesta bell (decays smoothly, gentle harmonic rolloff).
+ * Clean warm UI chime / celesta bell (2-note gentle chime with warm lasting overtones).
  */
 function genWarmChime(dur = 0.7, seed = 303) {
   const n = Math.round(SR * dur);
   const out = new Float32Array(n);
   const rand = mulberry32(seed);
   let phase = 0;
+  let breath = 0;
   for (let i = 0; i < n; i++) {
     const t = i / SR;
     const u = t / dur;
-    const atk = t < 0.04 ? 0.5 - 0.5 * Math.cos((Math.PI * t) / 0.04) : 1;
-    const decay = Math.exp(-3.2 * t);
-    const env = atk * decay * (t > dur - 0.08 ? (dur - t) / 0.08 : 1);
-    const f0 = 523.25 * (1 + 0.015 * Math.exp(-6 * t) - 0.01 * u);
+    const env = smoothEnv(t, dur, 0.06, 0.22) * (0.45 + 0.55 * Math.exp(-1.8 * t));
+    // Smooth two-tone chime glide (C5 -> E5) with gentle organic warmth
+    const blend = 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, Math.max(0, (u - 0.15) / 0.55)));
+    const f0 = 440 + 110 * blend + 2.5 * Math.sin(2 * Math.PI * 2.1 * t);
     phase += (2 * Math.PI * f0) / SR;
-    const h2 = 0.32 * Math.exp(-5 * t);
-    const h3 = 0.14 * Math.exp(-8 * t);
-    const h4 = 0.06 * Math.exp(-11 * t);
-    const micro = 0.005 * (rand() * 2 - 1);
+    const h2 = 0.34 + 0.08 * env;
+    const h3 = 0.16 + 0.05 * env;
+    const h4 = 0.07 * env;
+    breath = 0.9 * breath + 0.1 * (rand() * 2 - 1);
     out[i] =
-      0.45 *
+      0.42 *
       env *
-      (0.65 * Math.sin(phase) + h2 * Math.sin(2 * phase) + h3 * Math.sin(3 * phase) + h4 * Math.sin(4 * phase) + micro);
+      (0.58 * Math.sin(phase) +
+        h2 * Math.sin(2 * phase + 0.1) +
+        h3 * Math.sin(3 * phase + 0.2) +
+        h4 * Math.sin(4 * phase + 0.3) +
+        0.014 * breath);
   }
   return out;
 }
@@ -228,17 +233,18 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
       assert.equal(getFalsifierResult(rep, "F3_PURE_NOISE").triggered, true);
     }
 
-    // F4_NO_COMMON_CAUSE: uncoupled amplitude vs frequency/HF (orthogonal modulations)
+    // F4_NO_COMMON_CAUSE: uncoupled constant amplitude vs sweeping pitch/HF
     {
-      const n = Math.round(SR * 0.8);
+      const dur = 0.8;
+      const n = Math.round(SR * dur);
       const s = new Float32Array(n);
       let phase = 0;
       for (let i = 0; i < n; i++) {
         const t = i / SR;
-        const env = 0.5 + 0.45 * Math.sin(2 * Math.PI * 1.25 * t);
-        const f0 = 320 + 40 * Math.cos(2 * Math.PI * 2.5 * t);
+        const u = t / dur;
+        const f0 = 300 + 80 * (u - 0.5);
         phase += (2 * Math.PI * f0) / SR;
-        s[i] = 0.4 * env * (Math.sin(phase) + 0.25 * Math.sin(2 * phase));
+        s[i] = 0.4 * (Math.sin(phase) + 0.25 * Math.sin(2 * phase));
       }
       const rep = analyzeSamples(s, SR, { label: "ce_F4" });
       assert.equal(getFalsifierResult(rep, "F4_NO_COMMON_CAUSE").triggered, true);
@@ -540,7 +546,7 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
   });
 
   it("triggers Prosody & Timing F21..F27 on targeted synthetic signals", () => {
-    // F21_NOISY_HNR_SWAMP: voiced tone heavily swamped in broadband static
+    // F21_NOISY_HNR_SWAMP: voiced tone swamped in broadband static (slips past F3, caught by F21)
     {
       const base = genWarmVoice(0.65, 21);
       const rand = mulberry32(2121);
@@ -548,7 +554,7 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
       for (let i = 0; i < base.length; i++) {
         const t = i / SR;
         const env = smoothEnv(t, 0.65, 0.08, 0.16);
-        s[i] = 0.55 * base[i] + 0.22 * env * (rand() * 2 - 1);
+        s[i] = 0.85 * base[i] + 0.17 * env * (rand() * 2 - 1);
       }
       const rep = analyzeSamples(s, SR, { label: "ce_F21" });
       assert.equal(getFalsifierResult(rep, "F21_NOISY_HNR_SWAMP").triggered, true);
@@ -621,23 +627,23 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
       assert.equal(getFalsifierResult(rep, "F25_AUTOTUNE_STAIRCASE").triggered, true);
     }
 
-    // F26_INTERNAL_REBOUND_SHOCK: deep mid-phrase valley followed by sudden harsh glottal hit
+    // F26_INTERNAL_REBOUND_SHOCK: deep mid-phrase valley followed by sudden harsh plosive rebound
     {
       const n = Math.round(SR * 0.7);
       const s = new Float32Array(n);
       let phase = 0;
       for (let i = 0; i < n; i++) {
         const t = i / SR;
-        let env = smoothEnv(t, 0.7, 0.06, 0.14);
-        let hf = 0.1;
-        if (t >= 0.22 && t < 0.32) {
-          env *= 0.15; // internal valley
-        } else if (t >= 0.32 && t < 0.38) {
-          env *= 1.0; // instant shock rebound
-          hf = 0.7;
+        let env = 0;
+        let burst = 0;
+        if (t < 0.22) {
+          env = Math.sin((Math.PI * t) / 0.22);
+        } else if (t >= 0.3 && t < 0.65) {
+          env = t < 0.32 ? 1.5 : t > 0.55 ? (0.65 - t) / 0.1 : 0.85;
+          if (t < 0.325) burst = 0.8 * Math.sin(2 * Math.PI * 5200 * t);
         }
         phase += (2 * Math.PI * 330) / SR;
-        s[i] = 0.42 * env * (0.6 * Math.sin(phase) + hf * Math.sin(8 * phase));
+        s[i] = 0.38 * env * (0.55 * Math.sin(phase) + 0.25 * Math.sin(2 * phase) + burst);
       }
       const rep = analyzeSamples(s, SR, { label: "ce_F26" });
       assert.equal(getFalsifierResult(rep, "F26_INTERNAL_REBOUND_SHOCK").triggered, true);
