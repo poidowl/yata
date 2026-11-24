@@ -55,7 +55,7 @@ describe("M4A: Root Facade Exports & CLI", () => {
       assert.ok(name in yata && yata[name] !== undefined, `Missing export: ${name}`);
     }
     assert.equal(yata.ORIGINAL_6_FALSIFIERS.length, 6);
-    assert.equal(yata.DEFAULT_FALSIFIERS.length, 35);
+    assert.equal(yata.DEFAULT_FALSIFIERS.length, 36);
   });
 
   it("supports single-file analysis with --format, --falsifiers, --view, --zoom, --charset, --svg, --png", () => {
@@ -80,7 +80,7 @@ describe("M4A: Root Facade Exports & CLI", () => {
       assert.equal(jsonRes.status, 0, jsonRes.stderr);
       const parsed = JSON.parse(jsonRes.stdout);
       assert.equal(parsed.verdict, "SURVIVED_KAWAII_CANDIDATE");
-      assert.equal(parsed.totalFalsifiers, 35);
+      assert.equal(parsed.totalFalsifiers, 36);
 
       const coreRes = runCli([posPath, "--falsifiers", "core", "--format", "json"]);
       assert.equal(coreRes.status, 0, coreRes.stderr);
@@ -116,7 +116,7 @@ describe("M4A: Root Facade Exports & CLI", () => {
       const cmpJson = runCli(["--compare", aPath, bPath, "--format", "json"]);
       assert.equal(cmpJson.status, 0, cmpJson.stderr);
       const parsed = JSON.parse(cmpJson.stdout);
-      assert.equal(parsed.deltas.length, 35);
+      assert.equal(parsed.deltas.length, 36);
 
       const diffRes = runCli(["--diff", aPath, bPath, "--svg", svgOut, "--png", pngOut]);
       assert.equal(diffRes.status, 0, diffRes.stderr);
@@ -130,11 +130,11 @@ describe("M4A: Root Facade Exports & CLI", () => {
     const listLlm = runCli(["--list-falsifiers"]);
     assert.equal(listLlm.status, 0, listLlm.stderr);
     assert.match(listLlm.stdout, /F1_HARSH_EDGE/);
-    assert.match(listLlm.stdout, /F35_SYNTHETIC_TUBE_FLATNESS/);
+    assert.match(listLlm.stdout, /F36_COARTICULATION_SEAM/);
 
     const listJson = runCli(["--list-falsifiers", "--format", "json"]);
     assert.equal(listJson.status, 0, listJson.stderr);
-    assert.equal(JSON.parse(listJson.stdout).length, 35);
+    assert.equal(JSON.parse(listJson.stdout).length, 36);
 
     const discLlm = runCli(["--discover"]);
     assert.equal(discLlm.status, 0, discLlm.stderr);

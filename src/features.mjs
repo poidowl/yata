@@ -1080,6 +1080,49 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     : -90;
   const activeHiBandDb = activeIndices.map((i) => frameExtras[i].hiBand2800_11000Db);
   const hiBand2800_11000StdDb = activeCount ? stdOf(activeHiBandDb, meanOf(activeHiBandDb)) : 0;
+
+  // --- F36: Coarticulation seam / loudness-invariant Mel spectral-shape switching ---
+  const dbMat = profile.spectrogram?.dbMatrix;
+  let hiToMidStdDb = 0;
+  let relMelFluxStdDb = 0;
+  if (Array.isArray(dbMat) && dbMat.length === frames.length && frames.length > 0 && dbMat[0].length >= 46) {
+    const seamThr = Math.max(0.03, maxRms * 0.08);
+    const hiToMidVals = [];
+    const relFluxVals = [];
+    let currShape = new Float32Array(40);
+    let prevShape = new Float32Array(40);
+    let hasPrev = false;
+    for (let i = 0; i < frames.length; i++) {
+      if (frames[i].rms < seamThr) {
+        hasPrev = false;
+        continue;
+      }
+      const col = dbMat[i];
+      let mu = 0;
+      for (let m = 6; m <= 45; m++) mu += col[m];
+      mu /= 40;
+      for (let m = 6; m <= 45; m++) currShape[m - 6] = col[m] - mu;
+
+      let hi = 0;
+      let mid = 0;
+      for (let m = 30; m <= 45; m++) hi += col[m];
+      for (let m = 14; m <= 25; m++) mid += col[m];
+      hiToMidVals.push(hi / 16 - mid / 12);
+
+      if (hasPrev) {
+        let d = 0;
+        for (let k = 0; k < 40; k++) d += Math.abs(currShape[k] - prevShape[k]);
+        relFluxVals.push(d / 40);
+      }
+      const tmp = prevShape;
+      prevShape = currShape;
+      currShape = tmp;
+      hasPrev = true;
+    }
+    if (hiToMidVals.length >= 4) hiToMidStdDb = stdOf(hiToMidVals, meanOf(hiToMidVals));
+    if (relFluxVals.length >= 4) relMelFluxStdDb = stdOf(relFluxVals, meanOf(relFluxVals));
+  }
+
   const lowBandRatio = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].lowBandRatio)) : 0;
   const subBassRatio = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].subBassRatio)) : 0;
   const meanRoughness = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].roughness)) : 0;
@@ -1416,11 +1459,13 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     breathlessWallRatio: breath.breathlessWallRatio,
     tailTruncatedAtEof,
 
-    // === v0.9 Anti-Fog Live-vs-Synthetic Dynamics (F35) ===
+    // === v0.9 Anti-Fog Live-vs-Synthetic Dynamics (F35–F36) ===
     bodyBand80_200Db: roundTo(bodyBand80_200Db, 2),
     hf4500_7000Db: roundTo(hf4500_7000Db, 2),
     hiBand2800_11000StdDb: roundTo(hiBand2800_11000StdDb, 2),
     centroidStdHz: roundTo(centroidStdHz, 1),
+    hiToMidStdDb: roundTo(hiToMidStdDb, 2),
+    relMelFluxStdDb: roundTo(relMelFluxStdDb, 2),
   };
 
   // --- v0.6 Voice Compass ("sound produced to be heard by someone, using a respiratory organ") ---

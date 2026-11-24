@@ -536,6 +536,45 @@ export const SPECTRAL_EXTRA_FALSIFIERS = [
       };
     },
   },
+  {
+    id: "F36_COARTICULATION_SEAM",
+    domain: "prosody_rhythm",
+    name: "Coarticulation Seam / Abrupt Spectral-Shape Switching",
+    detect(f, override) {
+      const activeFrameCount = num(f.activeFrameCount);
+      const voicedRatio = num(f.voicedRatio);
+      const durationSec = num(f.durationSec);
+      const hiToMidStdDb = num(f.hiToMidStdDb);
+      const relMelFluxStdDb = num(f.relMelFluxStdDb);
+      const activeMpsSpeech4_16 = num(f.activeMpsSpeech4_16, num(f.mpsSpeech4_16, 0));
+      const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.5);
+      const minVoiced = num(opts?.minVoicedRatio, 0.35);
+      const minDur = num(opts?.minDurationSec, 0.8);
+      const minSpeechMod = num(opts?.minSpeechMod, 0.04);
+
+      const eligible =
+        activeFrameCount >= 20 &&
+        voicedRatio >= minVoiced &&
+        durationSec >= minDur &&
+        activeMpsSpeech4_16 >= minSpeechMod;
+
+      let score = 0;
+      if (eligible) {
+        const s1 = clamp01((hiToMidStdDb - 11.2) / 3.2);
+        const s2 = clamp01((relMelFluxStdDb - 1.05) / 0.42);
+        score = round3(s1 * s2);
+      }
+      const triggered = isNumericOverride ? eligible && score >= threshold : eligible && score >= threshold;
+
+      return {
+        triggered,
+        score,
+        threshold,
+        evidence: `hiToMidStd=${hiToMidStdDb}dB, relMelFluxStd=${relMelFluxStdDb}dB, mps4_16=${activeMpsSpeech4_16}`,
+        hint: "Smooth consonant-to-vowel coarticulation seams so high-frequency fricatives/bursts blend organically into vocal-tract formants.",
+      };
+    },
+  },
 ];
 
 export const SPECTRAL_FALSIFIERS = [...SPECTRAL_CORE_FALSIFIERS, ...SPECTRAL_EXTRA_FALSIFIERS];

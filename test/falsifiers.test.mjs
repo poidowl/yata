@@ -130,10 +130,10 @@ function getFalsifierResult(report, id) {
   return found;
 }
 
-describe("M2: 35-Axis Falsifier Registry & Report Engine", () => {
-  it("exports ORIGINAL_6_FALSIFIERS (6) and DEFAULT_FALSIFIERS (35) in exact F1..F35 order with unique IDs", () => {
+describe("M2: 36-Axis Falsifier Registry & Report Engine", () => {
+  it("exports ORIGINAL_6_FALSIFIERS (6) and DEFAULT_FALSIFIERS (36) in exact F1..F36 order with unique IDs", () => {
     assert.equal(ORIGINAL_6_FALSIFIERS.length, 6);
-    assert.equal(DEFAULT_FALSIFIERS.length, 35);
+    assert.equal(DEFAULT_FALSIFIERS.length, 36);
 
     const expectedCoreIds = [
       "F1_HARSH_EDGE",
@@ -149,7 +149,7 @@ describe("M2: 35-Axis Falsifier Registry & Report Engine", () => {
     );
 
     const seen = new Set();
-    for (let i = 0; i < 35; i++) {
+    for (let i = 0; i < 36; i++) {
       const f = DEFAULT_FALSIFIERS[i];
       assert.ok(f.id.startsWith(`F${i + 1}_`), `Index ${i} expected F${i + 1}_*, got ${f.id}`);
       assert.equal(typeof f.domain, "string");
@@ -160,7 +160,7 @@ describe("M2: 35-Axis Falsifier Registry & Report Engine", () => {
     }
   });
 
-  it("clean pleasant positive controls survive 0/35 (warm voice, sasayaki whisper, warm chime, clean stereo)", () => {
+  it("clean pleasant positive controls survive 0/36 (warm voice, sasayaki whisper, warm chime, clean stereo)", () => {
     const positives = [
       { label: "warm_voice", samples: genWarmVoice(0.65, 101) },
       { label: "sasayaki_whisper", samples: genSasayakiWhisper(0.65, 202) },
@@ -173,12 +173,12 @@ describe("M2: 35-Axis Falsifier Registry & Report Engine", () => {
       assert.equal(
         rep.verdict,
         "SURVIVED_KAWAII_CANDIDATE",
-        `${item.label} should survive 0/35, but triggered: ${triggered
+        `${item.label} should survive 0/36, but triggered: ${triggered
           .map((t) => `${t.id}(score=${t.score}, ${t.evidence})`)
           .join("; ")}`
       );
       assert.equal(rep.triggeredCount, 0);
-      assert.equal(rep.totalFalsifiers, 35);
+      assert.equal(rep.totalFalsifiers, 36);
       for (const f of rep.falsifiers) {
         assert.ok(Number.isFinite(f.score) && f.score >= 0 && f.score <= 1, `${f.id} score invalid`);
       }
@@ -739,7 +739,7 @@ describe("M2: 35-Axis Falsifier Registry & Report Engine", () => {
       ["short15ms", shortClip],
     ]) {
       const rep = analyzeSamples(buf, SR, { label });
-      assert.equal(rep.totalFalsifiers, 35);
+      assert.equal(rep.totalFalsifiers, 36);
       for (const f of rep.falsifiers) {
         assert.ok(
           Number.isFinite(f.score) && f.score >= 0 && f.score <= 1,
@@ -785,12 +785,12 @@ describe("M2: 35-Axis Falsifier Registry & Report Engine", () => {
 
     const repCore = analyzeSamples(warm, SR, { label: "core6", falsifiers: ORIGINAL_6_FALSIFIERS });
     const repAll = analyzeSamples(dc, SR, {
-      label: "all35_reversed",
+      label: "all36_reversed",
       falsifiers: [...DEFAULT_FALSIFIERS].reverse(),
     });
 
     const cmp = compareReports(repCore, repAll);
-    assert.equal(cmp.deltas.length, 35);
+    assert.equal(cmp.deltas.length, 36);
 
     const d1 = cmp.deltas.find((d) => d.id === "F1_HARSH_EDGE");
     assert.ok(d1 && d1.aScore !== null && d1.bScore !== null && d1.deltaBMinusA !== null);
@@ -813,7 +813,7 @@ describe("M2: 35-Axis Falsifier Registry & Report Engine", () => {
     const compactClean = formatForLLM(repClean);
     const verboseClean = formatForLLM(repClean, { verbose: true });
     assert.ok(compactClean.split("\n").length <= 10, `Compact clean too long: ${compactClean.split("\n").length}`);
-    assert.ok(verboseClean.split("\n").length > 35, "Verbose dump should include all 35 falsifiers");
+    assert.ok(verboseClean.split("\n").length > 36, "Verbose dump should include all 36 falsifiers");
 
     const repBad = analyzeSamples(dc, SR, { label: "dc_bad" });
     const compactBad = formatForLLM(repBad);
@@ -1138,5 +1138,29 @@ describe("M2: 35-Axis Falsifier Registry & Report Engine", () => {
       activeMpsSpeech4_16: 0.0001,
     });
     assert.equal(marimba.triggered, false);
+
+    // F36: Coarticulation seam (abrupt spectral-shape switching) fails on spliced seams, passes on live/VOICEVOX speech
+    const f36 = DEFAULT_FALSIFIERS.find((x) => x.id === "F36_COARTICULATION_SEAM");
+    const seamRes = f36.detect({
+      activeFrameCount: 250,
+      voicedRatio: 0.85,
+      durationSec: 3.1,
+      hiToMidStdDb: 13.8,
+      relMelFluxStdDb: 1.46,
+      activeMpsSpeech4_16: 0.14,
+    });
+    assert.equal(seamRes.triggered, true);
+    assert.ok(seamRes.score > 0.7);
+
+    const smoothLive = f36.detect({
+      activeFrameCount: 250,
+      voicedRatio: 0.85,
+      durationSec: 3.1,
+      hiToMidStdDb: 10.5,
+      relMelFluxStdDb: 0.88,
+      activeMpsSpeech4_16: 0.15,
+    });
+    assert.equal(smoothLive.triggered, false);
+    assert.equal(smoothLive.score, 0);
   });
 });
