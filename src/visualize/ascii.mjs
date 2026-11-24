@@ -406,6 +406,7 @@ function computeSummaryStats(prof, rep) {
   const subh = finite(rep.features?.subharmonicRatio, 0);
   const respiratoryScore = clamp(finite(rep.features?.respiratoryScore, 0), 0, 1);
   const directnessScore = clamp(finite(rep.features?.directnessScore, 0), 0, 1);
+  const sanitizationScore = clamp(finite(rep.features?.sanitizationScore, 0), 0, 1);
   const voiceCompassLabel =
     respiratoryScore >= 0.5 && directnessScore >= 0.5
       ? "addressed_breath"
@@ -424,6 +425,7 @@ function computeSummaryStats(prof, rep) {
     subh,
     respiratoryScore,
     directnessScore,
+    sanitizationScore,
     voiceCompassLabel,
   };
 }
@@ -541,7 +543,7 @@ export function renderTextVision(profile, report = null, opts = {}) {
   // -------------------------------------------------------------------------
   if (mode === "compact") {
     const lines = [];
-    const compassTag = `RESP=${fmtNum(stats.respiratoryScore, 2)} DIR=${fmtNum(stats.directnessScore, 2)} [${stats.voiceCompassLabel}]`;
+    const compassTag = `RESP=${fmtNum(stats.respiratoryScore, 2)} DIR=${fmtNum(stats.directnessScore, 2)} [${stats.voiceCompassLabel}] SAN=${fmtNum(stats.sanitizationScore, 2)}`;
     lines.push(`=== YATA VISION [${rep.label}] ===`);
     lines.push(
       `VERDICT: ${rep.verdict} (${rep.triggeredCount}/${rep.totalFalsifiers}) | dur=${fmtNum(prof.durationSec, 2)}s sr=${prof.sampleRate}Hz | pk=${fmtNum(stats.peak, 2)} rms=${fmtNum(stats.rmsDb, 1)}dB F0=${Math.round(stats.medF0)}Hz HNR=${fmtNum(stats.meanHnr, 1)}dB MPS30-150=${fmtNum(stats.mpsRough, 2)} SUBH=${fmtNum(stats.subh, 2)}`
@@ -619,7 +621,7 @@ export function renderTextVision(profile, report = null, opts = {}) {
     `STATS: peak=${fmtNum(stats.peak, 3)} | rms=${fmtNum(stats.rmsDb, 1)}dB | F0=${Math.round(stats.medF0)}Hz | HNR=${fmtNum(stats.meanHnr, 1)}dB | meanHF=${fmtNum(stats.meanHf, 3)} | MPS30-150=${fmtNum(stats.mpsRough, 3)} | SUBH=${fmtNum(stats.subh, 3)}`
   );
   lines.push(
-    `VOICE COMPASS: RESP=${fmtNum(stats.respiratoryScore, 2)} DIR=${fmtNum(stats.directnessScore, 2)} [${stats.voiceCompassLabel}]`
+    `VOICE COMPASS: RESP=${fmtNum(stats.respiratoryScore, 2)} DIR=${fmtNum(stats.directnessScore, 2)} [${stats.voiceCompassLabel}] | SAN=${fmtNum(stats.sanitizationScore, 2)}`
   );
   lines.push(
     win.active

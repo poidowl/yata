@@ -92,19 +92,86 @@ export function findTimelineHotspot(timeline) {
 }
 
 /**
+ * Deterministic Mulberry32 PRNG for reproducible organic breath-air synthesis.
+ */
+function makeSeededRng(seed = 0x59415441) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Find the sample index where the last active phrase ends (RMS >= max(0.03, maxRms * 0.12)).
+ */
+function findLastActiveCutoffSample(src, sampleRate) {
+  const n = src.length;
+  const frameLen = Math.max(64, Math.round(sampleRate * 0.02));
+  const hopLen = Math.max(32, Math.round(sampleRate * 0.01));
+  if (n < frameLen) return { cutIdx: n, maxRms: 0, endRms: 0 };
+
+  const rmsList = [];
+  let maxRms = 0;
+  for (let s = 0; s + frameLen <= n; s += hopLen) {
+    let sq = 0;
+    for (let j = 0; j < frameLen; j++) {
+      const x = src[s + j];
+      sq += x * x;
+    }
+    const r = Math.sqrt(sq / frameLen);
+    rmsList.push({ start: s, end: s + frameLen, rms: r });
+    if (r > maxRms) maxRms = r;
+  }
+
+  if (maxRms < 1e-4) return { cutIdx: 0, maxRms: 0, endRms: 0 };
+
+  const thresh = Math.max(0.03, maxRms * 0.12);
+  let lastActive = -1;
+  for (let i = rmsList.length - 1; i >= 0; i--) {
+    if (rmsList[i].rms >= thresh) {
+      lastActive = i;
+      break;
+    }
+  }
+  if (lastActive < 0) return { cutIdx: 0, maxRms, endRms: 0 };
+
+  // Refine exact cutoff sample inside the last active frame (avoid cutting mid-silence)
+  const frame = rmsList[lastActive];
+  const sampleThresh = Math.max(0.005, maxRms * 0.05);
+  let cutIdx = frame.end;
+  for (let i = Math.min(n - 1, frame.end + hopLen); i >= frame.start; i--) {
+    if (Math.abs(src[i]) >= sampleThresh) {
+      cutIdx = Math.min(n, i + 1);
+      break;
+    }
+  }
+  return { cutIdx, maxRms, endRms: frame.rms };
+}
+
+/**
  * Generate a minimal local counterfactual audio buffer where ONLY [startSec..endSec]
  * is gently smoothed/softened, leaving all samples outside [startSec..endSec]
  * bit-for-bit identical to the input.
+ *
+ * Modes:
+ *   - "soften_mps" (default): zero-phase low-pass + 30–150 Hz envelope-roughness damping
+ *   - "lowpass": zero-phase low-pass only
+ *   - "breath_tail": gentle exponential release taper + faint organic breath-air decay (~0.18s)
+ *     at the end of an abruptly cut active phrase (zero clicks)
  *
  * @param {Float32Array|ArrayLike<number>} samplesInput
  * @param {number} sampleRateInput
  * @param {{
  *   startSec?: number,
  *   endSec?: number,
- *   mode?: "soften_mps" | "lowpass",
+ *   mode?: "soften_mps" | "lowpass" | "breath_tail",
  *   windowSec?: number,
  *   crossfadeSec?: number,
  *   cutoffHz?: number,
+ *   tailDurationSec?: number,
  *   charset?: "ascii" | "unicode",
  * }} [opts={}]
  */
@@ -120,6 +187,7 @@ export function generateCounterfactualSlice(samplesInput, sampleRateInput, opts 
   const windowSec = Math.max(0.1, Math.min(5.0, finite(opts.windowSec, 0.5)));
   const crossfadeSec = Math.max(0.002, Math.min(0.25, finite(opts.crossfadeSec, 0.025)));
   const cutoffHz = Math.max(200, Math.min(sampleRate * 0.45, finite(opts.cutoffHz, 2400)));
+  const tailDurationSec = Math.max(0.05, Math.min(0.5, finite(opts.tailDurationSec, 0.18)));
   const charset = opts.charset === "unicode" ? "unicode" : "ascii";
 
   const beforeTimeline = extractSegmentTimeline(null, src, sampleRate, { windowSec });
@@ -140,15 +208,36 @@ export function generateCounterfactualSlice(samplesInput, sampleRateInput, opts 
 
   let startSec = Number.isFinite(opts.startSec) ? opts.startSec : null;
   let endSec = Number.isFinite(opts.endSec) ? opts.endSec : null;
+  let autoCutInfo = null;
 
   if (startSec === null || endSec === null) {
-    const hotspot = findTimelineHotspot(beforeTimeline);
-    if (hotspot) {
-      startSec = hotspot.startSec;
-      endSec = hotspot.endSec;
+    if (mode === "breath_tail") {
+      autoCutInfo = findLastActiveCutoffSample(src, sampleRate);
+      if (autoCutInfo.cutIdx > 0 && autoCutInfo.maxRms >= 1e-4) {
+        const afterSamples = n - autoCutInfo.cutIdx;
+        if (afterSamples >= Math.round(0.04 * sampleRate)) {
+          const preSamples = Math.min(autoCutInfo.cutIdx, Math.round(0.04 * sampleRate));
+          const postSamples = Math.min(afterSamples, Math.round(tailDurationSec * sampleRate));
+          startSec = (autoCutInfo.cutIdx - preSamples) / sampleRate;
+          endSec = (autoCutInfo.cutIdx + postSamples) / sampleRate;
+        } else {
+          const tailSamples = Math.min(autoCutInfo.cutIdx, Math.round(tailDurationSec * sampleRate));
+          startSec = (autoCutInfo.cutIdx - tailSamples) / sampleRate;
+          endSec = autoCutInfo.cutIdx / sampleRate;
+        }
+      } else {
+        startSec = 0;
+        endSec = Math.min(durationSec, tailDurationSec);
+      }
     } else {
-      startSec = 0;
-      endSec = Math.min(durationSec, windowSec);
+      const hotspot = findTimelineHotspot(beforeTimeline);
+      if (hotspot) {
+        startSec = hotspot.startSec;
+        endSec = hotspot.endSec;
+      } else {
+        startSec = 0;
+        endSec = Math.min(durationSec, windowSec);
+      }
     }
   }
 
@@ -159,7 +248,72 @@ export function generateCounterfactualSlice(samplesInput, sampleRateInput, opts 
   const endIdx = Math.max(startIdx, Math.min(n, Math.ceil(endSec * sampleRate)));
   const sliceLen = endIdx - startIdx;
 
-  if (sliceLen >= 4) {
+  if (sliceLen >= 4 && mode === "breath_tail") {
+    const cutInfo = autoCutInfo ?? findLastActiveCutoffSample(src, sampleRate);
+    const localCut =
+      cutInfo.cutIdx > startIdx && cutInfo.cutIdx < endIdx
+        ? cutInfo.cutIdx - startIdx
+        : sliceLen;
+
+    // Measure ending active RMS just before localCut
+    const refLen = Math.min(localCut, Math.max(16, Math.round(0.03 * sampleRate)));
+    let refSq = 0;
+    for (let i = Math.max(0, localCut - refLen); i < localCut; i++) {
+      const x = src[startIdx + i];
+      refSq += x * x;
+    }
+    const endRms = refLen > 0 ? Math.sqrt(refSq / refLen) : cutInfo.endRms;
+
+    if (endRms > 1e-4) {
+      // Synthesize deterministic warm band-limited breath-air (zero-phase LP ~2000 Hz minus LP ~220 Hz)
+      const rng = makeSeededRng(0x59415441 ^ sliceLen);
+      const rawNoise = new Float32Array(sliceLen);
+      for (let i = 0; i < sliceLen; i++) {
+        rawNoise[i] = (rng() * 2 - 1) * 0.5 + (rng() * 2 - 1) * 0.5;
+      }
+      const lpHi = lowPassZeroPhase(rawNoise, sampleRate, Math.min(2000, sampleRate * 0.4));
+      const lpLo = lowPassZeroPhase(rawNoise, sampleRate, Math.min(220, sampleRate * 0.1));
+      const air = new Float32Array(sliceLen);
+      let airSq = 0;
+      for (let i = 0; i < sliceLen; i++) {
+        const v = lpHi[i] - lpLo[i];
+        air[i] = v;
+        airSq += v * v;
+      }
+      const airRms = Math.sqrt(airSq / sliceLen);
+      const breathAmp = Math.min(0.16, Math.max(0.02, endRms * 0.25));
+      const airScale = airRms > 1e-6 ? breathAmp / airRms : 0;
+
+      const fadeInAir = Math.min(Math.round(0.02 * sampleRate), Math.max(2, Math.floor(sliceLen * 0.2)));
+      const fadeOutAir = Math.min(Math.round(0.02 * sampleRate), Math.max(2, Math.floor(sliceLen * 0.2)));
+
+      for (let i = 0; i < sliceLen; i++) {
+        // 1. Soft exponential release taper of the original active phrase (zero clicks at both ends)
+        let sigPart = 0;
+        if (i < localCut) {
+          const u = localCut > 1 ? i / (localCut - 1) : 1;
+          const taper = 0.5 * (1 + Math.cos(Math.PI * u)) * Math.exp(-1.5 * u);
+          sigPart = src[startIdx + i] * taper;
+        }
+
+        // 2. Faint organic breath-air decay across the release window
+        let envAir = 1;
+        if (i < fadeInAir) {
+          envAir = 0.5 * (1 - Math.cos((Math.PI * i) / fadeInAir));
+        } else {
+          const decayU = (i - fadeInAir) / Math.max(1, sliceLen - fadeInAir);
+          envAir = Math.exp(-3.0 * decayU);
+        }
+        if (i >= sliceLen - fadeOutAir) {
+          const k = sliceLen - 1 - i;
+          envAir *= 0.5 * (1 - Math.cos((Math.PI * k) / fadeOutAir));
+        }
+
+        const val = sigPart + air[i] * airScale * envAir;
+        out[startIdx + i] = Math.max(-0.98, Math.min(0.98, val));
+      }
+    }
+  } else if (sliceLen >= 4) {
     // Include up to 25ms context padding on both sides for artifact-free zero-phase filtering
     const padSamples = Math.min(Math.round(0.025 * sampleRate), n);
     const padStart = Math.max(0, startIdx - padSamples);

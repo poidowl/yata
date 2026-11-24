@@ -293,6 +293,18 @@ export function compareReports(reportA, reportB) {
     };
   });
 
+  const aSan = Number.isFinite(reportA?.features?.sanitizationScore)
+    ? clamp01(reportA.features.sanitizationScore)
+    : 0;
+  const bSan = Number.isFinite(reportB?.features?.sanitizationScore)
+    ? clamp01(reportB.features.sanitizationScore)
+    : 0;
+  const sanitizationDelta = Math.round((bSan - aSan) * 1000) / 1000;
+  const overSanitizationWarning =
+    sanitizationDelta >= 0.15 && bSan >= 0.45
+      ? `OVER-SANITIZATION WARNING: B is more sanitized (+${sanitizationDelta.toFixed(2)}) than A — check if polishing killed living charm!`
+      : null;
+
   return {
     schema: "unkawaii_compare/v0.2",
     a: {
@@ -300,13 +312,17 @@ export function compareReports(reportA, reportB) {
       verdict: reportA?.verdict ?? "UNKNOWN",
       triggeredCount: reportA?.triggeredCount ?? 0,
       totalFalsifiers: reportA?.totalFalsifiers ?? listA.length,
+      sanitizationScore: round3(aSan),
     },
     b: {
       label: reportB?.label ?? "B",
       verdict: reportB?.verdict ?? "UNKNOWN",
       triggeredCount: reportB?.triggeredCount ?? 0,
       totalFalsifiers: reportB?.totalFalsifiers ?? listB.length,
+      sanitizationScore: round3(bSan),
     },
+    sanitizationDelta,
+    overSanitizationWarning,
     deltas,
   };
 }
@@ -414,8 +430,11 @@ export function formatCompareForLLM(cmp, opts = { verbose: false }) {
     `[UNKAWAII COMPARE] A="${cmp.a.label}" vs B="${cmp.b.label}"`,
     `A: ${cmp.a.verdict} (${cmp.a.triggeredCount} triggered)`,
     `B: ${cmp.b.verdict} (${cmp.b.triggeredCount} triggered)`,
-    `DELTAS (B - A; positive = B is MORE unkawaii on that axis):`,
   ];
+  if (cmp.overSanitizationWarning) {
+    lines.push(cmp.overSanitizationWarning);
+  }
+  lines.push(`DELTAS (B - A; positive = B is MORE unkawaii on that axis):`);
 
   const deltas = Array.isArray(cmp.deltas) ? cmp.deltas : [];
   if (verbose) {

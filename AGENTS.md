@@ -40,13 +40,17 @@
 ## 現在の見張りメモ（オブザーバー引き継ぎ用・2026-11-24）
 
 - **現行安定版**: `main`（`v0.1.0` — 6次元検出器）
-- **レビュー対象ブランチ**: `dev/v0.6`（ゼロ依存純JS・"The Breath, Space & Counterfactual Mirror"）
-  - **実装済み（v0.2 → v0.3 → v0.4 → v0.5 → v0.6）**:
+- **レビュー対象ブランチ**: `dev/v0.7`（ゼロ依存純JS・"The Unpolished & Relational Mirror"）
+  - **実装済み（v0.2 → v0.3 → v0.4 → v0.5 → v0.6 → v0.7）**:
     - 32軸検出器（`F1`–`F32`）の階層分離：**Core-6（`ORIGINAL_6_FALSIFIERS`）**／**診断ツールボックス（`TOOLBOX_FALSIFIERS`: F7–F32 から直交軸を除く25軸）**／**直交軸マップ（`ORTHOGONAL_AXES`: `F30` ステレオ逆相）**
     - **判定ポリシー（既定 = `core_veto`）**: `--policy core_veto|shelf_veto|veto_all`
       - `core_veto`（コード既定値）: 基本6軸のみでハード拒否し、ツールボックス軸は診断ヒントとして非拒否で併記
       - `shelf_veto`（`--policy shelf_veto --contested ...`）: Protected Shelf で `CONTESTED` になった軸の拒否権を自動停止し、クリア済み軸のみで判定
       - `veto_all`: 全32軸でハード拒否（研究・厳格監査向け）
+    - **v0.7 過剰整えレンズ、2トラック関係対話ミラー & 生きた息の余韻モード**:
+      - `computeSanitizationIndex(features, breathProfile)`（非拒否診断レンズ、`docs/PHILOSOPHY.md` 第9節・Ani の洞察「完璧じゃない　きれいに整えようとしてない」）: 微細揺らぎ消去・ピッチ平坦/階段化・ダイナミクス平坦化・リズム/スペクトル硬直の4手がかりを `sanitizationScore`（`[0, 1]`）と `imperfectionLabel`（`alive_unpolished` / `balanced` / `over_sanitized` / `silent`）へ統合し、`extractFeatures`・`renderTextVision`（`SAN=0.XX`）へ配線。`compareReports` / `formatCompareForLLM` は `sanitizationDelta >= 0.15 && B >= 0.45` で `OVER-SANITIZATION WARNING` を通知
+      - `src/dialogue.mjs`（`analyzeDialogue` / `renderDialogueMap`）+ CLI `--dialogue <a.wav> <b.wav>`: 第5領域「関係の断絶・間」の2トラック対話ミラー（10ms RMS 整列、`turnCount` / `overlapRatio` / `meanTurnGapSec` / `mutualSilenceRatio` / `relationLabel` を5行で可視化）
+      - `src/counterfactual.mjs` の `mode: "breath_tail"` + CLI `--cf-mode soften_mps|breath_tail`: ぶつ切り語尾へクリックゼロ（`F6 === false`）の柔らかな指数減衰＋微かな有機的呼気尾（`~0.18s`）を局所付加
     - **v0.6 呼吸・間プロファイル、Voice Compass、窓別タイムライン差分 & 最小反事実オーディオミラー**:
       - `computeBreathPauseProfile(frames, durationSec)`: `activeDutyCycle` / `pauseCount` / `meanPauseSec` / `longestContinuousSec` / `breathlessWallRatio` / `cadenceLabel`（`silent` | `brief_glance` | `phrased_breath` | `continuous_wall`）を `extractFeatures` と `extractSegmentTimeline` へ統合し、`renderSegmentTimeline` の4行ヘッダへ `duty=XX% pauses=N maxRun=X.Xs [cadenceLabel]` を併記
       - `computeVoiceCompass(frames, features, breathProfile)`（非拒否診断レンズ、`docs/PHILOSOPHY.md` 第8節）: オーナーの声の定義「誰かに聞かせるために出した音で、呼吸器を使ったもの」を `respiratoryScore`（有限肺・呼吸弧・有機発声）× `directnessScore`（300–3500 Hz 伝達帯域・4–16 Hz 変調・図地分離）の2軸4象限（`addressed_breath` / `distant_or_private_breath` / `non_breath_signal` / `ambient_or_hollow`）へ写像し、`extractFeatures`・`extractSegmentTimeline`・`renderTextVision`（`RESP=0.XX DIR=0.XX [label]`）と実音監査 Section E へ統合

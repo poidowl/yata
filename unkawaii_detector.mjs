@@ -30,6 +30,7 @@ import {
   extractSegmentTimeline,
   computeBreathPauseProfile,
   computeVoiceCompass,
+  computeSanitizationIndex,
 } from "./src/features.mjs";
 import {
   ORIGINAL_6_FALSIFIERS,
@@ -56,11 +57,12 @@ import {
   renderPngDiff,
 } from "./src/visualize/index.mjs";
 import { findTimelineHotspot, generateCounterfactualSlice } from "./src/counterfactual.mjs";
+import { analyzeDialogue, renderDialogueMap } from "./src/dialogue.mjs";
 import { buildCorpus } from "./src/synth.mjs";
 import { runDiscoveryLoop, formatDiscoveryForLLM } from "./src/discovery.mjs";
 
 // ============================================================================
-// Public Programmatic API (v0.1 backward-compatible + v0.2–v0.6 extensions)
+// Public Programmatic API (v0.1 backward-compatible + v0.2–v0.7 extensions)
 // ============================================================================
 export {
   // v0.1 core exports
@@ -101,6 +103,10 @@ export {
   renderTimelineDiff,
   findTimelineHotspot,
   generateCounterfactualSlice,
+  // v0.7 extensions
+  computeSanitizationIndex,
+  analyzeDialogue,
+  renderDialogueMap,
 };
 
 // ============================================================================
@@ -111,7 +117,7 @@ const USAGE = `Usage:
                                         [--policy core_veto|veto_all|shelf_veto] [--contested <ID1,ID2,...>]
                                         [--precedents <path.json> | --shelf <path.json>] [--scope <scope>]
                                         [--view [micro|compact|full]] [--zoom [auto|<t0>..<t1>]] [--timeline]
-                                        [--counterfactual <out.wav> [--cf-window <t0>..<t1>]]
+                                        [--counterfactual <out.wav> [--cf-window <t0>..<t1>] [--cf-mode soften_mps|breath_tail]]
                                         [--charset ascii|unicode] [--width <N>]
                                         [--svg <out.svg>] [--png <out.png>]
   node unkawaii_detector.mjs --compare <a.wav> <b.wav> [--format llm|json] [--verbose] [--falsifiers all|core]
@@ -123,6 +129,7 @@ const USAGE = `Usage:
                                                     [--charset ascii|unicode] [--width <N>]
                                                     [--svg <out.svg>] [--png <out.png>]
   node unkawaii_detector.mjs --timeline-diff <a.wav> <b.wav> [--format llm|json] [--charset ascii|unicode] [--width <N>]
+  node unkawaii_detector.mjs --dialogue <a.wav> <b.wav> [--format llm|json] [--charset ascii|unicode] [--width <N>]
   node unkawaii_detector.mjs --discover [--format llm|json] [--view] [--charset ascii|unicode]
   node unkawaii_detector.mjs --list-falsifiers [--format llm|json] [--falsifiers all|core]`;
 
@@ -145,7 +152,7 @@ function parseZoomArg(raw) {
 function parseCliArgs(argv) {
   const opts = {
     help: false,
-    mode: "single", // single | compare | diff | timeline_diff | discover | list
+    mode: "single", // single | compare | diff | timeline_diff | dialogue | discover | list
     files: [],
     format: "llm",
     verbose: false,
@@ -157,6 +164,7 @@ function parseCliArgs(argv) {
     timeline: false,
     counterfactualOut: null,
     cfWindow: null, // null | { startSec, endSec }
+    cfMode: "soften_mps", // soften_mps | breath_tail
     view: null, // null | "micro" | "compact" | "full"
     zoom: null, // null | "auto" | { startSec, endSec }
     charset: "ascii",
@@ -201,6 +209,17 @@ function parseCliArgs(argv) {
       const b = argv[++i];
       if (!a || !b || a.startsWith("-") || b.startsWith("-")) {
         throw new Error("--timeline-diff requires two WAV file paths: --timeline-diff <a.wav> <b.wav>");
+      }
+      opts.files.push(a, b);
+      continue;
+    }
+
+    if (arg === "--dialogue") {
+      opts.mode = "dialogue";
+      const a = argv[++i];
+      const b = argv[++i];
+      if (!a || !b || a.startsWith("-") || b.startsWith("-")) {
+        throw new Error("--dialogue requires two WAV file paths: --dialogue <a.wav> <b.wav>");
       }
       opts.files.push(a, b);
       continue;
@@ -305,6 +324,15 @@ function parseCliArgs(argv) {
         throw new Error('--cf-window requires an explicit range "<t0>..<t1>"');
       }
       opts.cfWindow = parsed;
+      continue;
+    }
+
+    if (arg === "--cf-mode") {
+      const val = argv[++i];
+      if (val !== "soften_mps" && val !== "breath_tail") {
+        throw new Error(`Invalid --cf-mode "${val ?? ""}": expected "soften_mps" or "breath_tail"`);
+      }
+      opts.cfMode = val;
       continue;
     }
 
@@ -445,6 +473,25 @@ function runCli(argv) {
     return;
   }
 
+  if (opts.mode === "dialogue") {
+    const [fileA, fileB] = opts.files;
+    if (!fileA || !fileB) {
+      throw new Error("--dialogue requires two WAV paths");
+    }
+    const wavA = loadWavFile(fileA);
+    const wavB = loadWavFile(fileB);
+    const dialogue = analyzeDialogue(wavA.samples, wavA.sampleRate, wavB.samples, wavB.sampleRate, {
+      labelA: path.basename(fileA),
+      labelB: path.basename(fileB),
+    });
+    if (opts.format === "json") {
+      console.log(JSON.stringify(dialogue, null, 2));
+    } else {
+      console.log(renderDialogueMap(dialogue, { width: opts.width, charset: opts.charset }));
+    }
+    return;
+  }
+
   if (opts.mode === "compare" || opts.mode === "diff") {
     const [fileA, fileB] = opts.files;
     if (!fileA || !fileB) {
@@ -557,6 +604,7 @@ function runCli(argv) {
   if (opts.counterfactualOut) {
     cfResult = generateCounterfactualSlice(wav.samples, wav.sampleRate, {
       ...(opts.cfWindow || {}),
+      mode: opts.cfMode,
       charset: opts.charset,
     });
     fs.writeFileSync(opts.counterfactualOut, encodeWavBuffer(cfResult.samples, cfResult.sampleRate));

@@ -107,4 +107,18 @@
 
 さらに興味深いのは、**人声ではない「かわいい音」**（オルゴール、柔らかなチャイム、アコースティック楽器の余韻、小鳥のさえずり等）であっても、聴き手が「一緒にいたい」と感じるとき、そこには**呼吸に似た自然な間・減衰曲線（時間の矢）**や**聞き手へ優しく届く帯域・図地分離**が借りられていることが多い。Voice Compass は「声か非声か」を裁くための篩ではなく、あらゆる音が「呼吸器」と「誰かに聞かせること」の座標上でどこに立つかを静かに映す羅針盤である。
 
+## 9. 過剰な整えと関係の鏡：不完全さの生気と、ふたつの声の間（ま）
 
+> **「完璧じゃない　きれいに整えようとしてない」**（Ani 談）
+
+`yata` のブラインド鏡審査で、オーナーの耳が `F24` を平坦化した版ではなく原音の `tokiko` を **5–0** で選び抜いた理由は、この一言に集約される。音の揺らぎ・微細な不均一・息づかいの引っかかりを「ノイズ」と見なして過剰に均（なら）してしまうと、鏡の向こうから**生きている魅力（living charm）**が消え、均質な記号へと死んでしまう。
+
+そこで `yata` v0.7（*"The Unpolished & Relational Mirror"*）では、次の3つの非拒否・関係ミラーを加える。
+
+1. **過剰整え / 生きている不完全さレンズ（`computeSanitizationIndex`・非拒否診断）**
+   - 微細揺らぎの消去（`jitter` / `shimmer` の無菌化）、ピッチの平坦化・階段化（`f0RangeSemitones` / `flatStepRatio`）、ダイナミクス平坦化（`activeRmsCv` / `crestFactorDb`）、リズム・スペクトル硬直（`ioiCv` / `meanSpectralFlux`）の4手がかりを `[0, 1]` に統合し、`alive_unpolished` / `balanced` / `over_sanitized` / `silent` を映す。
+   - `--compare` において B が A より大きく過剰整えされている場合（`sanitizationDelta >= 0.15` かつ `B >= 0.45`）、`OVER-SANITIZATION WARNING` を発して「磨いた結果、生きている魅力を殺していないか？」を立ち止まって確認させる。
+2. **2トラック関係対話ミラー（`src/dialogue.mjs` / `--dialogue` — 第5領域「関係の断絶・間」の実装）**
+   - 単一クリップの検査を越えて、2つのトラック A/B の掛け合い・ターン交代（`turnCount`）・呼吸の間（`meanTurnGapSec`）・被り衝突（`overlapRatio`）・共有沈黙（`mutualSilenceRatio`）を 10ms 枠で整列し、`responsive_dialogue` / `overlapping_clash` / `disconnected_monologue` / `silent_void` を5行の地図で可視化する。
+3. **生きた息の余韻 vs 死んだ無音パディング（`--cf-mode breath_tail`）**
+   - ぶつ切りで死んだ無音に落ちる語尾に対し、クリックゼロの柔らかな指数減衰＋微かな有機的呼気尾（`~0.18s`）を局所生成する反事実モードを備え、「死んだ無音パディング」と「生きている息の抜け（living release）」を耳で直接比較できるようにする。

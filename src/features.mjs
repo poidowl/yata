@@ -1381,6 +1381,10 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
   featuresObj.respiratoryScore = compass.respiratoryScore;
   featuresObj.directnessScore = compass.directnessScore;
 
+  // --- v0.7 Over-Sanitization / Living Imperfection Lens ---
+  const sanitization = computeSanitizationIndex(featuresObj, breath);
+  featuresObj.sanitizationScore = sanitization.sanitizationScore;
+
   return featuresObj;
 }
 
@@ -1795,6 +1799,120 @@ export function computeVoiceCompass(frames, features = null, breathProfile = nul
     respiratoryScore: roundTo(respiratoryScore, 4),
     directnessScore: roundTo(directnessScore, 4),
     label,
+  };
+}
+
+/**
+ * Over-Sanitization / Living Imperfection Lens (v0.7 diagnostic lens — NEVER a hard veto):
+ * Measures how heavily an audio signal has been smoothed, grid-snapped, brickwalled,
+ * or stripped of living micro-variation ("完璧じゃない きれいに整えようとしてない").
+ *
+ * Combines 4 independent over-polishing cues:
+ *   1. microErasure: jitter & shimmer pushed near zero on voiced audio
+ *   2. pitchFlattening: narrow f0RangeSemitones (< 1.5 st) or autotune-like flatStepRatio
+ *   3. dynamicFlattening: low activeRmsCv & low crestFactorDb (brickwalling)
+ *   4. rhythmicSpectralRigidity: metronomic ioiCv (< 0.08 with onsetCount >= 4) or frozen meanSpectralFlux
+ *
+ * @param {object|null} features
+ * @param {object|null} [breathProfile=null]
+ * @returns {{
+ *   sanitizationScore: number,
+ *   imperfectionLabel: "silent" | "alive_unpolished" | "balanced" | "over_sanitized",
+ *   cues: {
+ *     microErasure: number,
+ *     pitchFlattening: number,
+ *     dynamicFlattening: number,
+ *     rhythmicSpectralRigidity: number,
+ *   }
+ * }}
+ */
+export function computeSanitizationIndex(features, breathProfile = null) {
+  const feat = features && typeof features === "object" ? features : null;
+  const activeFrames = feat ? finite(feat.activeFrameCount, 0) : 0;
+  const peak = feat ? finite(feat.peak, 0) : 0;
+  const isSilent =
+    !feat ||
+    activeFrames <= 0 ||
+    peak < 1e-4 ||
+    (breathProfile && breathProfile.cadenceLabel === "silent");
+
+  if (isSilent) {
+    return {
+      sanitizationScore: 0,
+      imperfectionLabel: "silent",
+      cues: {
+        microErasure: 0,
+        pitchFlattening: 0,
+        dynamicFlattening: 0,
+        rhythmicSpectralRigidity: 0,
+      },
+    };
+  }
+
+  const voicedRatio = clamp01(finite(feat.voicedRatio, 0));
+  const voicedGate = clamp01((voicedRatio - 0.1) / 0.3);
+
+  // 1. Micro-variation erasure (sterile smoothness in jitter & shimmer)
+  const jitter = Math.max(0, finite(feat.jitter, 0));
+  const shimmer = Math.max(0, finite(feat.shimmer, 0));
+  const jitterErasure = 1 - clamp01((jitter - 0.0004) / 0.0056);
+  const shimmerErasure = 1 - clamp01((shimmer - 0.006) / 0.044);
+  const microErasure = clamp01(voicedGate * (0.55 * jitterErasure + 0.45 * shimmerErasure));
+
+  // 2. Pitch / prosody flattening or grid-snapping
+  const f0Range = Math.max(0, finite(feat.f0RangeSemitones, 0));
+  const flatStepRatio = clamp01(finite(feat.flatStepRatio, 0));
+  const narrowF0 = 1 - clamp01(f0Range / 1.5);
+  const gridSnap = clamp01((flatStepRatio - 0.45) / 0.45);
+  const pitchFlattening = clamp01(voicedGate * Math.max(narrowF0, gridSnap));
+
+  // 3. Dynamic flattening / brickwalling
+  const activeRmsCv = Math.max(0, finite(feat.activeRmsCv, 0));
+  const crestFactorDb = Math.max(0, finite(feat.crestFactorDb, 0));
+  const lowCv = 1 - clamp01((activeRmsCv - 0.05) / 0.18);
+  const lowCrest = 1 - clamp01((crestFactorDb - 2.0) / 4.0);
+  const dynamicFlattening = clamp01(0.55 * lowCv + 0.45 * lowCrest);
+
+  // 4. Rhythmic / spectral rigidity
+  const onsetCount = Math.max(0, finite(feat.onsetCount, 0));
+  const ioiCv = Math.max(0, finite(feat.ioiCv, 0));
+  const meanSpectralFlux = Math.max(0, finite(feat.meanSpectralFlux, 0));
+  const metronomic = onsetCount >= 4 ? clamp01((0.08 - ioiCv) / 0.08) : 0;
+  const frozenFlux = 1 - clamp01((meanSpectralFlux - 0.0002) / 0.0013);
+  const rhythmicSpectralRigidity = clamp01(Math.max(metronomic, frozenFlux));
+
+  const weightedMean =
+    0.28 * microErasure +
+    0.30 * pitchFlattening +
+    0.22 * dynamicFlattening +
+    0.20 * rhythmicSpectralRigidity;
+  const sortedCues = [
+    microErasure,
+    pitchFlattening,
+    dynamicFlattening,
+    rhythmicSpectralRigidity,
+  ].sort((a, b) => b - a);
+  const top2Mean = 0.5 * (sortedCues[0] + sortedCues[1]);
+  const sanitizationScore = clamp01(0.65 * weightedMean + 0.35 * top2Mean);
+
+  let imperfectionLabel;
+  if (sanitizationScore < 0.35) {
+    imperfectionLabel = "alive_unpolished";
+  } else if (sanitizationScore < 0.60) {
+    imperfectionLabel = "balanced";
+  } else {
+    imperfectionLabel = "over_sanitized";
+  }
+
+  return {
+    sanitizationScore: roundTo(sanitizationScore, 4),
+    imperfectionLabel,
+    cues: {
+      microErasure: roundTo(microErasure, 4),
+      pitchFlattening: roundTo(pitchFlattening, 4),
+      dynamicFlattening: roundTo(dynamicFlattening, 4),
+      rhythmicSpectralRigidity: roundTo(rhythmicSpectralRigidity, 4),
+    },
   };
 }
 
