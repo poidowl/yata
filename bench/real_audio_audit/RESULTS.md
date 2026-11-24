@@ -1,6 +1,6 @@
 # yata v0.4 — Reproducible Real-Audio & Protected Shelf Audit (`RESULTS.md`)
 
-Generated: `2026-11-24T05:04:02.596Z` by `node bench/real_audio_audit/run_real_audio_audit.mjs`
+Generated: `2026-11-24T05:08:48.696Z` by `node bench/real_audio_audit/run_real_audio_audit.mjs`
 Manifest: [`manifest.json`](./manifest.json) (20 trimmed 24kHz mono clips from 16 Wikimedia Commons sources with verified licenses + 9 `tokiko-axis` clips).
 
 > **Brutal Honesty First**: On synthetic unit tests, all 32 falsifiers pass 100%. On **real human/animal recordings and `tokiko-axis` Japanese speech**, running all 32 axes with unilateral veto power (`--policy veto_all`) causes a high false-positive rate. This report quantifies that exact gap across **`core_veto`** (v0.4 default), **`shelf_veto`** (suspends veto on shelf-contested axes), and **`veto_all`**, lists every `CONTESTED` axis, and separates **LLM visual readability** from **detector precision/recall**.
