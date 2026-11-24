@@ -130,10 +130,10 @@ function getFalsifierResult(report, id) {
   return found;
 }
 
-describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
-  it("exports ORIGINAL_6_FALSIFIERS (6) and DEFAULT_FALSIFIERS (32) in exact F1..F32 order with unique IDs", () => {
+describe("M2: 35-Axis Falsifier Registry & Report Engine", () => {
+  it("exports ORIGINAL_6_FALSIFIERS (6) and DEFAULT_FALSIFIERS (35) in exact F1..F35 order with unique IDs", () => {
     assert.equal(ORIGINAL_6_FALSIFIERS.length, 6);
-    assert.equal(DEFAULT_FALSIFIERS.length, 32);
+    assert.equal(DEFAULT_FALSIFIERS.length, 35);
 
     const expectedCoreIds = [
       "F1_HARSH_EDGE",
@@ -149,7 +149,7 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
     );
 
     const seen = new Set();
-    for (let i = 0; i < 32; i++) {
+    for (let i = 0; i < 35; i++) {
       const f = DEFAULT_FALSIFIERS[i];
       assert.ok(f.id.startsWith(`F${i + 1}_`), `Index ${i} expected F${i + 1}_*, got ${f.id}`);
       assert.equal(typeof f.domain, "string");
@@ -160,7 +160,7 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
     }
   });
 
-  it("clean pleasant positive controls survive 0/32 (warm voice, sasayaki whisper, warm chime, clean stereo)", () => {
+  it("clean pleasant positive controls survive 0/35 (warm voice, sasayaki whisper, warm chime, clean stereo)", () => {
     const positives = [
       { label: "warm_voice", samples: genWarmVoice(0.65, 101) },
       { label: "sasayaki_whisper", samples: genSasayakiWhisper(0.65, 202) },
@@ -173,12 +173,12 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
       assert.equal(
         rep.verdict,
         "SURVIVED_KAWAII_CANDIDATE",
-        `${item.label} should survive 0/32, but triggered: ${triggered
+        `${item.label} should survive 0/35, but triggered: ${triggered
           .map((t) => `${t.id}(score=${t.score}, ${t.evidence})`)
           .join("; ")}`
       );
       assert.equal(rep.triggeredCount, 0);
-      assert.equal(rep.totalFalsifiers, 32);
+      assert.equal(rep.totalFalsifiers, 35);
       for (const f of rep.falsifiers) {
         assert.ok(Number.isFinite(f.score) && f.score >= 0 && f.score <= 1, `${f.id} score invalid`);
       }
@@ -739,7 +739,7 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
       ["short15ms", shortClip],
     ]) {
       const rep = analyzeSamples(buf, SR, { label });
-      assert.equal(rep.totalFalsifiers, 32);
+      assert.equal(rep.totalFalsifiers, 35);
       for (const f of rep.falsifiers) {
         assert.ok(
           Number.isFinite(f.score) && f.score >= 0 && f.score <= 1,
@@ -785,12 +785,12 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
 
     const repCore = analyzeSamples(warm, SR, { label: "core6", falsifiers: ORIGINAL_6_FALSIFIERS });
     const repAll = analyzeSamples(dc, SR, {
-      label: "all32_reversed",
+      label: "all35_reversed",
       falsifiers: [...DEFAULT_FALSIFIERS].reverse(),
     });
 
     const cmp = compareReports(repCore, repAll);
-    assert.equal(cmp.deltas.length, 32);
+    assert.equal(cmp.deltas.length, 35);
 
     const d1 = cmp.deltas.find((d) => d.id === "F1_HARSH_EDGE");
     assert.ok(d1 && d1.aScore !== null && d1.bScore !== null && d1.deltaBMinusA !== null);
@@ -813,7 +813,7 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
     const compactClean = formatForLLM(repClean);
     const verboseClean = formatForLLM(repClean, { verbose: true });
     assert.ok(compactClean.split("\n").length <= 10, `Compact clean too long: ${compactClean.split("\n").length}`);
-    assert.ok(verboseClean.split("\n").length > 32, "Verbose dump should include all 32 falsifiers");
+    assert.ok(verboseClean.split("\n").length > 35, "Verbose dump should include all 35 falsifiers");
 
     const repBad = analyzeSamples(dc, SR, { label: "dc_bad" });
     const compactBad = formatForLLM(repBad);
@@ -1012,5 +1012,131 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
       assert.equal(f5.triggered, true, `Expected F5 triggered on ${name} with 50ms trailing silence`);
       assert.equal(f5.observed, true);
     }
+  });
+
+  it("v0.9 Anti-Fog Mirror: F33 (remote belting), F34 (chipmunk shift), F35 (synthetic tube flatness), and F1 whisper-vs-hiss guard", () => {
+    const f1 = DEFAULT_FALSIFIERS.find((x) => x.id === "F1_HARSH_EDGE");
+    const f33 = DEFAULT_FALSIFIERS.find((x) => x.id === "F33_REMOTE_BELTING");
+    const f34 = DEFAULT_FALSIFIERS.find((x) => x.id === "F34_CHIPMUNK_SHIFT");
+    const f35 = DEFAULT_FALSIFIERS.find((x) => x.id === "F35_SYNTHETIC_TUBE_FLATNESS");
+
+    // F1: Soft human whisper (speech-rhythmic 4-16Hz, low 30-150Hz roughness) passes, aggressive hiss fails
+    const softWhisper = f1.detect({
+      maxAttackSlope: 0.405,
+      maxAttackTimeSec: 0.3,
+      meanHfRatio: 0.511,
+      voicedRatio: 0.29,
+      meanRoughness: 0.86,
+      activeMpsSpeech4_16: 0.171,
+      activeMpsRoughness30_150: 0.018,
+      clipRatio: 0,
+      subBassRatio: 0.01,
+    });
+    assert.equal(softWhisper.triggered, false, `Soft human whisper should pass F1: ${softWhisper.evidence}`);
+    assert.match(softWhisper.evidence, /softWhisperGuarded/);
+
+    const catHiss = f1.detect({
+      maxAttackSlope: 0.33,
+      maxAttackTimeSec: 0.4,
+      meanHfRatio: 0.113,
+      voicedRatio: 0.37,
+      meanRoughness: 0.51,
+      activeMpsSpeech4_16: 0.046,
+      activeMpsRoughness30_150: 0.029,
+      clipRatio: 0,
+      subBassRatio: 0.60,
+    });
+    assert.equal(catHiss.triggered, true, "Cat hiss must still trigger F1");
+
+    // F33: Sustained dark airless belting fails; airy speech & short warm voice pass
+    const beltRes = f33.detect({
+      activeFrameCount: 250,
+      voicedRatio: 0.85,
+      voicedDurationSec: 2.8,
+      longestContinuousSec: 2.9,
+      meanHfRatio: 0.029,
+      highAirRatio: 0.001,
+      spectralCentroidHz: 1163,
+    });
+    assert.equal(beltRes.triggered, true);
+    assert.ok(beltRes.score > 0.65);
+
+    const airySpeech = f33.detect({
+      activeFrameCount: 250,
+      voicedRatio: 0.8,
+      voicedDurationSec: 2.2,
+      longestContinuousSec: 1.5,
+      meanHfRatio: 0.078,
+      highAirRatio: 0.068,
+      spectralCentroidHz: 2440,
+    });
+    assert.equal(airySpeech.triggered, false);
+
+    // F34: Chipmunk over-pitch + vanished chest warmth fails; high human female & bird chirp pass
+    const chipRes = f34.detect({
+      activeFrameCount: 200,
+      voicedRatio: 0.9,
+      medianF0: 525,
+      lowWarmthRatio: 0.0,
+      activeMpsSpeech4_16: 0.12,
+    });
+    assert.equal(chipRes.triggered, true);
+    assert.ok(chipRes.score > 0.8);
+
+    const highFemale = f34.detect({
+      activeFrameCount: 200,
+      voicedRatio: 0.85,
+      medianF0: 418,
+      lowWarmthRatio: 0.016,
+      activeMpsSpeech4_16: 0.16,
+    });
+    assert.equal(highFemale.triggered, false);
+
+    const birdChirp = f34.detect({
+      activeFrameCount: 60,
+      voicedRatio: 0.9,
+      medianF0: 582,
+      lowWarmthRatio: 0.0,
+      activeMpsSpeech4_16: 0.0003,
+    });
+    assert.equal(birdChirp.triggered, false);
+
+    // F35: Synthetic tube flatness fails; live/VOICEVOX speech & clean marimba pass
+    const synthTube = f35.detect({
+      activeFrameCount: 250,
+      voicedRatio: 0.85,
+      durationSec: 3.2,
+      jitter: 0.032,
+      bodyBand80_200Db: -45.2,
+      hf4500_7000Db: -18.9,
+      hiBand2800_11000StdDb: 6.4,
+      activeMpsSpeech4_16: 0.16,
+    });
+    assert.equal(synthTube.triggered, true);
+    assert.ok(synthTube.score > 0.7);
+
+    const liveSpeech = f35.detect({
+      activeFrameCount: 250,
+      voicedRatio: 0.8,
+      durationSec: 3.2,
+      jitter: 0.051,
+      bodyBand80_200Db: -31.5,
+      hf4500_7000Db: -24.2,
+      hiBand2800_11000StdDb: 11.1,
+      activeMpsSpeech4_16: 0.15,
+    });
+    assert.equal(liveSpeech.triggered, false);
+
+    const marimba = f35.detect({
+      activeFrameCount: 80,
+      voicedRatio: 0.9,
+      durationSec: 0.95,
+      jitter: 0.003,
+      bodyBand80_200Db: -45.8,
+      hf4500_7000Db: -87.4,
+      hiBand2800_11000StdDb: 2.3,
+      activeMpsSpeech4_16: 0.0001,
+    });
+    assert.equal(marimba.triggered, false);
   });
 });

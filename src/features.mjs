@@ -297,6 +297,7 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
   const b60 = Math.max(1, binOf(60));
   const b80 = Math.max(1, binOf(80));
   const b90 = binOf(90);
+  const b200 = binOf(200);
   const b250 = binOf(250);
   const b300 = binOf(300);
   const b600 = binOf(600);
@@ -304,6 +305,7 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
   const b1000 = binOf(1000);
   const b2000 = binOf(2000);
   const b2500 = binOf(2500);
+  const b2800 = binOf(2800);
   const b3400 = binOf(3400);
   const b3500 = binOf(3500);
   const b4000 = binOf(4000);
@@ -311,8 +313,10 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
   const b5000 = binOf(5000);
   const b5500 = binOf(5500);
   const b6500 = binOf(6500);
+  const b7000 = binOf(7000);
   const b8000 = binOf(8000);
   const b10000 = binOf(10000);
+  const b11000 = binOf(11000);
   const aliasStartBin = sampleRate > 16000 ? b8000 : Math.max(1, Math.floor((halfBins - 1) * 0.7));
   const minDomBin = Math.max(1, Math.ceil(50 / binHz));
 
@@ -486,6 +490,13 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
       Math.min(40, 10 * Math.log10((lowUnder600Pow + 1e-12) / (mid1k3k5Pow + 1e-12)))
     );
 
+    // v0.9 Live-vs-Synthetic anti-fog bands (dB relative to 80–11000 Hz active spectrum)
+    const band80_11kPow = Math.max(1e-18, powPrefix[b11000 + 1] - powPrefix[b80]);
+    const bodyBand80_200Db = 10 * Math.log10((powPrefix[b200 + 1] - powPrefix[b80]) / band80_11kPow + 1e-9);
+    const hf4500_7000Db = 10 * Math.log10((powPrefix[b7000 + 1] - powPrefix[b4500]) / band80_11kPow + 1e-9);
+    const hiBand2800_11000Db =
+      10 * Math.log10((powPrefix[b11000 + 1] - powPrefix[b2800]) / band80_11kPow + 1e-9);
+
     // Top-1 peak energy share (domBin ± 2) for F20 STERILE_PURE_TONE
     const top1Lo = Math.max(1, domBin - 2);
     const top1Hi = Math.min(halfBins - 1, domBin + 2);
@@ -601,6 +612,9 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
       piercingPromDb,
       piercingShare,
       piercingHz,
+      bodyBand80_200Db,
+      hf4500_7000Db,
+      hiBand2800_11000Db,
     });
   }
 
@@ -1053,11 +1067,19 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     ampMod = computeModulationDft(envSeries, hopSec, 2, 16);
   }
 
-  // --- F12–F21, F31, F32: Spectral aggregates over active frames ---
+  // --- F12–F21, F31–F35: Spectral aggregates over active frames ---
   const medianF0 = voicedFrameCount > 0 ? median(voicedFrames.map((f) => f.f0)) : 0;
-  const spectralCentroidHz = activeCount
-    ? meanOf(activeIndices.map((i) => frames[i].spectralCentroidHz))
-    : 0;
+  const activeCentroids = activeIndices.map((i) => frames[i].spectralCentroidHz);
+  const spectralCentroidHz = activeCount ? meanOf(activeCentroids) : 0;
+  const centroidStdHz = activeCount ? stdOf(activeCentroids, spectralCentroidHz) : 0;
+  const bodyBand80_200Db = activeCount
+    ? meanOf(activeIndices.map((i) => frameExtras[i].bodyBand80_200Db))
+    : -90;
+  const hf4500_7000Db = activeCount
+    ? meanOf(activeIndices.map((i) => frameExtras[i].hf4500_7000Db))
+    : -90;
+  const activeHiBandDb = activeIndices.map((i) => frameExtras[i].hiBand2800_11000Db);
+  const hiBand2800_11000StdDb = activeCount ? stdOf(activeHiBandDb, meanOf(activeHiBandDb)) : 0;
   const lowBandRatio = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].lowBandRatio)) : 0;
   const subBassRatio = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].subBassRatio)) : 0;
   const meanRoughness = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].roughness)) : 0;
@@ -1393,6 +1415,12 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     longestContinuousSec: breath.longestContinuousSec,
     breathlessWallRatio: breath.breathlessWallRatio,
     tailTruncatedAtEof,
+
+    // === v0.9 Anti-Fog Live-vs-Synthetic Dynamics (F35) ===
+    bodyBand80_200Db: roundTo(bodyBand80_200Db, 2),
+    hf4500_7000Db: roundTo(hf4500_7000Db, 2),
+    hiBand2800_11000StdDb: roundTo(hiBand2800_11000StdDb, 2),
+    centroidStdHz: roundTo(centroidStdHz, 1),
   };
 
   // --- v0.6 Voice Compass ("sound produced to be heard by someone, using a respiratory organ") ---

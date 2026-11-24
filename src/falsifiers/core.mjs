@@ -44,12 +44,29 @@ export const ORIGINAL_6_FALSIFIERS = [
       const meanRoughness = num(f.meanRoughness, 0);
       const meanVoicedHnrDb = num(f.meanVoicedHnrDb, 20);
       const mpsRoughToSpeechRatio = num(f.mpsRoughToSpeechRatio, 0);
+      const activeMpsSpeech4_16 = num(f.activeMpsSpeech4_16, num(f.mpsSpeech4_16, 0));
+      const activeMpsRoughness30_150 = num(f.activeMpsRoughness30_150, num(f.mpsRoughness30_150, 0));
+      const clipRatio = num(f.clipRatio, 0);
       const subBassRatio = num(f.subBassRatio, 0);
 
-      const edgeScore = round3(maxAttackSlope * 0.6 + meanHfRatio * 0.4);
+      // Soft human whisper guard (Arnal et al. 2015): unvoiced breath-heavy speech with
+      // 4–16 Hz syllabic modulation, low 30–150 Hz hiss/scream roughness, and soft attack curvature.
+      const isSoftHumanWhisper =
+        voicedRatio < 0.45 &&
+        meanHfRatio > 0.3 &&
+        activeMpsSpeech4_16 >= 0.1 &&
+        activeMpsRoughness30_150 < 0.025 &&
+        maxAttackSlope < 0.45 &&
+        clipRatio < 0.001;
+
+      const edgeScore = round3(maxAttackSlope * 0.6 + meanHfRatio * (isSoftHumanWhisper ? 0.15 : 0.4));
       const hfNorm = meanHfRatio / Math.max(0.25, 1 - subBassRatio);
       const isRoughHiss =
-        voicedRatio < 0.5 && meanRoughness > 0.45 && hfNorm > 0.22 && maxAttackSlope > 0.25;
+        !isSoftHumanWhisper &&
+        voicedRatio < 0.5 &&
+        meanRoughness > 0.45 &&
+        hfNorm > 0.22 &&
+        maxAttackSlope > 0.25;
       const isAperiodicGrowl =
         voicedRatio >= 0.25 &&
         voicedRatio <= 0.75 &&
@@ -70,7 +87,7 @@ export const ORIGINAL_6_FALSIFIERS = [
       const sharpEdgeTriggered =
         edgeScore > threshold ||
         maxAttackSlope > extremeAttackLimit ||
-        (maxAttackSlope > attackLimit && meanHfRatio >= minAttackHf);
+        (!isSoftHumanWhisper && maxAttackSlope > attackLimit && meanHfRatio >= minAttackHf);
       const triggered = isNumericOverride
         ? score > threshold
         : sharpEdgeTriggered || isRoughHiss || isAperiodicGrowl;
@@ -80,6 +97,8 @@ export const ORIGINAL_6_FALSIFIERS = [
         evidence += `, roughHiss(rough=${meanRoughness}, hfNorm=${hfNorm.toFixed(2)}, voiced=${voicedRatio})`;
       } else if (!sharpEdgeTriggered && isAperiodicGrowl) {
         evidence += `, roughGrowl(hnr=${meanVoicedHnrDb}dB, rough=${meanRoughness}, mpsRatio=${mpsRoughToSpeechRatio})`;
+      } else if (isSoftHumanWhisper && !triggered) {
+        evidence += `, softWhisperGuarded(mps4_16=${activeMpsSpeech4_16}, mps30_150=${activeMpsRoughness30_150})`;
       }
       return {
         triggered,

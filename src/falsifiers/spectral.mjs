@@ -401,6 +401,141 @@ export const SPECTRAL_EXTRA_FALSIFIERS = [
       };
     },
   },
+  {
+    id: "F33_REMOTE_BELTING",
+    domain: "hollowness",
+    name: "Remote Belting / Airless Mid-Low Projection",
+    detect(f, override) {
+      const activeFrameCount = num(f.activeFrameCount);
+      const voicedRatio = num(f.voicedRatio);
+      const voicedDurationSec = num(f.voicedDurationSec);
+      const longestContinuousSec = num(f.longestContinuousSec);
+      const meanHfRatio = num(f.meanHfRatio);
+      const highAirRatio = num(f.highAirRatio);
+      const centroid = num(f.spectralCentroidHz);
+      const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.45);
+      const maxHf = num(opts?.maxHfRatio, 0.075);
+      const maxAir = num(opts?.maxHighAirRatio, 0.02);
+      const maxCent = num(opts?.maxCentroidHz, 2600);
+      const minVoiced = num(opts?.minVoicedRatio, 0.35);
+      const minSustainedSec = num(opts?.minSustainedSec, 1.2);
+
+      // Guard: sustained vocal projection (not brief warm chimes, lullabies, or short phrases)
+      const eligible =
+        activeFrameCount >= 10 &&
+        voicedRatio >= minVoiced &&
+        voicedDurationSec >= minSustainedSec &&
+        longestContinuousSec >= minSustainedSec &&
+        centroid >= 850 &&
+        highAirRatio < maxAir;
+
+      let score = 0;
+      if (eligible) {
+        const hfPen = clamp01((maxHf - meanHfRatio) / Math.max(0.01, maxHf - 0.01));
+        const centPen = clamp01((maxCent - centroid) / 1400);
+        score = round3(hfPen * centPen);
+      }
+      const triggered = isNumericOverride ? eligible && score >= threshold : eligible && score >= threshold;
+
+      return {
+        triggered,
+        score,
+        threshold,
+        evidence: `hfRatio=${meanHfRatio}, air=${highAirRatio}, centroid=${centroid}Hz, maxRun=${longestContinuousSec}s`,
+        hint: "Bring the voice closer with gentle high-frequency breath air (>4–6%) rather than projecting dark airless mid-low resonance.",
+        where: centroid > 0 ? { freqHz: Math.round(centroid) } : undefined,
+      };
+    },
+  },
+  {
+    id: "F34_CHIPMUNK_SHIFT",
+    domain: "prosody_rhythm",
+    name: "Chipmunk Over-Pitch / Vanished Chest Warmth",
+    detect(f, override) {
+      const activeFrameCount = num(f.activeFrameCount);
+      const voicedRatio = num(f.voicedRatio);
+      const medianF0 = num(f.medianF0);
+      const lowWarmthRatio = num(f.lowWarmthRatio);
+      const activeMpsSpeech4_16 = num(f.activeMpsSpeech4_16, num(f.mpsSpeech4_16, 0));
+      const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.5);
+      const minF0 = num(opts?.minF0Hz, 440);
+      const maxF0 = num(opts?.maxF0Hz, 720);
+      const maxWarmth = num(opts?.maxLowWarmthRatio, 0.025);
+      const minVoiced = num(opts?.minVoicedRatio, 0.35);
+      const minSpeechMod = num(opts?.minSpeechMod, 0.04);
+
+      // Guard: syllabic speech in chipmunk register (excludes pure bird whistles & chimes)
+      const eligible =
+        activeFrameCount >= 10 &&
+        voicedRatio >= minVoiced &&
+        activeMpsSpeech4_16 >= minSpeechMod &&
+        medianF0 >= minF0 &&
+        medianF0 <= maxF0;
+
+      let score = 0;
+      if (eligible) {
+        const f0Pen = clamp01((medianF0 - minF0) / 100);
+        const noWarmth = clamp01((maxWarmth - lowWarmthRatio) / Math.max(0.005, maxWarmth));
+        score = round3(f0Pen * noWarmth);
+      }
+      const triggered = isNumericOverride ? eligible && score >= threshold : eligible && score >= threshold;
+
+      return {
+        triggered,
+        score,
+        threshold,
+        evidence: `medianF0=${medianF0}Hz, lowWarmth(80-300Hz)=${lowWarmthRatio}, mps4_16=${activeMpsSpeech4_16}`,
+        hint: "Keep fundamental pitch in natural human range (<440 Hz) and preserve chest warmth instead of shrinking the whole vocal tract.",
+        where: medianF0 > 0 ? { freqHz: Math.round(medianF0) } : undefined,
+      };
+    },
+  },
+  {
+    id: "F35_SYNTHETIC_TUBE_FLATNESS",
+    domain: "absence_of_presence",
+    name: "Synthetic Tube Flatness / Missing Live Micro-Dynamics",
+    detect(f, override) {
+      const activeFrameCount = num(f.activeFrameCount);
+      const voicedRatio = num(f.voicedRatio);
+      const durationSec = num(f.durationSec);
+      const jitter = num(f.jitter);
+      const bodyBand80_200Db = num(f.bodyBand80_200Db, -90);
+      const hf4500_7000Db = num(f.hf4500_7000Db, -90);
+      const hiBand2800_11000StdDb = num(f.hiBand2800_11000StdDb, 0);
+      const activeMpsSpeech4_16 = num(f.activeMpsSpeech4_16, num(f.mpsSpeech4_16, 0));
+      const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.5);
+      const minVoiced = num(opts?.minVoicedRatio, 0.4);
+      const minDur = num(opts?.minDurationSec, 0.8);
+      const minSpeechMod = num(opts?.minSpeechMod, 0.04);
+      const minSmearedHfDb = num(opts?.minSmearedHfDb, -25);
+
+      // Guard: speech-like voiced audio with smeared 4.5–7 kHz floor (excludes clean tonal instruments)
+      const eligible =
+        activeFrameCount >= 20 &&
+        voicedRatio >= minVoiced &&
+        durationSec >= minDur &&
+        activeMpsSpeech4_16 >= minSpeechMod &&
+        hf4500_7000Db >= minSmearedHfDb;
+
+      let score = 0;
+      if (eligible) {
+        const pJit = clamp01((0.048 - jitter) / 0.022);
+        const pBody = clamp01((-35 - bodyBand80_200Db) / 11);
+        const pFlatHf =
+          clamp01((hf4500_7000Db - -22) / 5) * clamp01((9.5 - hiBand2800_11000StdDb) / 3.5);
+        score = round3(pJit * 0.4 + pBody * 0.35 + pFlatHf * 0.25);
+      }
+      const triggered = isNumericOverride ? eligible && score >= threshold : eligible && score >= threshold;
+
+      return {
+        triggered,
+        score,
+        threshold,
+        evidence: `jitter=${jitter}, body80_200=${bodyBand80_200Db}dB, hf4.5_7k=${hf4500_7000Db}dB, hiStd=${hiBand2800_11000StdDb}dB`,
+        hint: "Restore organic cycle-to-cycle glottal micro-jitter (~0.05+), 80–200 Hz chest/body floor, and clean vowel-vs-consonant HF contrast.",
+      };
+    },
+  },
 ];
 
 export const SPECTRAL_FALSIFIERS = [...SPECTRAL_CORE_FALSIFIERS, ...SPECTRAL_EXTRA_FALSIFIERS];

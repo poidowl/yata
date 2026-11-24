@@ -1,11 +1,11 @@
 /**
- * src/falsifiers/index.mjs — 32-Axis "Unkawaii" Falsifier Registry
+ * src/falsifiers/index.mjs — 35-Axis "Unkawaii" Falsifier Registry
  *
  * Exports:
  *   - ORIGINAL_6_FALSIFIERS: F1–F6 (v0.1 backward-compatible core)
- *   - DEFAULT_FALSIFIERS:    F1–F32 in exact numerical order
+ *   - DEFAULT_FALSIFIERS:    F1–F35 in exact numerical order
  *   - ORTHOGONAL_AXES:       Axes confirmed neither kawaii nor unkawaii (freedom-of-expression map)
- *   - TOOLBOX_FALSIFIERS:    F7–F32 excluding ORTHOGONAL_AXES (diagnostic/toolbox axes)
+ *   - TOOLBOX_FALSIFIERS:    F7–F35 excluding ORTHOGONAL_AXES (diagnostic/toolbox axes)
  *   - createFalsifiers(thresholdOverrides = {}, baseFalsifiers = DEFAULT_FALSIFIERS)
  *
  * Zero external dependencies. Pure ES Module.
@@ -25,7 +25,7 @@ export const DEFAULT_FALSIFIERS = Object.freeze([
   ...SPECTRAL_CORE_FALSIFIERS,    // F12–F20
   ...PROSODY_FALSIFIERS,          // F21–F27
   ...SPATIAL_FALSIFIERS,          // F28–F30
-  ...SPECTRAL_EXTRA_FALSIFIERS,   // F31–F32
+  ...SPECTRAL_EXTRA_FALSIFIERS,   // F31–F35
 ]);
 
 /**
