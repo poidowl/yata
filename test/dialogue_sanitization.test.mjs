@@ -346,4 +346,40 @@ describe("v0.7: Over-Sanitization Lens, Relational Dialogue Mirror & Breath-Rele
     assert.doesNotMatch(ohMap, /backch=/);
     assert.match(ohMap, /1 overlapping/);
   });
+
+  it("distinguishes simultaneous start after silence (simStart) from backchannel and overlapping handoff, preserving pre-overlap gap", () => {
+    // 1. A speaks 0.0-0.5s, 2.5s silence, then both say "えっ" at 3.0-3.1s and both stop
+    const ss1A = genToneBurstTrack(3.5, [[0.0, 0.5], [3.0, 3.1]], 300);
+    const ss1B = genToneBurstTrack(3.5, [[3.0, 3.1]], 420);
+    const ss1 = yata.analyzeDialogue(ss1A, SR, ss1B, SR);
+    assert.equal(ss1.simultaneousStartCount, 1);
+    assert.equal(ss1.backchannelCount, 0, "Simultaneous start after silence must not be counted as backchannel");
+    assert.equal(ss1.overlapHandoffCount, 0);
+    assert.equal(ss1.turnCount, 0);
+    assert.equal(ss1.relationLabel, "disconnected_monologue");
+    const ss1Map = yata.renderDialogueMap(ss1);
+    assert.equal(countLines(ss1Map), 5);
+    assert.match(ss1Map, /simStart=1/);
+    assert.doesNotMatch(ss1Map, /backch=/);
+    assert.match(ss1Map, /1 simultaneous start/);
+
+    // 2. A speaks 0.0-0.5s, 2.5s silence, both start at 3.0-3.1s, then B continues solo 3.1-3.8s
+    const ss2A = genToneBurstTrack(4.0, [[0.0, 0.5], [3.0, 3.1]], 300);
+    const ss2B = genToneBurstTrack(4.0, [[3.0, 3.8]], 420);
+    const ss2 = yata.analyzeDialogue(ss2A, SR, ss2B, SR);
+    assert.equal(ss2.simultaneousStartCount, 1);
+    assert.equal(ss2.backchannelCount, 0);
+    assert.equal(ss2.overlapHandoffCount, 0, "Simultaneous start after silence must not be counted as overlapping handoff");
+    assert.equal(ss2.turnCount, 1);
+    assert.ok(
+      ss2.meanTurnGapSec >= 2.35 && ss2.meanTurnGapSec <= 2.65,
+      `Expected ~2.50s pre-overlap silence gap preserved, got ${ss2.meanTurnGapSec}`
+    );
+    assert.equal(ss2.relationLabel, "disconnected_monologue");
+    const ss2Map = yata.renderDialogueMap(ss2);
+    assert.equal(countLines(ss2Map), 5);
+    assert.match(ss2Map, /simStart=1/);
+    assert.doesNotMatch(ss2Map, /ovHandoff=/);
+    assert.match(ss2Map, /1 simultaneous start/);
+  });
 });
