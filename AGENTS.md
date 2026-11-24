@@ -48,14 +48,14 @@
       - `shelf_veto`（`--policy shelf_veto --contested ...`）: Protected Shelf で `CONTESTED` になった軸の拒否権を自動停止し、クリア済み軸のみで判定
       - `veto_all`: 全65軸でハード拒否（研究・厳格監査向け）
     - **v0.11 高域位相粒立ちミラー（`F65_HF_PHASE_GRAININESS`・追加 FFT ゼロ）**:
-      - 1.2–4.5 kHz 聴覚フィルタ帯域（2400 Hz, Q=0.8）の時間波形尖度（`hfBandWaveKurt`）を実装。38 クリップ監査で既存64軸すべてと **64/64（100.0%）直交（`max |r| = 0.542`）**。生録音4本・VOICEVOX つむぎ/雨晴はう/めたん・位相分散済み tokiko は 0 FP 通過、裸の位相揃え tokiko を 100% 捕捉。
+      - 1.2–4.5 kHz 聴覚フィルタ帯域（2400 Hz, Q=0.8）の時間波形尖度（`hfBandWaveKurt`）を実装。38 クリップ監査で既存64軸すべてと **64/64（100.0%）直交（`max |r| = 0.542`）**。生録音4本・VOICEVOX つむぎ/雨晴はう/めたん・位相分散済み tokiko は 0 FP 通過、裸の位相揃え tokiko を 100% 捕捉。（※ VOICEVOX は非CC0・未収録のため v0.11.1 で証拠撤回）
     - **v0.10 64軸直交ミラー（`F41`–`F64`・追加 FFT ゼロ）**:
       - 3モジュール新設：`src/falsifiers/dynamics.mjs`（`F41`–`F48` 韻律・調音ダイナミクス）、`src/falsifiers/acoustics.mjs`（`F49`–`F56` 空間・コーデック・位相）、`src/falsifiers/fatigue.mjs`（`F57`–`F64` 微細表現・声区・聴覚疲労）。
-      - 64×64 直交性監査（39クリップ：実音29＋VOICEVOX女性6＋`tokiko`4、全 2,016 ペア）：**`1,977 / 2,016`（`98.07%`）が `|r| < 0.60` で直交**。VOICEVOX女性の `F41`–`F64` 通過率は **`141 / 144`（`97.9%`）**。
+      - 64×64 直交性監査（39クリップ：実音29＋VOICEVOX女性6＋`tokiko`4、全 2,016 ペア）：**`1,977 / 2,016`（`98.07%`）が `|r| < 0.60` で直交**。VOICEVOX女性の `F41`–`F64` 通過率は **`141 / 144`（`97.9%`）**。（※ v0.11.1: VOICEVOX は非CC0・音声と監査スクリプトが未収録で再現不能のため証拠撤回。「直交」は重複が少ないだけで、見分ける力の証拠ではない）
       - **Goodhart 罠修正（オーナー耳検証）**: `F35_SYNTHETIC_TUBE_FLATNESS` から生ジッタ下限ペナルティ（`jitter < 0.048`）を撤去。生ジッタ追従が合成音に喉の痰がらみノイズを誘発する問題を解消。
     - **v0.9 反霧ミラー（`F33`–`F40`）& `F1` ささやき保護**:
       - `F1_HARSH_EDGE` に `isSoftHumanWhisper` ガード（Arnal 4–16 Hz vs 30–150 Hz）を追加し、`ho_whisper` を救済しつつ猫の威嚇・怒ったトラ・鋭いエッジを捕捉。
-      - `F33`–`F40` を `src/falsifiers/spectral.mjs` へ追加（`F36_COARTICULATION_SEAM`・`F37_DECOUPLED_HF_EXCITER` は実録音/VOICEVOX vs 合成で `AUC = 1.000`）。
+      - `F33`–`F40` を `src/falsifiers/spectral.mjs` へ追加（`F36_COARTICULATION_SEAM`・`F37_DECOUPLED_HF_EXCITER` の旧「実録音/VOICEVOX vs 合成で AUC = 1.000」は v0.11.1 で撤回）。
     - **v0.8 Core-6 実音キャリブレーション & 未見 PD/CC0 ホールドアウト評価**:
       - `F5_ABRUPT_TAIL` の `observed: false`（`[UNOBSERVED]`）分離、`F3` 平坦度ガード、`F4` RMS×重心相関、`F1` 無声ラフヒス検出、および未見 PD/CC0 9本監査（[`bench/real_audio_audit/HELDOUT_RESULTS.md`](bench/real_audio_audit/HELDOUT_RESULTS.md)）。
     - **v0.7 過剰整えレンズ、2トラック関係対話ミラー & 生きた息の余韻モード**:

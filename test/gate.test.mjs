@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
-import { analyzeSamples, formatForLLM, ORIGINAL_6_FALSIFIERS } from "../unkawaii_detector.mjs";
+import { analyzeSamples, formatForLLM, ORIGINAL_6_FALSIFIERS, buildCorpus } from "../unkawaii_detector.mjs";
 import { QUARANTINED, TOKIKO_DERIVED } from "../src/falsifiers/gate.mjs";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
@@ -48,6 +48,16 @@ describe("held-out hygiene", () => {
     for (const f of files) {
       const s = fs.readFileSync(f, "utf8");
       for (const k of keys) assert.ok(!s.includes(k), `held-out key "${k}" found in ${path.relative(ROOT, f)}: move that clip to tuning`);
+    }
+  });
+});
+
+describe("pass-side references are synthetic or PD/CC0 (no VOICEVOX)", () => {
+  it("synthetic positive controls trip none of F33+", () => {
+    for (const p of buildCorpus({ sampleRate: 24000, seed: 2026 }).positives) {
+      const r = analyzeSamples(p.samples, p.sampleRate, p.channels ? { channels: p.channels } : {});
+      const hit = r.falsifiers.filter((f) => f.triggered && +f.id.slice(1).split("_")[0] >= 33).map((f) => f.id);
+      assert.deepEqual(hit, [], `${p.id}: ${hit.join(",")}`);
     }
   });
 });

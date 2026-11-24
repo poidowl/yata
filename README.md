@@ -44,11 +44,11 @@
 - **v0.11 高域位相粒立ちミラー（`F65_HF_PHASE_GRAININESS`・追加 FFT ゼロ）**:
   - 1.2–4.5 kHz 聴覚フィルタ帯域（2400 Hz, Q=0.8）の時間波形尖度（`hfBandWaveKurt` — Patterson 1987 / Kohlrausch 1995）を実装し、広帯域では見逃される高次倍音の位相揃え「粒立ち」を捕捉。38 クリップ監査で既存64軸すべてと **64/64（100.0%）直交（`max |r| = 0.542`）**。
 - **v0.10 64軸直交ミラー（`F41`–`F64`・追加 FFT ゼロ）**:
-  - 3つの新規モジュール（`src/falsifiers/dynamics.mjs`、`src/falsifiers/acoustics.mjs`、`src/falsifiers/fatigue.mjs`）で 24 軸を追加し、39 クリップ（実音29＋VOICEVOX女性6＋`tokiko`4）の 64×64 相関監査で **`1,977 / 2,016` ペア（`98.07%`）の直交性（`|r| < 0.60`）** を達成。
+  - 3つの新規モジュール（`src/falsifiers/dynamics.mjs`、`src/falsifiers/acoustics.mjs`、`src/falsifiers/fatigue.mjs`）で 24 軸を追加し、64×64 相関監査で `1,977 / 2,016` ペア（`98.07%`）が `|r| < 0.60`。※直交＝重複が少ないことの証拠で、正しく見分ける証拠ではありません。監査セットに非CC0の VOICEVOX 音声が含まれ、音声も監査スクリプトもリポジトリに無いため **再現不能・証拠としては撤回**（v0.11.1）。
   - **オーナー耳による Goodhart 罠修正**: `F35_SYNTHETIC_TUBE_FLATNESS` から生ジッタ下限ペナルティ（`jitter < 0.048`）を撤去。生ジッタ追従が合成側に喉の痰がらみノイズを誘発する問題を解消し、物理的な低域ボディ欠落＋高域塗りつぶし検出へ純化。
 - **v0.9 反霧ミラー（`F33`–`F40`）& `F1` ささやき保護**:
   - `F1_HARSH_EDGE` に Arnal 4–16 Hz 発話変調 vs 30–150 Hz 粗さ帯を用いた `isSoftHumanWhisper` ガードを追加し、人間の柔らかいささやきを通しつつ猫の威嚇・怒ったトラ・鋭いエッジを捕捉。
-  - 合成音声の「霧・継ぎ目・エキサイタ分離・硬直拍子」を捉える `F33`–`F40` を追加（`F36_COARTICULATION_SEAM` / `F37_DECOUPLED_HF_EXCITER` は生声・VOICEVOX vs 合成で `AUC = 1.000`）。
+  - 合成音声の「霧・継ぎ目・エキサイタ分離・硬直拍子」を捉える `F33`–`F40` を追加（旧記載の「生声・VOICEVOX vs 合成で `AUC = 1.000`」は、VOICEVOX が CC0 でなく音声・スクリプトも未収録のため撤回。`F37` は現在 `tokiko_derived` タグ付き）。
 - **v0.8 Core-6 実音キャリブレーション、F5 観測可否（`observed` / `[UNOBSERVED]`）& 未見 PD/CC0 ホールドアウト評価**:
   - **Core-6 物理修正**: `F5_ABRUPT_TAIL` が録音末尾 15ms に音が残る途中切り出し（`tailTruncatedAtEof`）を誤爆せず `observed: false`（`[UNOBSERVED]`）として「自然な余韻（`observed: true, score: 0`）」と明確に分離。`F3_PURE_NOISE` にスペクトル平坦度ガード（`>= 0.25`）、`F4_NO_COMMON_CAUSE` に RMS×重心相関、`F1_HARSH_EDGE` に無声ラフヒス／非周期ラフうなり検出を追加。
   - **未見 PD/CC0 ホールドアウト評価（ゼロ調整）**: 閾値調整に一切使っていない Public Domain / CC0 音源 9 本（人間の「しーっ」・ささやき・発話・子犬・怒ったトラ・路面電車警告音・食洗機）での実測を [`bench/real_audio_audit/HELDOUT_RESULTS.md`](bench/real_audio_audit/HELDOUT_RESULTS.md) に公開。
