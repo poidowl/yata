@@ -1268,6 +1268,9 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
   const mps = computeMpsRoughness(core.samples, core.sampleRate);
   const subharmonicRatio = computeSubharmonicRatio(core.norm, core.sampleRate, f0Track, hopSize);
 
+  // --- v0.6 Breath & Pause Profile ---
+  const breath = computeBreathPauseProfile(frames, durationSec);
+
   return {
     // === 16 v0.1 backward-compatible scalar keys ===
     sampleRate: core.sampleRate,
@@ -1364,6 +1367,133 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     mpsRoughness30_150: roundTo(mps.mpsRoughness30_150, 4),
     mpsRoughToSpeechRatio: roundTo(mps.mpsRoughToSpeechRatio, 3),
     subharmonicRatio: roundTo(subharmonicRatio, 4),
+
+    // === v0.6 Breath & Pause Profile ===
+    activeDutyCycle: breath.activeDutyCycle,
+    pauseCount: breath.pauseCount,
+    meanPauseSec: breath.meanPauseSec,
+    longestContinuousSec: breath.longestContinuousSec,
+    breathlessWallRatio: breath.breathlessWallRatio,
+  };
+}
+
+/**
+ * Breath & Pause Profile: segments active sound islands (rms >= 0.03) and internal
+ * breathing pauses (>= 0.06s) to distinguish silence, brief glances, phrased speech/music
+ * with breathing room, and relentless breathless walls of sound.
+ *
+ * @param {Array<{ timeSec: number, rms: number }>} frames
+ * @param {number} durationSec
+ * @returns {{
+ *   activeDutyCycle: number,
+ *   pauseCount: number,
+ *   meanPauseSec: number,
+ *   longestContinuousSec: number,
+ *   breathlessWallRatio: number,
+ *   cadenceLabel: "silent" | "brief_glance" | "phrased_breath" | "continuous_wall",
+ * }}
+ */
+export function computeBreathPauseProfile(frames, durationSec) {
+  const dur = finite(durationSec, 0);
+  if (!Array.isArray(frames) || frames.length === 0 || dur <= 0) {
+    return {
+      activeDutyCycle: 0,
+      pauseCount: 0,
+      meanPauseSec: 0,
+      longestContinuousSec: 0,
+      breathlessWallRatio: 0,
+      cadenceLabel: "silent",
+    };
+  }
+
+  const n = frames.length;
+  const dt = n >= 2
+    ? Math.max(1e-4, finite(frames[1].timeSec - frames[0].timeSec, 0.01))
+    : Math.min(dur, 0.025);
+  const ACTIVE_RMS = 0.03;
+  const PAUSE_MIN_SEC = 0.06;
+
+  let activeCount = 0;
+  const activeFlags = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    if (finite(frames[i]?.rms, 0) >= ACTIVE_RMS) {
+      activeFlags[i] = 1;
+      activeCount++;
+    }
+  }
+
+  if (activeCount === 0) {
+    return {
+      activeDutyCycle: 0,
+      pauseCount: 0,
+      meanPauseSec: 0,
+      longestContinuousSec: 0,
+      breathlessWallRatio: 0,
+      cadenceLabel: "silent",
+    };
+  }
+
+  const activeDutyCycle = Math.max(0, Math.min(1, activeCount / n));
+
+  const islands = [];
+  let i = 0;
+  while (i < n) {
+    if (activeFlags[i] === 1) {
+      const start = i;
+      while (i < n && activeFlags[i] === 1) i++;
+      islands.push({ start, end: i - 1 });
+    } else {
+      i++;
+    }
+  }
+
+  const pauses = [];
+  const merged = [islands[0]];
+  for (let k = 1; k < islands.length; k++) {
+    const prev = merged[merged.length - 1];
+    const curr = islands[k];
+    const gapFrames = curr.start - prev.end - 1;
+    const gapSec = gapFrames * dt;
+    if (gapSec >= PAUSE_MIN_SEC) {
+      pauses.push(gapSec);
+      merged.push(curr);
+    } else {
+      prev.end = curr.end;
+    }
+  }
+
+  const pauseCount = pauses.length;
+  const meanPauseSec = pauseCount > 0 ? meanOf(pauses) : 0;
+
+  let longestContinuousSec = 0;
+  for (const run of merged) {
+    const runSec = Math.min(dur, (run.end - run.start + 1) * dt);
+    if (runSec > longestContinuousSec) longestContinuousSec = runSec;
+  }
+
+  const breathlessWallRatio = Math.max(0, Math.min(1, (longestContinuousSec - 2.0) / 3.0));
+
+  let cadenceLabel;
+  if (activeDutyCycle < 0.01) {
+    cadenceLabel = "silent";
+  } else if (longestContinuousSec >= 2.0 && (pauseCount === 0 || breathlessWallRatio >= 0.2)) {
+    cadenceLabel = "continuous_wall";
+  } else if (
+    pauseCount === 0 &&
+    (longestContinuousSec <= 0.25 || (activeDutyCycle <= 0.3 && longestContinuousSec <= 0.5))
+  ) {
+    cadenceLabel = "brief_glance";
+  } else {
+    cadenceLabel = "phrased_breath";
+  }
+
+  return {
+    activeDutyCycle: roundTo(activeDutyCycle, 4),
+    pauseCount,
+    meanPauseSec: roundTo(meanPauseSec, 3),
+    longestContinuousSec: roundTo(longestContinuousSec, 3),
+    breathlessWallRatio: roundTo(breathlessWallRatio, 4),
+    cadenceLabel,
   };
 }
 
@@ -1388,6 +1518,7 @@ export function extractSegmentTimeline(profile, samples, sampleRate, opts = { wi
     ? profile
     : extractAudioProfile(sig, sr);
   const frames = prof.frames || [];
+  const breath = computeBreathPauseProfile(frames, durationSec);
 
   const segments = [];
   if (durationSec <= 0 || n === 0) {
@@ -1396,6 +1527,7 @@ export function extractSegmentTimeline(profile, samples, sampleRate, opts = { wi
       windowSec: roundTo(windowSec, 3),
       durationSec: 0,
       sampleRate: sr,
+      breath,
       segments,
     };
   }
@@ -1454,6 +1586,7 @@ export function extractSegmentTimeline(profile, samples, sampleRate, opts = { wi
     windowSec: roundTo(windowSec, 3),
     durationSec: roundTo(durationSec, 3),
     sampleRate: sr,
+    breath,
     segments,
   };
 }

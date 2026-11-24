@@ -793,8 +793,13 @@ export function renderSegmentTimeline(timeline, opts = {}) {
   const ramp = unicode ? SPARK_UNICODE : SPARK_ASCII;
   const vSep = unicode ? "│" : "|";
 
+  const b = timeline?.breath;
+  const breathTag = b
+    ? ` | duty=${Math.round(finite(b.activeDutyCycle, 0) * 100)}% pauses=${Math.round(finite(b.pauseCount, 0))} maxRun=${fmtNum(b.longestContinuousSec, 1)}s [${b.cadenceLabel || "silent"}]`
+    : "";
+
   if (segs.length === 0) {
-    return `[YATA TIMELINE] dur=${fmtNum(dur, 2)}s win=${fmtNum(winSec, 2)}s (0 segs — empty/silent)`;
+    return `[YATA TIMELINE] dur=${fmtNum(dur, 2)}s win=${fmtNum(winSec, 2)}s (0 segs — empty/silent)${breathTag}`;
   }
 
   const width = clamp(Math.floor(finite(opts?.width, Math.max(segs.length * 2, 16))), segs.length, 64);
@@ -819,9 +824,111 @@ export function renderSegmentTimeline(timeline, opts = {}) {
   const f0Summary = shown.map((s) => `${Math.round(finite(s.medianF0, 0))}Hz`).join(" ");
 
   return [
-    `[YATA TIMELINE] dur=${fmtNum(dur, 2)}s win=${fmtNum(winSec, 2)}s (${segs.length} segs; PRES shows presence(active%))`,
+    `[YATA TIMELINE] dur=${fmtNum(dur, 2)}s win=${fmtNum(winSec, 2)}s (${segs.length} segs)${breathTag}`,
     `PRES      ${vSep}${presSpark}${vSep} ${presSummary}${suffix}`,
     `MPS30-150 ${vSep}${mpsSpark}${vSep} ${mpsSummary}${suffix}`,
     `F0        ${vSep}${f0Spark}${vSep} ${f0Summary}${suffix}`,
+  ].join("\n");
+}
+
+function renderSignedSparkline(values, width, scale, ramp) {
+  const w = Math.max(1, width);
+  const midChar = ramp[ramp.length >> 1];
+  if (!values.length) return midChar.repeat(w);
+  const s = scale > 1e-9 ? scale : 1;
+  let out = "";
+  for (let col = 0; col < w; col++) {
+    const i0 = Math.floor((col * values.length) / w);
+    const i1 = Math.max(i0 + 1, Math.floor(((col + 1) * values.length) / w));
+    let peak = values[Math.min(values.length - 1, i0)];
+    for (let i = i0 + 1; i < Math.min(values.length, i1); i++) {
+      if (Math.abs(values[i]) > Math.abs(peak)) peak = values[i];
+    }
+    out += pickSignedGlyph(ramp, peak / s);
+  }
+  return out;
+}
+
+/**
+ * Window-by-window timeline diff renderer (B - A) in 5 compact lines:
+ * header (with exact hotspot window) + 4 delta tracks (dPRES, dACT%, dMPS, dF0).
+ *
+ * @param {object} timelineA - Baseline extractSegmentTimeline output
+ * @param {object} timelineB - Comparison extractSegmentTimeline output
+ * @param {{ charset?: "ascii" | "unicode", width?: number }} [opts={}]
+ * @returns {string}
+ */
+export function renderTimelineDiff(timelineA, timelineB, opts = {}) {
+  const segsA = Array.isArray(timelineA?.segments) ? timelineA.segments : [];
+  const segsB = Array.isArray(timelineB?.segments) ? timelineB.segments : [];
+  const count = Math.max(segsA.length, segsB.length);
+  const winSec = finite(timelineB?.windowSec, finite(timelineA?.windowSec, 0.5));
+  const unicode = opts?.charset === "unicode";
+  const diffRamp = unicode ? DIFF_UNICODE : DIFF_ASCII;
+  const vSep = unicode ? "│" : "|";
+
+  if (count === 0) {
+    return `[YATA TIMELINE DIFF] (0 segs — empty/silent)`;
+  }
+
+  const signed = (v, digits = 2, unit = "") => `${v >= 0 ? "+" : ""}${fmtNum(v, digits)}${unit}`;
+
+  const deltas = [];
+  let hotIdx = 0;
+  let hotScore = -1;
+  for (let i = 0; i < count; i++) {
+    const a = segsA[i] || null;
+    const b = segsB[i] || null;
+    const startSec = finite(a?.startSec, finite(b?.startSec, i * winSec));
+    const endSec = finite(b?.endSec, finite(a?.endSec, startSec + winSec));
+    const dPres = finite(b?.presence, 0) - finite(a?.presence, 0);
+    const dActPct = (finite(b?.activeRatio, 0) - finite(a?.activeRatio, 0)) * 100;
+    const dMps = finite(b?.mpsRoughness30_150, 0) - finite(a?.mpsRoughness30_150, 0);
+    const dF0 = finite(b?.medianF0, 0) - finite(a?.medianF0, 0);
+
+    const score =
+      Math.abs(dMps) * 4.0 +
+      Math.abs(dPres) * 1.5 +
+      (Math.abs(dActPct) / 100) * 1.0 +
+      Math.min(1, Math.abs(dF0) / 100) * 0.5;
+    if (score > hotScore) {
+      hotScore = score;
+      hotIdx = i;
+    }
+    deltas.push({ startSec, endSec, dPres, dActPct, dMps, dF0 });
+  }
+
+  const hot = deltas[hotIdx];
+  const width = clamp(Math.floor(finite(opts?.width, Math.max(count * 2, 16))), count, 64);
+
+  const dPresVals = deltas.map((d) => d.dPres);
+  const dActVals = deltas.map((d) => d.dActPct);
+  const dMpsVals = deltas.map((d) => d.dMps);
+  const dF0Vals = deltas.map((d) => d.dF0);
+
+  const presScale = Math.max(0.25, ...dPresVals.map(Math.abs));
+  const mpsScale = Math.max(0.15, ...dMpsVals.map(Math.abs));
+  const f0Scale = Math.max(80, ...dF0Vals.map(Math.abs));
+
+  const presSpark = renderSignedSparkline(dPresVals, width, presScale, diffRamp);
+  const actSpark = renderSignedSparkline(dActVals, width, 100, diffRamp);
+  const mpsSpark = renderSignedSparkline(dMpsVals, width, mpsScale, diffRamp);
+  const f0Spark = renderSignedSparkline(dF0Vals, width, f0Scale, diffRamp);
+
+  const maxInline = 8;
+  const shown = deltas.slice(0, maxInline);
+  const suffix = deltas.length > maxInline ? ` +${deltas.length - maxInline}` : "";
+  const presSummary = shown.map((d) => `${fmtNum(d.startSec, 1)}s:${signed(d.dPres, 2)}`).join(" ");
+  const actSummary = shown.map((d) => `${fmtNum(d.startSec, 1)}s:${signed(d.dActPct, 0, "%")}`).join(" ");
+  const mpsSummary = shown.map((d) => `${fmtNum(d.startSec, 1)}s:${signed(d.dMps, 2)}`).join(" ");
+  const f0Summary = shown.map((d) => `${signed(d.dF0, 0, "Hz")}`).join(" ");
+
+  const deltaLbl = unicode ? "HOTSPOT Δ" : "HOTSPOT d";
+  return [
+    `[YATA TIMELINE DIFF] ${count} segs (B-A) | ${deltaLbl}: ${fmtNum(hot.startSec, 1)}..${fmtNum(hot.endSec, 1)}s (dMPS=${signed(hot.dMps, 2)}, dPRES=${signed(hot.dPres, 2)}, dACT=${signed(hot.dActPct, 0, "%")})`,
+    `dPRES ${vSep}${presSpark}${vSep} ${presSummary}${suffix}`,
+    `dACT% ${vSep}${actSpark}${vSep} ${actSummary}${suffix}`,
+    `dMPS  ${vSep}${mpsSpark}${vSep} ${mpsSummary}${suffix}`,
+    `dF0   ${vSep}${f0Spark}${vSep} ${f0Summary}${suffix}`,
   ].join("\n");
 }

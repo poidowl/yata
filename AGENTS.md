@@ -40,13 +40,17 @@
 ## 現在の見張りメモ（オブザーバー引き継ぎ用・2026-11-24）
 
 - **現行安定版**: `main`（`v0.1.0` — 6次元検出器）
-- **レビュー対象ブランチ**: `dev/v0.5`（ゼロ依存純JS・"The Neuroscience & Ear-Memory Mirror"）
-  - **実装済み（v0.2 → v0.3 → v0.4 → v0.5）**:
+- **レビュー対象ブランチ**: `dev/v0.6`（ゼロ依存純JS・"The Breath, Space & Counterfactual Mirror"）
+  - **実装済み（v0.2 → v0.3 → v0.4 → v0.5 → v0.6）**:
     - 32軸検出器（`F1`–`F32`）の階層分離：**Core-6（`ORIGINAL_6_FALSIFIERS`）**／**診断ツールボックス（`TOOLBOX_FALSIFIERS`: F7–F32 から直交軸を除く25軸）**／**直交軸マップ（`ORTHOGONAL_AXES`: `F30` ステレオ逆相）**
     - **判定ポリシー（既定 = `core_veto`）**: `--policy core_veto|shelf_veto|veto_all`
       - `core_veto`（コード既定値）: 基本6軸のみでハード拒否し、ツールボックス軸は診断ヒントとして非拒否で併記
       - `shelf_veto`（`--policy shelf_veto --contested ...`）: Protected Shelf で `CONTESTED` になった軸の拒否権を自動停止し、クリア済み軸のみで判定
       - `veto_all`: 全32軸でハード拒否（研究・厳格監査向け）
+    - **v0.6 呼吸・間プロファイル、窓別タイムライン差分 & 最小反事実オーディオミラー**:
+      - `computeBreathPauseProfile(frames, durationSec)`: `activeDutyCycle` / `pauseCount` / `meanPauseSec` / `longestContinuousSec` / `breathlessWallRatio` / `cadenceLabel`（`silent` | `brief_glance` | `phrased_breath` | `continuous_wall`）を `extractFeatures` と `extractSegmentTimeline` へ統合し、`renderSegmentTimeline` の4行ヘッダへ `duty=XX% pauses=N maxRun=X.Xs [cadenceLabel]` を併記
+      - `renderTimelineDiff(timelineA, timelineB)` + CLI `--timeline-diff` / `--compare ... --timeline` / `--diff ... --timeline`: 5行の窓別差分（`dPRES`, `dACT%`, `dMPS`, `dF0`）で最大変化の半秒窓（`HOTSPOT`）を特定
+      - `src/counterfactual.mjs`（`findTimelineHotspot` / `generateCounterfactualSlice`）+ CLI `--counterfactual <out.wav>`（任意 `--cf-window <t0>..<t1>`）: ホットスポット半秒窓**のみ**をゼロ位相ローパス＋30–150 Hz エンベロープ粗さ減衰＋コサインクロスフェードで局所緩和（窓外はビット単位で原音と同一）
     - **v0.5 神経科学 DSP レンズ & 時間分割ミラー**:
       - `computeMpsRoughness`（Arnal et al. 2015/2025: `4–16 Hz` 発話帯 vs `30–150 Hz` 粗さ帯）および `computeSubharmonicRatio`（Wilden 1998 / Fitch 2002 / Anikin 2020: 非線形サブハーモニクス $f_0/2$）を `extractFeatures` とコンパクト視覚（`MPS30-150`, `SUBH`）へ統合
       - `extractSegmentTimeline` / `renderSegmentTimeline` / `--timeline`（`0.5s` 窓の Presence × MPS 30–150 Hz × F0 の4行スパークライン）

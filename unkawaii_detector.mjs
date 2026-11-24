@@ -24,7 +24,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { decodeWavBuffer, encodeWavBuffer } from "./src/wav.mjs";
-import { extractFeatures, extractAudioProfile, extractSegmentTimeline } from "./src/features.mjs";
+import {
+  extractFeatures,
+  extractAudioProfile,
+  extractSegmentTimeline,
+  computeBreathPauseProfile,
+} from "./src/features.mjs";
 import {
   ORIGINAL_6_FALSIFIERS,
   DEFAULT_FALSIFIERS,
@@ -43,16 +48,18 @@ import {
   renderTextVision,
   renderTextDiff,
   renderSegmentTimeline,
+  renderTimelineDiff,
   renderSvgVision,
   renderSvgDiff,
   renderPngVision,
   renderPngDiff,
 } from "./src/visualize/index.mjs";
+import { findTimelineHotspot, generateCounterfactualSlice } from "./src/counterfactual.mjs";
 import { buildCorpus } from "./src/synth.mjs";
 import { runDiscoveryLoop, formatDiscoveryForLLM } from "./src/discovery.mjs";
 
 // ============================================================================
-// Public Programmatic API (v0.1 backward-compatible + v0.2/v0.3/v0.5 extensions)
+// Public Programmatic API (v0.1 backward-compatible + v0.2–v0.6 extensions)
 // ============================================================================
 export {
   // v0.1 core exports
@@ -87,6 +94,11 @@ export {
   renderSegmentTimeline,
   loadEarPrecedents,
   applyEarPrecedents,
+  // v0.6 extensions
+  computeBreathPauseProfile,
+  renderTimelineDiff,
+  findTimelineHotspot,
+  generateCounterfactualSlice,
 };
 
 // ============================================================================
@@ -97,16 +109,18 @@ const USAGE = `Usage:
                                         [--policy core_veto|veto_all|shelf_veto] [--contested <ID1,ID2,...>]
                                         [--precedents <path.json> | --shelf <path.json>] [--scope <scope>]
                                         [--view [micro|compact|full]] [--zoom [auto|<t0>..<t1>]] [--timeline]
+                                        [--counterfactual <out.wav> [--cf-window <t0>..<t1>]]
                                         [--charset ascii|unicode] [--width <N>]
                                         [--svg <out.svg>] [--png <out.png>]
   node unkawaii_detector.mjs --compare <a.wav> <b.wav> [--format llm|json] [--verbose] [--falsifiers all|core]
                                                        [--policy core_veto|veto_all|shelf_veto] [--contested <ID1,ID2,...>]
                                                        [--precedents <path.json> | --shelf <path.json>] [--scope <scope>]
-                                                       [--view [micro|compact|full]] [--svg <out.svg>] [--png <out.png>]
+                                                       [--view [micro|compact|full]] [--timeline] [--svg <out.svg>] [--png <out.png>]
   node unkawaii_detector.mjs --diff <a.wav> <b.wav> [--falsifiers all|core] [--policy core_veto|veto_all|shelf_veto]
-                                                    [--contested <ID1,ID2,...>]
+                                                    [--contested <ID1,ID2,...>] [--timeline]
                                                     [--charset ascii|unicode] [--width <N>]
                                                     [--svg <out.svg>] [--png <out.png>]
+  node unkawaii_detector.mjs --timeline-diff <a.wav> <b.wav> [--format llm|json] [--charset ascii|unicode] [--width <N>]
   node unkawaii_detector.mjs --discover [--format llm|json] [--view] [--charset ascii|unicode]
   node unkawaii_detector.mjs --list-falsifiers [--format llm|json] [--falsifiers all|core]`;
 
@@ -129,7 +143,7 @@ function parseZoomArg(raw) {
 function parseCliArgs(argv) {
   const opts = {
     help: false,
-    mode: "single", // single | compare | diff | discover | list
+    mode: "single", // single | compare | diff | timeline_diff | discover | list
     files: [],
     format: "llm",
     verbose: false,
@@ -139,6 +153,8 @@ function parseCliArgs(argv) {
     precedentsPath: null,
     scope: null,
     timeline: false,
+    counterfactualOut: null,
+    cfWindow: null, // null | { startSec, endSec }
     view: null, // null | "micro" | "compact" | "full"
     zoom: null, // null | "auto" | { startSec, endSec }
     charset: "ascii",
@@ -172,6 +188,17 @@ function parseCliArgs(argv) {
       const b = argv[++i];
       if (!a || !b || a.startsWith("-") || b.startsWith("-")) {
         throw new Error("--diff requires two WAV file paths: --diff <a.wav> <b.wav>");
+      }
+      opts.files.push(a, b);
+      continue;
+    }
+
+    if (arg === "--timeline-diff") {
+      opts.mode = "timeline_diff";
+      const a = argv[++i];
+      const b = argv[++i];
+      if (!a || !b || a.startsWith("-") || b.startsWith("-")) {
+        throw new Error("--timeline-diff requires two WAV file paths: --timeline-diff <a.wav> <b.wav>");
       }
       opts.files.push(a, b);
       continue;
@@ -254,6 +281,28 @@ function parseCliArgs(argv) {
 
     if (arg === "--timeline") {
       opts.timeline = true;
+      continue;
+    }
+
+    if (arg === "--counterfactual") {
+      const val = argv[++i];
+      if (!val || val.startsWith("-")) {
+        throw new Error("--counterfactual requires an output WAV file path");
+      }
+      opts.counterfactualOut = val;
+      continue;
+    }
+
+    if (arg === "--cf-window") {
+      const val = argv[++i];
+      if (!val || val.startsWith("-")) {
+        throw new Error('--cf-window requires a time range "<t0>..<t1>" (e.g. 0.5..1.0)');
+      }
+      const parsed = parseZoomArg(val);
+      if (parsed === "auto") {
+        throw new Error('--cf-window requires an explicit range "<t0>..<t1>"');
+      }
+      opts.cfWindow = parsed;
       continue;
     }
 
@@ -377,6 +426,23 @@ function runCli(argv) {
     return;
   }
 
+  if (opts.mode === "timeline_diff") {
+    const [fileA, fileB] = opts.files;
+    if (!fileA || !fileB) {
+      throw new Error("--timeline-diff requires two WAV paths");
+    }
+    const wavA = loadWavFile(fileA);
+    const wavB = loadWavFile(fileB);
+    const tlA = extractSegmentTimeline(null, wavA.samples, wavA.sampleRate);
+    const tlB = extractSegmentTimeline(null, wavB.samples, wavB.sampleRate);
+    if (opts.format === "json") {
+      console.log(JSON.stringify({ timelineA: tlA, timelineB: tlB }, null, 2));
+    } else {
+      console.log(renderTimelineDiff(tlA, tlB, { charset: opts.charset, width: opts.width }));
+    }
+    return;
+  }
+
   if (opts.mode === "compare" || opts.mode === "diff") {
     const [fileA, fileB] = opts.files;
     if (!fileA || !fileB) {
@@ -404,9 +470,16 @@ function runCli(argv) {
       ...chB,
     });
 
-    const needProfiles = opts.mode === "diff" || Boolean(opts.view) || Boolean(opts.svgOut) || Boolean(opts.pngOut);
+    const needProfiles =
+      opts.mode === "diff" ||
+      Boolean(opts.view) ||
+      Boolean(opts.timeline) ||
+      Boolean(opts.svgOut) ||
+      Boolean(opts.pngOut);
     const profA = needProfiles ? extractAudioProfile(wavA.samples, wavA.sampleRate, chA) : null;
     const profB = needProfiles ? extractAudioProfile(wavB.samples, wavB.sampleRate, chB) : null;
+    const tlA = opts.timeline ? extractSegmentTimeline(profA, wavA.samples, wavA.sampleRate) : null;
+    const tlB = opts.timeline ? extractSegmentTimeline(profB, wavB.samples, wavB.sampleRate) : null;
 
     if (opts.svgOut) {
       fs.writeFileSync(opts.svgOut, renderSvgDiff(profA, profB, repA, repB), "utf8");
@@ -416,18 +489,23 @@ function runCli(argv) {
     }
 
     if (opts.mode === "diff") {
-      console.log(
+      const out = [
         renderTextDiff(profA, profB, repA, repB, {
           width: opts.width,
           charset: opts.charset,
-        })
-      );
+        }),
+      ];
+      if (tlA && tlB) {
+        out.push("", renderTimelineDiff(tlA, tlB, { charset: opts.charset, width: opts.width }));
+      }
+      console.log(out.join("\n"));
       return;
     }
 
     const cmp = compareReports(repA, repB);
     if (opts.format === "json") {
-      console.log(JSON.stringify(cmp, null, 2));
+      const outObj = tlA && tlB ? { ...cmp, timelineA: tlA, timelineB: tlB } : cmp;
+      console.log(JSON.stringify(outObj, null, 2));
     } else {
       const out = [formatCompareForLLM(cmp, { verbose: opts.verbose })];
       if (opts.view) {
@@ -438,6 +516,9 @@ function runCli(argv) {
             charset: opts.charset,
           })
         );
+      }
+      if (tlA && tlB) {
+        out.push("", renderTimelineDiff(tlA, tlB, { charset: opts.charset, width: opts.width }));
       }
       console.log(out.join("\n"));
     }
@@ -470,6 +551,15 @@ function runCli(argv) {
   const profile = needProfile ? extractAudioProfile(wav.samples, wav.sampleRate, chOpt) : null;
   const timeline = opts.timeline ? extractSegmentTimeline(profile, wav.samples, wav.sampleRate) : null;
 
+  let cfResult = null;
+  if (opts.counterfactualOut) {
+    cfResult = generateCounterfactualSlice(wav.samples, wav.sampleRate, {
+      ...(opts.cfWindow || {}),
+      charset: opts.charset,
+    });
+    fs.writeFileSync(opts.counterfactualOut, encodeWavBuffer(cfResult.samples, cfResult.sampleRate));
+  }
+
   if (opts.svgOut) {
     fs.writeFileSync(opts.svgOut, renderSvgVision(profile, rep), "utf8");
   }
@@ -478,7 +568,17 @@ function runCli(argv) {
   }
 
   if (opts.format === "json") {
-    const outObj = timeline ? { ...rep, timeline } : rep;
+    const outObj = { ...rep };
+    if (timeline) outObj.timeline = timeline;
+    if (cfResult) {
+      outObj.counterfactual = {
+        outputPath: opts.counterfactualOut,
+        window: cfResult.window,
+        mode: cfResult.mode,
+        beforeTimeline: cfResult.beforeTimeline,
+        afterTimeline: cfResult.afterTimeline,
+      };
+    }
     console.log(JSON.stringify(outObj, null, 2));
   } else if (opts.view || opts.zoom) {
     const parts = [
@@ -492,11 +592,25 @@ function runCli(argv) {
     if (timeline) {
       parts.push("", renderSegmentTimeline(timeline, { charset: opts.charset }));
     }
+    if (cfResult) {
+      parts.push(
+        "",
+        `[YATA COUNTERFACTUAL] wrote ${opts.counterfactualOut} | window=${cfResult.window.startSec.toFixed(2)}..${cfResult.window.endSec.toFixed(2)}s mode=${cfResult.mode}`,
+        cfResult.timelineDiff
+      );
+    }
     console.log(parts.join("\n"));
   } else {
     const parts = [formatForLLM(rep, { verbose: opts.verbose })];
     if (timeline) {
       parts.push("", renderSegmentTimeline(timeline, { charset: opts.charset }));
+    }
+    if (cfResult) {
+      parts.push(
+        "",
+        `[YATA COUNTERFACTUAL] wrote ${opts.counterfactualOut} | window=${cfResult.window.startSec.toFixed(2)}..${cfResult.window.endSec.toFixed(2)}s mode=${cfResult.mode}`,
+        cfResult.timelineDiff
+      );
     }
     console.log(parts.join("\n"));
   }
