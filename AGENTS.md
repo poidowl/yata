@@ -39,14 +39,16 @@
 
 ## 現在の見張りメモ（オブザーバー引き継ぎ用・2026-11-24）
 
-- **現行安定版**: `main`（`v0.5.0`）
-- **レビュー対象ブランチ**: `dev/v0.10`（ゼロ依存純JS・"64-Axis Orthogonal Mirror"）
-  - **実装済み（v0.2 → v0.10）**:
-    - 64軸検出器（`F1`–`F64`）の階層分離：**Core-6（`ORIGINAL_6_FALSIFIERS`）**／**診断ツールボックス（`TOOLBOX_FALSIFIERS`: F7–F64 から直交軸を除く57軸）**／**直交軸マップ（`ORTHOGONAL_AXES`: `F30` ステレオ逆相）**
+- **現行安定版**: `main`（`v0.11.0` — 65軸直交ミラー `F1`–`F65`）
+- **最新開発ブランチ**: `dev/v0.11`（`main` へマージ済み）
+  - **実装済み（v0.2 → v0.11）**:
+    - 65軸検出器（`F1`–`F65`）の階層分離：**Core-6（`ORIGINAL_6_FALSIFIERS`）**／**診断ツールボックス（`TOOLBOX_FALSIFIERS`: F7–F65 から直交軸を除く58軸）**／**直交軸マップ（`ORTHOGONAL_AXES`: `F30` ステレオ逆相）**
     - **判定ポリシー（既定 = `core_veto`）**: `--policy core_veto|shelf_veto|veto_all`
       - `core_veto`（コード既定値）: 基本6軸のみでハード拒否し、ツールボックス軸は診断ヒントとして非拒否で併記
       - `shelf_veto`（`--policy shelf_veto --contested ...`）: Protected Shelf で `CONTESTED` になった軸の拒否権を自動停止し、クリア済み軸のみで判定
-      - `veto_all`: 全64軸でハード拒否（研究・厳格監査向け）
+      - `veto_all`: 全65軸でハード拒否（研究・厳格監査向け）
+    - **v0.11 高域位相粒立ちミラー（`F65_HF_PHASE_GRAININESS`・追加 FFT ゼロ）**:
+      - 1.2–4.5 kHz 聴覚フィルタ帯域（2400 Hz, Q=0.8）の時間波形尖度（`hfBandWaveKurt`）を実装。38 クリップ監査で既存64軸すべてと **64/64（100.0%）直交（`max |r| = 0.542`）**。生録音4本・VOICEVOX つむぎ/雨晴はう/めたん・位相分散済み tokiko は 0 FP 通過、裸の位相揃え tokiko を 100% 捕捉。
     - **v0.10 64軸直交ミラー（`F41`–`F64`・追加 FFT ゼロ）**:
       - 3モジュール新設：`src/falsifiers/dynamics.mjs`（`F41`–`F48` 韻律・調音ダイナミクス）、`src/falsifiers/acoustics.mjs`（`F49`–`F56` 空間・コーデック・位相）、`src/falsifiers/fatigue.mjs`（`F57`–`F64` 微細表現・声区・聴覚疲労）。
       - 64×64 直交性監査（39クリップ：実音29＋VOICEVOX女性6＋`tokiko`4、全 2,016 ペア）：**`1,977 / 2,016`（`98.07%`）が `|r| < 0.60` で直交**。VOICEVOX女性の `F41`–`F64` 通過率は **`141 / 144`（`97.9%`）**。
