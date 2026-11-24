@@ -315,4 +315,35 @@ describe("v0.7: Over-Sanitization Lens, Relational Dialogue Mirror & Breath-Rele
     assert.ok(relLine, "Expected REL line");
     assert.ok(!relLine.includes("X"), `REL line must not draw 'X' when overlapRatio=0: ${relLine}`);
   });
+
+  it("distinguishes mid-turn backchannel (active_listening) from overlapping floor handoff (ovHandoff)", () => {
+    // 1. A speaks 0.0-1.1s; B gives 0.1s backchannel at 0.5-0.6s; A continues -> active_listening
+    const alA = genToneBurstTrack(1.2, [[0.0, 1.1]], 300);
+    const alB = genToneBurstTrack(1.2, [[0.5, 0.6]], 420);
+    const alRes = yata.analyzeDialogue(alA, SR, alB, SR);
+    assert.equal(alRes.turnCount, 0);
+    assert.equal(alRes.backchannelCount, 1);
+    assert.equal(alRes.overlapHandoffCount, 0);
+    assert.equal(alRes.relationLabel, "active_listening");
+    const alMap = yata.renderDialogueMap(alRes);
+    assert.equal(countLines(alMap), 5);
+    assert.match(alMap, /backch=1/);
+    assert.match(alMap, /\[active_listening\]/);
+    assert.match(alMap, /sustained floor with 1 backchannel/);
+    assert.doesNotMatch(alMap, /one-sided monologue/);
+
+    // 2. A speaks 0.0-0.6s; B overlaps 0.5-0.6s and takes the floor 0.6-1.2s -> overlapping handoff (NOT backchannel)
+    const ohA = genToneBurstTrack(1.2, [[0.0, 0.6]], 300);
+    const ohB = genToneBurstTrack(1.2, [[0.5, 1.2]], 420);
+    const ohRes = yata.analyzeDialogue(ohA, SR, ohB, SR);
+    assert.equal(ohRes.turnCount, 1);
+    assert.equal(ohRes.backchannelCount, 0, `Floor takeover must not count as backchannel, got ${ohRes.backchannelCount}`);
+    assert.equal(ohRes.overlapHandoffCount, 1, `Expected overlapHandoffCount=1, got ${ohRes.overlapHandoffCount}`);
+    assert.equal(ohRes.relationLabel, "responsive_dialogue");
+    const ohMap = yata.renderDialogueMap(ohRes);
+    assert.equal(countLines(ohMap), 5);
+    assert.match(ohMap, /ovHandoff=1/);
+    assert.doesNotMatch(ohMap, /backch=/);
+    assert.match(ohMap, /1 overlapping/);
+  });
 });

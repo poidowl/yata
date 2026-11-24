@@ -77,6 +77,8 @@ export function analyzeDialogue(samplesA, sampleRateA, samplesB, sampleRateB, op
       activeRatioB: 0,
       bothActiveRatio: 0,
       overlapRatio: 0,
+      backchannelCount: 0,
+      overlapHandoffCount: 0,
       turnCount: 0,
       meanTurnGapSec: 0,
       mutualSilenceRatio: 1,
@@ -94,20 +96,31 @@ export function analyzeDialogue(samplesA, sampleRateA, samplesB, sampleRateB, op
   let countUnion = 0;
   let countNeither = 0;
 
-  // Turn-taking & backchannel tracker
+  // Turn-taking, backchannel & overlapping-handoff tracker
   let lastSoleSpeaker = null; // "A" | "B"
   let lastActiveFrame = -1; // last frame where EITHER speaker was active (A, B, or X)
   let currentOverlapRun = 0; // contiguous frames of simultaneous speech (X)
-  let backchannelCount = 0; // brief overlaps (<= 0.35s) such as "うん" during the other's turn
+  let overlapPrevSpeaker = null; // sole speaker holding floor immediately before entering X
+  let backchannelCount = 0; // brief overlaps (<= 0.35s) where the other speaker does NOT take the floor
+  let overlapHandoffCount = 0; // overlaps immediately followed by the other speaker taking the floor
   const backchannelMaxFrames = Math.max(1, Math.round(0.35 / frameSec));
   let turnCount = 0;
   const turnGaps = [];
 
-  const closeOverlapRun = () => {
-    if (currentOverlapRun > 0 && currentOverlapRun <= backchannelMaxFrames) {
-      backchannelCount++;
+  const closeOverlapRun = (nextState) => {
+    if (currentOverlapRun > 0) {
+      const isFloorTakeover =
+        overlapPrevSpeaker !== null &&
+        (nextState === "A" || nextState === "B") &&
+        nextState !== overlapPrevSpeaker;
+      if (isFloorTakeover) {
+        overlapHandoffCount++;
+      } else if (currentOverlapRun <= backchannelMaxFrames) {
+        backchannelCount++;
+      }
     }
     currentOverlapRun = 0;
+    overlapPrevSpeaker = null;
   };
 
   for (let k = 0; k < numFrames; k++) {
@@ -124,6 +137,9 @@ export function analyzeDialogue(samplesA, sampleRateA, samplesB, sampleRateB, op
 
     let st;
     if (actA && actB) {
+      if (currentOverlapRun === 0) {
+        overlapPrevSpeaker = lastSoleSpeaker;
+      }
       st = "X";
       countA++;
       countB++;
@@ -132,7 +148,7 @@ export function analyzeDialogue(samplesA, sampleRateA, samplesB, sampleRateB, op
       currentOverlapRun++;
       lastActiveFrame = k;
     } else if (actA) {
-      closeOverlapRun();
+      closeOverlapRun("A");
       st = "A";
       countA++;
       countUnion++;
@@ -145,7 +161,7 @@ export function analyzeDialogue(samplesA, sampleRateA, samplesB, sampleRateB, op
       lastSoleSpeaker = "A";
       lastActiveFrame = k;
     } else if (actB) {
-      closeOverlapRun();
+      closeOverlapRun("B");
       st = "B";
       countB++;
       countUnion++;
@@ -158,14 +174,14 @@ export function analyzeDialogue(samplesA, sampleRateA, samplesB, sampleRateB, op
       lastSoleSpeaker = "B";
       lastActiveFrame = k;
     } else {
-      closeOverlapRun();
+      closeOverlapRun(".");
       st = ".";
       countNeither++;
     }
 
     statesArr[k] = st;
   }
-  closeOverlapRun();
+  closeOverlapRun(null);
 
   const activeRatioA = countA / numFrames;
   const activeRatioB = countB / numFrames;
@@ -182,6 +198,8 @@ export function analyzeDialogue(samplesA, sampleRateA, samplesB, sampleRateB, op
     relationLabel = "overlapping_clash";
   } else if (turnCount >= 1 && overlapRatio < 0.35 && meanTurnGapSec <= 1.2) {
     relationLabel = "responsive_dialogue";
+  } else if (turnCount === 0 && backchannelCount >= 1 && overlapRatio < 0.35) {
+    relationLabel = "active_listening";
   } else {
     relationLabel = "disconnected_monologue";
   }
@@ -198,6 +216,7 @@ export function analyzeDialogue(samplesA, sampleRateA, samplesB, sampleRateB, op
     bothActiveRatio: roundTo(bothActiveRatio, 4),
     overlapRatio: roundTo(overlapRatio, 4),
     backchannelCount,
+    overlapHandoffCount,
     turnCount,
     meanTurnGapSec: roundTo(meanTurnGapSec, 3),
     mutualSilenceRatio: roundTo(mutualSilenceRatio, 4),
@@ -224,6 +243,7 @@ export function renderDialogueMap(dialogue, opts = {}) {
   const turns = Math.round(finite(dialogue?.turnCount, 0));
   const overlapPct = Math.round(clamp(finite(dialogue?.overlapRatio, 0), 0, 1) * 100);
   const backchannels = Math.round(finite(dialogue?.backchannelCount, 0));
+  const overlapHandoffs = Math.round(finite(dialogue?.overlapHandoffCount, 0));
   const gapSec = finite(dialogue?.meanTurnGapSec, 0);
   const relLabel = dialogue?.relationLabel || "silent_void";
 
@@ -286,17 +306,26 @@ export function renderDialogueMap(dialogue, opts = {}) {
     assessment = "both tracks silent";
   } else if (relLabel === "overlapping_clash") {
     assessment = `heavy overlap (${overlapPct}% of active time talking over each other)`;
+  } else if (relLabel === "active_listening") {
+    assessment = `sustained floor with ${backchannels} backchannel${backchannels === 1 ? "" : "s"} (no full handoff)`;
   } else if (relLabel === "responsive_dialogue") {
-    assessment = `clean call-and-response (${turns} handoff${turns === 1 ? "" : "s"}, avg gap ${gapSec.toFixed(2)}s)`;
+    if (overlapHandoffs > 0) {
+      assessment = `call-and-response (${turns} handoff${turns === 1 ? "" : "s"}, ${overlapHandoffs} overlapping, avg gap ${gapSec.toFixed(2)}s)`;
+    } else {
+      assessment = `clean call-and-response (${turns} handoff${turns === 1 ? "" : "s"}, avg gap ${gapSec.toFixed(2)}s)`;
+    }
   } else if (turns === 0) {
-    assessment = "one-sided monologue (no speaker handoffs)";
+    assessment = "one-sided monologue (no speaker handoffs or backchannels)";
+  } else if (backchannels > 0) {
+    assessment = `sluggish turn-taking (avg gap ${gapSec.toFixed(2)}s > 1.20s, ${backchannels} backchannel${backchannels === 1 ? "" : "s"})`;
   } else {
     assessment = `sluggish turn-taking (avg gap ${gapSec.toFixed(2)}s > 1.20s)`;
   }
 
   const bcSuffix = backchannels > 0 ? ` backch=${backchannels}` : "";
+  const ovhSuffix = overlapHandoffs > 0 ? ` ovHandoff=${overlapHandoffs}` : "";
   return [
-    `[YATA DIALOGUE] dur=${dur.toFixed(2)}s turns=${turns} overlap=${overlapPct}%${bcSuffix} gap=${gapSec.toFixed(2)}s [${relLabel}]`,
+    `[YATA DIALOGUE] dur=${dur.toFixed(2)}s turns=${turns} overlap=${overlapPct}%${bcSuffix}${ovhSuffix} gap=${gapSec.toFixed(2)}s [${relLabel}]`,
     `TRACK A ${vSep}${trackA}${vSep}`,
     `TRACK B ${vSep}${trackB}${vSep}`,
     `REL     ${vSep}${relTrack}${vSep}`,
