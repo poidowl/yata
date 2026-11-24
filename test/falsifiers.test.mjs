@@ -1101,7 +1101,7 @@ describe("M2: 64-Axis Falsifier Registry & Report Engine", () => {
     });
     assert.equal(birdChirp.triggered, false);
 
-    // F35: Synthetic tube flatness fails; live/VOICEVOX speech & clean marimba pass
+    // F35: Synthetic tube flatness fails; hand-written live-speech-like feature vector & clean marimba pass (not VOICEVOX-derived evidence)
     const synthTube = f35.detect({
       activeFrameCount: 250,
       voicedRatio: 0.85,
@@ -1139,7 +1139,7 @@ describe("M2: 64-Axis Falsifier Registry & Report Engine", () => {
     });
     assert.equal(marimba.triggered, false);
 
-    // F36: Coarticulation seam (abrupt spectral-shape switching) fails on spliced seams, passes on live/VOICEVOX speech
+    // F36: Coarticulation seam (abrupt spectral-shape switching) fails on spliced seams, passes on a hand-written smooth feature vector
     const f36 = DEFAULT_FALSIFIERS.find((x) => x.id === "F36_COARTICULATION_SEAM");
     const seamRes = f36.detect({
       activeFrameCount: 250,
@@ -1163,7 +1163,7 @@ describe("M2: 64-Axis Falsifier Registry & Report Engine", () => {
     assert.equal(smoothLive.triggered, false);
     assert.equal(smoothLive.score, 0);
 
-    // F37: Decoupled HF exciter (midHiCorr < 0) fails; coupled live/VOICEVOX speech (+0.27..+0.81) passes
+    // F37: Decoupled HF exciter (midHiCorr < 0) fails; coupled hand-written feature vector passes
     const f37 = DEFAULT_FALSIFIERS.find((x) => x.id === "F37_DECOUPLED_HF_EXCITER");
     assert.equal(
       f37.detect({ activeFrameCount: 200, voicedRatio: 0.8, durationSec: 3.0, midHiCorr: -0.22, activeMpsSpeech4_16: 0.14 }).triggered,

@@ -41,7 +41,10 @@ if (!fs.existsSync(KUDA_PATH)) {
 
 try {
   const kuda = await import(pathToFileURL(KUDA_PATH).href);
-  const synthFn = kuda.synthesize || kuda.synthUtterance || kuda.renderUtterance || kuda.default;
+  // tokiko exports synthKuda(text, { preset, srOut }); older names kept as fallback ({ preset, text } object form).
+  const synthFn = kuda.synthKuda
+    ? ({ preset, text }) => kuda.synthKuda(text, { preset, srOut: 24000 })
+    : kuda.synthesize || kuda.synthUtterance || kuda.renderUtterance || kuda.default;
   if (typeof synthFn !== "function") {
     console.log(`[tokiko_axis_bench] Loaded ${KUDA_PATH}, but no known synthesis entrypoint found; skipping.`);
     process.exit(0);
@@ -53,11 +56,11 @@ try {
     try {
       const out = await synthFn({ preset, text: "なる" });
       const samples = out?.samples || out;
-      const sr = out?.sampleRate || 24000;
+      const sr = out?.sampleRate || out?.sr || 24000;
       if (!samples || !samples.length) continue;
       const rep = analyzeSamples(samples, sr, { label: `kuda_${preset}`, falsifiers: DEFAULT_FALSIFIERS });
-      const trig = rep.falsifiers.filter((f) => f.triggered).map((f) => f.id).join(", ");
-      console.log(`  - ${preset.padEnd(14)}: ${rep.verdict} (${rep.triggeredCount}/32) ${trig}`);
+      const trig = rep.falsifiers.filter((f) => f.triggered && !f.diagnostic).map((f) => f.id).join(", ");
+      console.log(`  - ${preset.padEnd(14)}: ${rep.verdict} (${rep.triggeredCount}/${rep.totalFalsifiers} veto, ${rep.diagnosticCount} diag) ${trig}`);
     } catch (err) {
       console.log(`  - ${preset.padEnd(14)}: skipped (${err.message})`);
     }

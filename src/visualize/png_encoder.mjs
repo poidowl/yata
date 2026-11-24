@@ -624,12 +624,17 @@ export function normalizeReport(report) {
       evidence: typeof o.evidence === "string" ? o.evidence : "",
       hint: typeof o.hint === "string" ? o.hint : "",
       where,
+      diagnostic: Boolean(o.diagnostic),
+      gateTag: o.gate && typeof o.gate.tag === "string" ? o.gate.tag : null,
     };
   });
 
+  // Vetoes first; quarantined diagnostics (real-voice gate) are kept out of text vision.
+  const isHidden = (f) => f.diagnostic && f.gateTag === "quarantined";
   const triggered = falsifiers
-    .filter((f) => f.triggered)
-    .sort((a, b) => (b.score - a.score) || a.id.localeCompare(b.id));
+    .filter((f) => f.triggered && !isHidden(f))
+    .sort((a, b) => (Number(a.diagnostic) - Number(b.diagnostic)) || (b.score - a.score) || a.id.localeCompare(b.id));
+  const quarantinedHidden = falsifiers.filter((f) => f.triggered && isHidden(f)).length;
 
   const totalFalsifiers = Number.isFinite(report.totalFalsifiers)
     ? Math.max(0, Math.floor(report.totalFalsifiers))
@@ -657,5 +662,6 @@ export function normalizeReport(report) {
     features,
     falsifiers,
     triggered,
+    quarantinedHidden,
   };
 }

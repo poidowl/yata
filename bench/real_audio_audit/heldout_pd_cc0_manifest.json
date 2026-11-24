@@ -1,70 +1,107 @@
 {
-  "schema": "yata_heldout_pd_cc0_manifest/v0.8",
-  "purpose": "Strictly unseen, zero-tuning out-of-sample evaluation set using ONLY Public Domain / CC0 Wikimedia Commons recordings (never used for threshold selection).",
+  "schema": "yata_heldout_pd_cc0_manifest/v0.11.1",
+  "purpose": "Unseen PD/CC0 evaluation set. Never read it while choosing thresholds, guards or which filters to show; once a clip informs a change, move it to tuning_pd_cc0_manifest.json (burned).",
   "createdAt": "2026-11-24",
+  "splitRevisedAt": "2026-11-25",
+  "trim": "ffmpeg -ss trimStartSec -t trimDurationSec -i <source> -ac 1 -ar 24000 -c:a pcm_s16le",
+  "runner": "node bench/real_audio_audit/run_heldout.mjs --fetch --cache-dir /tmp/yata_heldout",
   "clips": [
-    {
-      "id": "ho_whisper",
-      "group": "benign_human",
-      "license": "CC0",
-      "title": "Real human whispering (Whispering-example.ogg)",
-      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e8/Whispering-example.ogg"
-    },
     {
       "id": "ho_shhh",
       "group": "benign_human",
       "license": "CC0",
       "title": "Human voiceless sibilant fricative (shhh/sss)",
-      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/a/ae/Voiceless_linguolabial_sibilant_fricative.ogg"
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/a/ae/Voiceless_linguolabial_sibilant_fricative.ogg",
+      "trimStartSec": 0,
+      "trimDurationSec": 3,
+      "sourceSha256": "7297bf66ea65d9bb2b45875d61279dbdff313464c1964780031ba23628df518e",
+      "wavSha256": "494c76bedf78ebeba275019b03b94b257b8acc627df6b12543c6359b0c6acaad",
+      "split": "heldout"
     },
     {
       "id": "ho_good_morning",
       "group": "benign_human",
       "license": "CC0",
       "title": "Real human speech: Good Morning",
-      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/2/20/Good_Morning.wav"
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/2/20/Good_Morning.wav",
+      "trimStartSec": 0,
+      "trimDurationSec": 3,
+      "sourceSha256": "1b4c179b9464c2af4bc485664b0c3864219b9732a4711dd9acc3ecce86c361a0",
+      "wavSha256": "38e89f062a337f18c8eeb6b38eb288bc94ccc19e85f27f58eea4fcd287e2193b",
+      "split": "heldout"
     },
     {
       "id": "ho_bonjour",
       "group": "benign_human",
       "license": "CC0",
       "title": "Real human speech: French Good morning",
-      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/1/1b/French_Good_morning.wav"
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/1/1b/French_Good_morning.wav",
+      "trimStartSec": 0,
+      "trimDurationSec": 3,
+      "sourceSha256": "32ca4f839848609fe128bfbc0930d4baf3ea2dd7072008cc07ddcd0ea6b61438",
+      "wavSha256": "eaca65a2948bf55d2b7bde7e49e5bcd829cefe88d99d0c2b01d25dbb5035cc10",
+      "split": "heldout"
     },
     {
       "id": "ho_lullaby_word",
       "group": "benign_human",
       "license": "CC0",
       "title": "Real human speech: lullaby",
-      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c1/LL-Q1860_%28eng%29-Arlo_Barnes-lullaby.wav"
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c1/LL-Q1860_%28eng%29-Arlo_Barnes-lullaby.wav",
+      "trimStartSec": 0,
+      "trimDurationSec": 3,
+      "sourceSha256": "befbf7151508e38ad3af47850345bf580dbb2ef36145dc7f614175d094a64ab1",
+      "wavSha256": "ad5173af209db21787b7a4d2a5dc2fffe5ba801864f37baaac83e79de412c59c",
+      "split": "heldout"
     },
     {
       "id": "ho_puppy",
       "group": "benign_animal",
       "license": "CC0",
       "title": "Puppy at a night",
-      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/7/7c/Puppy_at_a_night.ogg"
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/7/7c/Puppy_at_a_night.ogg",
+      "trimStartSec": 0,
+      "trimDurationSec": 3,
+      "sourceSha256": "50852aa8556bfd86d309642cdd48791c55f8cb051b44e5991a2b3f27dff196e3",
+      "wavSha256": "befe7efb5d928fb59939ff72d4988f8ee85c4356e74dd072565546b877c644e7",
+      "split": "heldout"
     },
     {
       "id": "ho_angry_tiger",
       "group": "expected_unkawaii",
       "license": "CC0",
       "title": "Angry tiger growl/roar (439280 schots)",
-      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/2/29/439280_schots_angry-tiger.wav"
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/2/29/439280_schots_angry-tiger.wav",
+      "trimStartSec": 0,
+      "trimDurationSec": 3,
+      "sourceSha256": "497b4584308d85e2ba96c1e4281413bf2e6e72c831f73a6ce1646657bcee7f66",
+      "wavSha256": "d20abd5718f28574ea4c7e1c5d240ff322c27c2d5516a4003eefe4bcc28ff7e6",
+      "split": "heldout"
     },
     {
       "id": "ho_tram_beep",
       "group": "expected_unkawaii",
       "license": "Public domain",
       "title": "Tram doors hiss and warning beeping",
-      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b9/Tram_doors_open_and_close_hiss_and_beeping.ogg"
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b9/Tram_doors_open_and_close_hiss_and_beeping.ogg",
+      "trimStartSec": 0,
+      "trimDurationSec": 3,
+      "sourceSha256": "c252c0e7181556dcd1c0786723ffcfa6f414ca9cfca91821d45f013688a5b788",
+      "wavSha256": "780c98d3623cbda47b916df14cf635c689b48bc3597add8f16ac08a0b432a8ad",
+      "split": "heldout"
     },
     {
       "id": "ho_dishwasher",
       "group": "expected_unkawaii",
       "license": "Public domain",
       "title": "Dishwasher droning hissing humming",
-      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c7/Dishwasher_end_droning_hissing_humming.ogg"
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c7/Dishwasher_end_droning_hissing_humming.ogg",
+      "trimStartSec": 0,
+      "trimDurationSec": 3,
+      "sourceSha256": "1e84b61bd4c0ab4ea8323b2ca36ba828b2ed1f8cc9635ccbb32d9c675c94f66c",
+      "wavSha256": "586f503f473020403c79503b2328d5d504c809e4ca6c856dc0b72a0c6ab808bc",
+      "split": "heldout"
     }
-  ]
+  ],
+  "wavShaNote": "wavSha256 made with ffmpeg 7.1.5 (Debian 13); other ffmpeg/libvorbis builds can decode .ogg to different PCM, so trust sourceSha256 first"
 }

@@ -1,0 +1,23 @@
+{
+  "schema": "yata_tuning_pd_cc0_manifest/v0.11.1",
+  "purpose": "PD/CC0 clips that have already informed a threshold or guard (burned held-out clips land here). Usable for tuning and for the real-voice gate; never cite them as out-of-sample evidence.",
+  "createdAt": "2026-11-25",
+  "trim": "same as heldout manifest",
+  "clips": [
+    {
+      "id": "tu_whisper",
+      "group": "benign_human",
+      "license": "CC0",
+      "title": "Real human whispering (Whispering-example.ogg)",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e8/Whispering-example.ogg",
+      "trimStartSec": 0,
+      "trimDurationSec": 3,
+      "sourceSha256": "bbdbe95dfe4742e27845c03fba3a8caf9f0f5ad65e34e512fd5609d155e6304e",
+      "wavSha256": "347fb4b9eadcbe1d100436fc8e459a18e14f7fd3179240a7acb74e53324b5fe5",
+      "formerId": "ho_whisper",
+      "split": "tuning",
+      "burnedBy": "deae5cb (v0.9): F1 isSoftHumanWhisper guard was fitted after this clip's held-out FP was seen in 24b16da"
+    }
+  ],
+  "wavShaNote": "wavSha256 made with ffmpeg 7.1.5 (Debian 13); other ffmpeg/libvorbis builds can decode .ogg to different PCM, so trust sourceSha256 first"
+}

@@ -12,6 +12,7 @@
 
 import { extractFeatures, extractAudioProfile } from "./features.mjs";
 import { ORIGINAL_6_FALSIFIERS, DEFAULT_FALSIFIERS } from "./falsifiers/index.mjs";
+import { QUARANTINED, TOKIKO_DERIVED, GATE_SET } from "./falsifiers/gate.mjs";
 
 const CORE_FALSIFIER_IDS = new Set(ORIGINAL_6_FALSIFIERS.map((f) => f.id));
 
@@ -194,12 +195,26 @@ export function analyzeSamples(samples, sampleRate, options = {}) {
     if (out.where && typeof out.where === "object") {
       entry.where = out.where;
     }
+    // Real-voice gate tags (bench/real_voice_gate.mjs). Never change the verdict.
+    const q = !CORE_FALSIFIER_IDS.has(fn.id) && QUARANTINED[fn.id];
+    const t = !CORE_FALSIFIER_IDS.has(fn.id) && TOKIKO_DERIVED[fn.id];
+    if (q) entry.gate = { tag: "quarantined", note: `fires on ${q.gateFires}/${q.gateN} benign PD/CC0 real clips` };
+    else if (t) entry.gate = { tag: "tokiko_derived", note: `0/${t.gateN} real clips vs ${t.tokikoFires}/${t.tokikoN} tokiko: measures tokiko-ness, not real-voice distance` };
     return entry;
   });
 
   const vetoTriggered = results.filter((r) => r.triggered && !r.diagnostic);
   const diagnosticTriggered = results.filter((r) => r.triggered && r.diagnostic);
   const survived = vetoTriggered.length === 0;
+  // Text summaries: quarantined diagnostics hidden, at most 3 IDs (top score), rest counted.
+  const isHidden = (r) => r.diagnostic && r.gate?.tag === "quarantined";
+  const quarantinedCount = diagnosticTriggered.filter(isHidden).length;
+  const diagShort = (list) => {
+    const vis = list.filter((r) => !isHidden(r)).sort((a, b) => b.score - a.score);
+    const more = vis.length > 3 ? ` +${vis.length - 3} more` : "";
+    const q = quarantinedCount ? ` (+${quarantinedCount} quarantined hidden)` : "";
+    return `${vis.slice(0, 3).map((t) => t.id).join(", ") || "-"}${more}${q}`;
+  };
 
   let mirrorSummary;
   if (policy === "core_veto") {
@@ -207,7 +222,7 @@ export function analyzeSamples(samples, sampleRate, options = {}) {
       mirrorSummary =
         "Mirror clear: failed to detect any 'do-not-want-to-be-with' signature across all dimensions.";
     } else if (survived) {
-      mirrorSummary = `Mirror clear (core_veto): no core veto triggered; ${diagnosticTriggered.length} diagnostic note(s): ${diagnosticTriggered.map((t) => `${t.id} (${t.name})`).join("; ")}.`;
+      mirrorSummary = `Mirror clear (core_veto): no core veto triggered; ${diagnosticTriggered.length} diagnostic note(s): ${diagShort(diagnosticTriggered)}.`;
     } else {
       mirrorSummary = `Mirror reflects (core_veto): ${vetoTriggered.map((t) => `${t.id} (${t.name})`).join("; ")}.`;
     }
@@ -216,7 +231,7 @@ export function analyzeSamples(samples, sampleRate, options = {}) {
       mirrorSummary =
         "Mirror clear: failed to detect any 'do-not-want-to-be-with' signature across all dimensions.";
     } else if (survived) {
-      mirrorSummary = `Mirror clear (shelf_veto): no non-contested veto triggered; ${diagnosticTriggered.length} contested diagnostic note(s): ${diagnosticTriggered.map((t) => `${t.id} (${t.name})`).join("; ")}.`;
+      mirrorSummary = `Mirror clear (shelf_veto): no non-contested veto triggered; ${diagnosticTriggered.length} contested diagnostic note(s): ${diagShort(diagnosticTriggered)}.`;
     } else {
       mirrorSummary = `Mirror reflects (shelf_veto): ${vetoTriggered.map((t) => `${t.id} (${t.name})`).join("; ")}.`;
     }
@@ -233,6 +248,8 @@ export function analyzeSamples(samples, sampleRate, options = {}) {
     verdict: survived ? "SURVIVED_KAWAII_CANDIDATE" : "REJECTED_UNKAWAII",
     triggeredCount: vetoTriggered.length,
     diagnosticCount: diagnosticTriggered.length,
+    quarantinedCount,
+    gateSet: GATE_SET,
     totalFalsifiers: results.length,
     mirrorSummary,
     features,
@@ -364,7 +381,7 @@ export function formatForLLM(report, opts = { verbose: false }) {
         : dim.observed === false
           ? "UNOBSERVED"
           : "clear    ";
-      const precTag = dim.earPrecedentTag ? ` ${dim.earPrecedentTag}` : "";
+      const precTag = (dim.earPrecedentTag ? ` ${dim.earPrecedentTag}` : "") + (dim.gate ? ` [${dim.gate.tag.toUpperCase()}]` : "");
       lines.push(
         `  - [${mark}] ${dim.id}${precTag}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
       );
@@ -377,11 +394,13 @@ export function formatForLLM(report, opts = { verbose: false }) {
 
   // Compact triggered-first summary
   const vetoTriggered = all.filter((d) => d.triggered && !d.diagnostic).sort((a, b) => b.score - a.score);
-  const diagTriggered = all.filter((d) => d.triggered && d.diagnostic).sort((a, b) => b.score - a.score);
+  const diagAll = all.filter((d) => d.triggered && d.diagnostic).sort((a, b) => b.score - a.score);
+  const diagHidden = diagAll.filter((d) => d.gate?.tag === "quarantined").length;
+  const diagTriggered = diagAll.filter((d) => d.gate?.tag !== "quarantined");
   const unobservedDims = all.filter((d) => !d.triggered && d.observed === false);
-  const clearCount = all.length - vetoTriggered.length - diagTriggered.length - unobservedDims.length;
+  const clearCount = all.length - vetoTriggered.length - diagAll.length - unobservedDims.length;
 
-  if (vetoTriggered.length === 0 && diagTriggered.length === 0) {
+  if (vetoTriggered.length === 0 && diagAll.length === 0) {
     lines.push(`VETO: none (${clearCount}/${all.length} dimensions clear)`);
     const nearMiss = all
       .filter((d) => d.score > 0 && d.observed !== false)
@@ -409,15 +428,17 @@ export function formatForLLM(report, opts = { verbose: false }) {
     }
     if (diagTriggered.length > 0) {
       const diagLabel = policy === "shelf_veto" ? "contested/non-veto" : "non-veto toolbox";
-      lines.push(`DIAGNOSTIC (${diagTriggered.length} ${diagLabel}):`);
-      for (const dim of diagTriggered) {
-        const tag = dim.contested ? " [CONTESTED]" : "";
+      lines.push(`DIAGNOSTIC (${diagAll.length} ${diagLabel}; top ${Math.min(3, diagTriggered.length)} shown):`);
+      for (const dim of diagTriggered.slice(0, 3)) {
+        const tag = (dim.contested ? " [CONTESTED]" : "") + (dim.gate?.tag === "tokiko_derived" ? " [TOKIKO-DERIVED]" : "");
         const precTag = dim.earPrecedentTag ? ` ${dim.earPrecedentTag}` : "";
         lines.push(
           `  - ${dim.id}${tag}${precTag}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
         );
       }
+      if (diagTriggered.length > 3) lines.push(`  ... +${diagTriggered.length - 3} more`);
     }
+    if (diagHidden) lines.push(`QUARANTINED: ${diagHidden} hidden (fire on benign real voices; see json .gate)`);
     lines.push(`CLEAR: ${clearCount}/${all.length} dimensions clear (pass { verbose: true } for full dump)`);
   }
 

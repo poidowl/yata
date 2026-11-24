@@ -37,6 +37,14 @@
 
 ---
 
+## yata で tokiko を磨くときの Goodhart よけ（3つのルール）
+
+yata は「明らかにアカン音」を見つける道具です。**点数そのものを目標にしない**でください。tokiko で鳴ったフィルタを足し、tokiko をそれに合わせ、また足す、を回すと、yata は「本物の声との距離」ではなく「前の tokiko との差」を測るようになります（v0.10 の `F35` で痰がらみノイズ、v0.11 の `F37`/`F38`/`F65` が実例）。
+
+1. **新しいフィルタは本物の声で先に試す。** `node bench/real_voice_gate.mjs --cache-dir <wavs> --tokiko-dir <tokiko>` で PD/CC0 実音（BY・BY-SA・VOICEVOX 除外）の誤爆率を出し、20% を超えるものは `quarantined`（JSON には残すが既定/compact 表示から隠す）。実音で 0 回なのに tokiko の 2/3 以上で鳴るものは `tokiko_derived` タグ（その軸に合わせて tokiko を調整しない）。`--write` で `src/falsifiers/gate.mjs` を再生成。
+2. **調整用と確認用の音を分ける。** 閾値・ガード・表示選びに使ってよいのは `manifest.json` と `tuning_pd_cc0_manifest.json` だけ。`heldout_pd_cc0_manifest.json` は `bench/real_audio_audit/run_heldout.mjs` で確かめるだけ。見て何かを直したら、そのクリップは tuning へ移す（`ho_whisper` → `tu_whisper` が前例）。`test/gate.test.mjs` が src/test 内の held-out ID 混入を検出します。
+3. **最後は耳か ASR で決める。** 合否は core-6（F1–F6）だけ。診断軸の増減で「良くなった」とは言わない。方向が変わるときだけ 10 秒の A/B を 1 本。
+
 ## 現在の見張りメモ（オブザーバー引き継ぎ用・2026-11-24）
 
 - **現行安定版**: `main`（`v0.11.0` — 65軸直交ミラー `F1`–`F65`）
@@ -48,14 +56,14 @@
       - `shelf_veto`（`--policy shelf_veto --contested ...`）: Protected Shelf で `CONTESTED` になった軸の拒否権を自動停止し、クリア済み軸のみで判定
       - `veto_all`: 全65軸でハード拒否（研究・厳格監査向け）
     - **v0.11 高域位相粒立ちミラー（`F65_HF_PHASE_GRAININESS`・追加 FFT ゼロ）**:
-      - 1.2–4.5 kHz 聴覚フィルタ帯域（2400 Hz, Q=0.8）の時間波形尖度（`hfBandWaveKurt`）を実装。38 クリップ監査で既存64軸すべてと **64/64（100.0%）直交（`max |r| = 0.542`）**。生録音4本・VOICEVOX つむぎ/雨晴はう/めたん・位相分散済み tokiko は 0 FP 通過、裸の位相揃え tokiko を 100% 捕捉。
+      - 1.2–4.5 kHz 聴覚フィルタ帯域（2400 Hz, Q=0.8）の時間波形尖度（`hfBandWaveKurt`）を実装。38 クリップ監査で既存64軸すべてと **64/64（100.0%）直交（`max |r| = 0.542`）**。生録音4本・VOICEVOX つむぎ/雨晴はう/めたん・位相分散済み tokiko は 0 FP 通過、裸の位相揃え tokiko を 100% 捕捉。（※ VOICEVOX は非CC0・未収録のため v0.11.1 で証拠撤回）
     - **v0.10 64軸直交ミラー（`F41`–`F64`・追加 FFT ゼロ）**:
       - 3モジュール新設：`src/falsifiers/dynamics.mjs`（`F41`–`F48` 韻律・調音ダイナミクス）、`src/falsifiers/acoustics.mjs`（`F49`–`F56` 空間・コーデック・位相）、`src/falsifiers/fatigue.mjs`（`F57`–`F64` 微細表現・声区・聴覚疲労）。
-      - 64×64 直交性監査（39クリップ：実音29＋VOICEVOX女性6＋`tokiko`4、全 2,016 ペア）：**`1,977 / 2,016`（`98.07%`）が `|r| < 0.60` で直交**。VOICEVOX女性の `F41`–`F64` 通過率は **`141 / 144`（`97.9%`）**。
+      - 64×64 直交性監査（39クリップ：実音29＋VOICEVOX女性6＋`tokiko`4、全 2,016 ペア）：**`1,977 / 2,016`（`98.07%`）が `|r| < 0.60` で直交**。VOICEVOX女性の `F41`–`F64` 通過率は **`141 / 144`（`97.9%`）**。（※ v0.11.1: VOICEVOX は非CC0・音声と監査スクリプトが未収録で再現不能のため証拠撤回。「直交」は重複が少ないだけで、見分ける力の証拠ではない）
       - **Goodhart 罠修正（オーナー耳検証）**: `F35_SYNTHETIC_TUBE_FLATNESS` から生ジッタ下限ペナルティ（`jitter < 0.048`）を撤去。生ジッタ追従が合成音に喉の痰がらみノイズを誘発する問題を解消。
     - **v0.9 反霧ミラー（`F33`–`F40`）& `F1` ささやき保護**:
       - `F1_HARSH_EDGE` に `isSoftHumanWhisper` ガード（Arnal 4–16 Hz vs 30–150 Hz）を追加し、`ho_whisper` を救済しつつ猫の威嚇・怒ったトラ・鋭いエッジを捕捉。
-      - `F33`–`F40` を `src/falsifiers/spectral.mjs` へ追加（`F36_COARTICULATION_SEAM`・`F37_DECOUPLED_HF_EXCITER` は実録音/VOICEVOX vs 合成で `AUC = 1.000`）。
+      - `F33`–`F40` を `src/falsifiers/spectral.mjs` へ追加（`F36_COARTICULATION_SEAM`・`F37_DECOUPLED_HF_EXCITER` の旧「実録音/VOICEVOX vs 合成で AUC = 1.000」は v0.11.1 で撤回）。
     - **v0.8 Core-6 実音キャリブレーション & 未見 PD/CC0 ホールドアウト評価**:
       - `F5_ABRUPT_TAIL` の `observed: false`（`[UNOBSERVED]`）分離、`F3` 平坦度ガード、`F4` RMS×重心相関、`F1` 無声ラフヒス検出、および未見 PD/CC0 9本監査（[`bench/real_audio_audit/HELDOUT_RESULTS.md`](bench/real_audio_audit/HELDOUT_RESULTS.md)）。
     - **v0.7 過剰整えレンズ、2トラック関係対話ミラー & 生きた息の余韻モード**:
@@ -83,7 +91,8 @@
     - v0.4 ブラインド鏡審査（`245ed15`、[MIRROR_AUDIT_VERDICT.md](bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md)）: `原音派 5–0`（単純確率 `1/108`、真ん中テイクに話速変更 `1.30–1.45×` を含む旧版での結果）＋ `#4 わたし` tie → `F24` の単独拒否権を否定し、スコープ付き耳判例メモリへ記録
   - **重要：LLM 視覚の読解力と、検出器の誤爆率（FPR）を明確に区別すること**:
     - **LLM 視覚の読解力（目隠し視力検査・ラベル全隠し）**: 一般実音10本で **v0.1（数値のみ）25/100 → v0.2（コンパクト視覚）80/100**、動物・子ども vs 大人5ペアで **v0.1 3/5 → v0.2 4/5**。
-    - **検出器の誤爆率（実音＋`tokiko` 保護棚19本の再現監査: [RESULTS.md](bench/real_audio_audit/RESULTS.md)）**:
+    - **v0.11.1 再測（オブザーバー, ffmpeg 7.1.5 で再取得, core-6 は不変）**: 問題なし実音 **8/10** 通過・期待かわいくない **4/5** 検出・`tokiko` 9/9 生存・`veto_all` 0/19。held-out（`ho_whisper` を tuning へ移した 8 本）: 人の声 4/4・子犬 0/1・期待かわいくない 2/3。テスト 85/85 + e2e 27/27。
+    - **（旧 v0.4 の数値・参考）検出器の誤爆率（実音＋`tokiko` 保護棚19本の再現監査: [RESULTS.md](bench/real_audio_audit/RESULTS.md)）**:
       - `core_veto`（F1–F6・既定）: 保護棚生存率 **68.4%（13/19）**（`tokiko` 単体 **88.9% = 8/9**）／期待かわいくない実音再現率 **60.0%（3/5）**
       - `shelf_veto`（棚クリア19軸）: インサンプル **100.0%（19/19）**／**アウトオブサンプル汎化: LOO 78.9%（15/19）、Real→`tokiko` 66.7%（6/9）、`tokiko`→Real 30.0%（3/10）**／期待かわいくない実音再現率 **60.0%（3/5、LOO 3–4/5）**
       - `veto_all`（F1–F32）: 保護棚生存率 **5.3%（1/19）**（`tokiko` 単体 **0.0% = 0/9**）／期待かわいくない実音再現率 **100.0%（5/5）** — 計 **13軸が `CONTESTED`**。

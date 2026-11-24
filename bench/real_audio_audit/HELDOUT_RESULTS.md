@@ -1,3 +1,5 @@
+> **v0.11.1 split revision (2026-11-25)**: `ho_whisper` is **burned** — the `F1` `isSoftHumanWhisper` guard (deae5cb, v0.9) was added after its FP below was seen, so it moved to `tuning_pd_cc0_manifest.json` as `tu_whisper`. The held-out set is now 8 clips with trims + SHA-256; rerun with `node bench/real_audio_audit/run_heldout.mjs --fetch --cache-dir /tmp/yata_heldout`. v0.11.1 result: benign human 4/4, puppy 0/1 (F1), expected-unkawaii 2/3 (dishwasher missed). The table below is the original v0.8 record.
+
 # yata v0.8 — Strictly Unseen PD / CC0 Held-Out Evaluation (`HELDOUT_RESULTS.md`)
 
 > **Zero-Tuning Discipline**: None of the 9 Wikimedia Commons clips below were used to choose or adjust any threshold in `yata v0.8`. Every clip is strictly **CC0** or **Public Domain** (zero CC BY / CC BY-SA clips), converted to 24 kHz mono WAV (≤ 3.0s) and evaluated once as-is under default `--policy core_veto`.
