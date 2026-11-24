@@ -25,8 +25,15 @@ import { fileURLToPath } from "node:url";
 
 import { decodeWavBuffer, encodeWavBuffer } from "./src/wav.mjs";
 import { extractFeatures, extractAudioProfile } from "./src/features.mjs";
-import { ORIGINAL_6_FALSIFIERS, DEFAULT_FALSIFIERS, createFalsifiers } from "./src/falsifiers/index.mjs";
+import {
+  ORIGINAL_6_FALSIFIERS,
+  DEFAULT_FALSIFIERS,
+  ORTHOGONAL_AXES,
+  TOOLBOX_FALSIFIERS,
+  createFalsifiers,
+} from "./src/falsifiers/index.mjs";
 import { analyzeSamples, compareReports, formatForLLM, formatCompareForLLM } from "./src/report.mjs";
+import { auditFalsifiersAgainstShelf, formatShelfAuditForLLM } from "./src/shelf.mjs";
 import {
   renderTextVision,
   renderTextDiff,
@@ -39,7 +46,7 @@ import { buildCorpus } from "./src/synth.mjs";
 import { runDiscoveryLoop, formatDiscoveryForLLM } from "./src/discovery.mjs";
 
 // ============================================================================
-// Public Programmatic API (v0.1 backward-compatible + v0.2 extensions)
+// Public Programmatic API (v0.1 backward-compatible + v0.2/v0.3 extensions)
 // ============================================================================
 export {
   // v0.1 core exports
@@ -64,6 +71,11 @@ export {
   buildCorpus,
   runDiscoveryLoop,
   formatDiscoveryForLLM,
+  // v0.3 extensions
+  ORTHOGONAL_AXES,
+  TOOLBOX_FALSIFIERS,
+  auditFalsifiersAgainstShelf,
+  formatShelfAuditForLLM,
 };
 
 // ============================================================================
@@ -71,12 +83,15 @@ export {
 // ============================================================================
 const USAGE = `Usage:
   node unkawaii_detector.mjs <file.wav> [--format llm|json] [--verbose] [--falsifiers all|core]
+                                        [--policy veto_all|core_veto]
                                         [--view [micro|compact|full]] [--zoom [auto|<t0>..<t1>]]
                                         [--charset ascii|unicode] [--width <N>]
                                         [--svg <out.svg>] [--png <out.png>]
   node unkawaii_detector.mjs --compare <a.wav> <b.wav> [--format llm|json] [--verbose] [--falsifiers all|core]
+                                                       [--policy veto_all|core_veto]
                                                        [--view [micro|compact|full]] [--svg <out.svg>] [--png <out.png>]
-  node unkawaii_detector.mjs --diff <a.wav> <b.wav> [--falsifiers all|core] [--charset ascii|unicode] [--width <N>]
+  node unkawaii_detector.mjs --diff <a.wav> <b.wav> [--falsifiers all|core] [--policy veto_all|core_veto]
+                                                    [--charset ascii|unicode] [--width <N>]
                                                     [--svg <out.svg>] [--png <out.png>]
   node unkawaii_detector.mjs --discover [--format llm|json] [--view] [--charset ascii|unicode]
   node unkawaii_detector.mjs --list-falsifiers [--format llm|json] [--falsifiers all|core]`;
@@ -105,6 +120,7 @@ function parseCliArgs(argv) {
     format: "llm",
     verbose: false,
     falsifiersSet: "all",
+    policy: "veto_all",
     view: null, // null | "micro" | "compact" | "full"
     zoom: null, // null | "auto" | { startSec, endSec }
     charset: "ascii",
@@ -173,6 +189,15 @@ function parseCliArgs(argv) {
         throw new Error(`Invalid --falsifiers "${val ?? ""}": expected "all" or "core"`);
       }
       opts.falsifiersSet = val;
+      continue;
+    }
+
+    if (arg === "--policy") {
+      const val = argv[++i];
+      if (val !== "veto_all" && val !== "core_veto") {
+        throw new Error(`Invalid --policy "${val ?? ""}": expected "veto_all" or "core_veto"`);
+      }
+      opts.policy = val;
       continue;
     }
 
@@ -305,11 +330,13 @@ function runCli(argv) {
     const repA = analyzeSamples(wavA.samples, wavA.sampleRate, {
       label: path.basename(fileA),
       falsifiers,
+      policy: opts.policy,
       ...chA,
     });
     const repB = analyzeSamples(wavB.samples, wavB.sampleRate, {
       label: path.basename(fileB),
       falsifiers,
+      policy: opts.policy,
       ...chB,
     });
 
@@ -363,6 +390,7 @@ function runCli(argv) {
   const rep = analyzeSamples(wav.samples, wav.sampleRate, {
     label: path.basename(file),
     falsifiers,
+    policy: opts.policy,
     ...chOpt,
   });
 

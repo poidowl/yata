@@ -66,12 +66,13 @@ export const ORIGINAL_6_FALSIFIERS = [
       const shimmer = num(f.shimmer);
       const score = voicedRatio >= 0.4 ? round3(1 - Math.min(1, jitter * 200 + shimmer * 25)) : 0;
       const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.7);
-      const minJitter = num(opts?.minJitter, 0.0005);
-      const softJitter = num(opts?.softJitter, 0.0015);
+      const minJitter = num(opts?.minJitter, 0.00015);
+      const softJitter = num(opts?.softJitter, 0.0025);
       const softShimmer = num(opts?.softShimmer, 0.012);
       const triggered = isNumericOverride
         ? voicedRatio >= 0.4 && score > threshold
-        : voicedRatio >= 0.4 && (jitter < minJitter || (jitter < softJitter && shimmer < softShimmer));
+        : voicedRatio >= 0.4 &&
+          ((jitter < minJitter && shimmer < 0.025) || (jitter < softJitter && shimmer < softShimmer));
       return {
         triggered,
         score,

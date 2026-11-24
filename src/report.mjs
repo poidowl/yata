@@ -11,7 +11,9 @@
  */
 
 import { extractFeatures, extractAudioProfile } from "./features.mjs";
-import { DEFAULT_FALSIFIERS } from "./falsifiers/index.mjs";
+import { ORIGINAL_6_FALSIFIERS, DEFAULT_FALSIFIERS } from "./falsifiers/index.mjs";
+
+const CORE_FALSIFIER_IDS = new Set(ORIGINAL_6_FALSIFIERS.map((f) => f.id));
 
 function clamp01(x) {
   if (!Number.isFinite(x)) return 0;
@@ -46,12 +48,14 @@ function formatWhere(where) {
  *   falsifiers?: readonly Array<object>,
  *   channels?: Float32Array[],
  *   includeProfile?: boolean,
- *   thresholds?: Record<string, number | Record<string, number>>
+ *   thresholds?: Record<string, number | Record<string, number>>,
+ *   policy?: "veto_all" | "core_veto"
  * }} [options={}]
  */
 export function analyzeSamples(samples, sampleRate, options = {}) {
   const label = options.label || "untitled";
   const falsifiers = options.falsifiers || DEFAULT_FALSIFIERS;
+  const policy = options.policy === "core_veto" ? "core_veto" : "veto_all";
   const featOpts = options.channels ? { channels: options.channels } : {};
   const features = extractFeatures(samples, sampleRate, featOpts);
   const thresholds = options.thresholds && typeof options.thresholds === "object" ? options.thresholds : null;
@@ -62,34 +66,61 @@ export function analyzeSamples(samples, sampleRate, options = {}) {
         ? thresholds[fn.id]
         : undefined;
     const out = fn.detect(features, override) || {};
+    const isTriggered = Boolean(out.triggered);
     const entry = {
       id: fn.id,
       domain: fn.domain,
       name: fn.name,
-      triggered: Boolean(out.triggered),
+      triggered: isTriggered,
       score: round3(out.score),
       threshold: Number.isFinite(out.threshold) ? out.threshold : 0.5,
       evidence: typeof out.evidence === "string" ? out.evidence : "",
       hint: typeof out.hint === "string" ? out.hint : "",
     };
+    if (policy === "core_veto" && isTriggered && !CORE_FALSIFIER_IDS.has(fn.id)) {
+      entry.diagnostic = true;
+    }
     if (out.where && typeof out.where === "object") {
       entry.where = out.where;
     }
     return entry;
   });
 
-  const triggered = results.filter((r) => r.triggered);
-  const survived = triggered.length === 0;
+  const vetoTriggered =
+    policy === "core_veto"
+      ? results.filter((r) => r.triggered && CORE_FALSIFIER_IDS.has(r.id))
+      : results.filter((r) => r.triggered);
+  const diagnosticTriggered =
+    policy === "core_veto"
+      ? results.filter((r) => r.triggered && !CORE_FALSIFIER_IDS.has(r.id))
+      : [];
+  const survived = vetoTriggered.length === 0;
+
+  let mirrorSummary;
+  if (policy === "core_veto") {
+    if (survived && diagnosticTriggered.length === 0) {
+      mirrorSummary =
+        "Mirror clear: failed to detect any 'do-not-want-to-be-with' signature across all dimensions.";
+    } else if (survived) {
+      mirrorSummary = `Mirror clear (core_veto): no core veto triggered; ${diagnosticTriggered.length} diagnostic note(s): ${diagnosticTriggered.map((t) => `${t.id} (${t.name})`).join("; ")}.`;
+    } else {
+      mirrorSummary = `Mirror reflects (core_veto): ${vetoTriggered.map((t) => `${t.id} (${t.name})`).join("; ")}.`;
+    }
+  } else {
+    mirrorSummary = survived
+      ? "Mirror clear: failed to detect any 'do-not-want-to-be-with' signature across all dimensions."
+      : `Mirror reflects: ${vetoTriggered.map((t) => `${t.id} (${t.name})`).join("; ")}.`;
+  }
 
   const report = {
     schema: "unkawaii_report/v0.2",
     label,
+    policy,
     verdict: survived ? "SURVIVED_KAWAII_CANDIDATE" : "REJECTED_UNKAWAII",
-    triggeredCount: triggered.length,
+    triggeredCount: vetoTriggered.length,
+    diagnosticCount: diagnosticTriggered.length,
     totalFalsifiers: results.length,
-    mirrorSummary: survived
-      ? "Mirror clear: failed to detect any 'do-not-want-to-be-with' signature across all dimensions."
-      : `Mirror reflects: ${triggered.map((t) => `${t.id} (${t.name})`).join("; ")}.`,
+    mirrorSummary,
     features,
     falsifiers: results,
   };
@@ -188,7 +219,7 @@ export function formatForLLM(report, opts = { verbose: false }) {
   if (verbose) {
     lines.push("DIMENSIONS:");
     for (const dim of all) {
-      const mark = dim.triggered ? "TRIGGERED" : "clear    ";
+      const mark = dim.triggered ? (dim.diagnostic ? "DIAG     " : "TRIGGERED") : "clear    ";
       lines.push(
         `  - [${mark}] ${dim.id}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
       );
@@ -200,10 +231,11 @@ export function formatForLLM(report, opts = { verbose: false }) {
   }
 
   // Compact triggered-first summary
-  const triggered = all.filter((d) => d.triggered).sort((a, b) => b.score - a.score);
-  const clearCount = all.length - triggered.length;
+  const vetoTriggered = all.filter((d) => d.triggered && !d.diagnostic).sort((a, b) => b.score - a.score);
+  const diagTriggered = all.filter((d) => d.triggered && d.diagnostic).sort((a, b) => b.score - a.score);
+  const clearCount = all.length - vetoTriggered.length - diagTriggered.length;
 
-  if (triggered.length === 0) {
+  if (vetoTriggered.length === 0 && diagTriggered.length === 0) {
     lines.push(`TRIGGERED: none (all ${all.length} dimensions clear)`);
     const nearMiss = all
       .filter((d) => d.score > 0)
@@ -215,13 +247,25 @@ export function formatForLLM(report, opts = { verbose: false }) {
       );
     }
   } else {
-    lines.push("TRIGGERED:");
-    for (const dim of triggered) {
-      lines.push(
-        `  - ${dim.id}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
-      );
-      if (dim.hint) {
-        lines.push(`      hint: ${dim.hint}`);
+    if (vetoTriggered.length > 0) {
+      lines.push("TRIGGERED:");
+      for (const dim of vetoTriggered) {
+        lines.push(
+          `  - ${dim.id}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
+        );
+        if (dim.hint) {
+          lines.push(`      hint: ${dim.hint}`);
+        }
+      }
+    } else {
+      lines.push("TRIGGERED: none (core_veto clear)");
+    }
+    if (diagTriggered.length > 0) {
+      lines.push(`DIAGNOSTIC (${diagTriggered.length} non-veto toolbox):`);
+      for (const dim of diagTriggered) {
+        lines.push(
+          `  - ${dim.id}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
+        );
       }
     }
     lines.push(`CLEAR: ${clearCount}/${all.length} dimensions clear (pass { verbose: true } for full dump)`);

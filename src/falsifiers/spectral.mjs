@@ -105,6 +105,8 @@ export const SPECTRAL_CORE_FALSIFIERS = [
     },
   },
   {
+    // Sensory dissonance curve based on Sethares, W. A. (1993), "Local consonance and the
+    // relationship between timbre and scale", JASA 94(3), 1218–1228 (parametrizing Plomp & Levelt 1965).
     id: "F14_HELMHOLTZ_ROUGHNESS",
     domain: "aggression",
     name: "Psychoacoustic Roughness / Beating Dissonance",

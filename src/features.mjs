@@ -10,6 +10,7 @@ import {
   hannWindow,
   computeMelFilterbank,
   estimateF0Parabolic,
+  computeCycleJitter,
   computeRoughness,
   computeCepstrumComb,
   computeModulationDft,
@@ -924,19 +925,18 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
   const voicedRatio = activeCount ? voicedFrameCount / activeCount : 0;
   const voicedDurationSec = voicedFrameCount * hopSec;
 
-  let jitterSum = 0;
   let shimmerSum = 0;
   let pairCount = 0;
   for (let i = 1; i < voicedFrames.length; i++) {
     const prev = voicedFrames[i - 1];
     const curr = voicedFrames[i];
     if (curr.timeSec - prev.timeSec <= 0.025) {
-      jitterSum += Math.abs(curr.f0 - prev.f0) / Math.max(prev.f0, 1);
       shimmerSum += Math.abs(curr.rms - prev.rms) / Math.max(prev.rms, 1e-6);
       pairCount++;
     }
   }
-  const jitter = pairCount ? jitterSum / pairCount : 0;
+  const f0Track = frames.map((f) => (f.voiced ? f.f0 : 0));
+  const jitter = computeCycleJitter(core.norm, core.sampleRate, f0Track, hopSize);
   const shimmer = pairCount ? shimmerSum / pairCount : 0;
 
   const corrRmsHf = Math.abs(

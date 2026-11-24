@@ -5,6 +5,7 @@ import {
   hannWindow,
   computeMelFilterbank,
   estimateF0Parabolic,
+  computeCycleJitter,
   computeRoughness,
   computeCepstrumComb,
   computeModulationDft,
@@ -193,6 +194,85 @@ test("estimateF0Parabolic: accurate across 110 Hz, 302 Hz, 780 Hz without octave
   const noise = seededNoise(frameLen, 99);
   const estNoise = estimateF0Parabolic(noise, sr, 55, 1000);
   assert.ok(estNoise.periodicity < 0.45, `Noise periodicity too high: ${estNoise.periodicity}`);
+});
+
+test("computeCycleJitter & extractFeatures.jitter: glide-invariant RAP vs 1% cycle perturbation vs pure rigid tone", () => {
+  const sr = 24000;
+  const dur = 0.6;
+  const n = Math.round(sr * dur);
+
+  // 1. Smooth pitch glide (220 Hz -> 440 Hz over 0.6s, zero jitter)
+  const glide = new Float32Array(n);
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const u = i / n;
+    const f0 = 220 * Math.pow(2, u);
+    phase += (2 * Math.PI * f0) / sr;
+    glide[i] = 0.6 * (0.7 * Math.sin(phase) + 0.25 * Math.sin(2 * phase));
+  }
+  const glideFeat = extractFeatures(glide, sr);
+
+  // 2. Steady 250 Hz tone with 1% random cycle-to-cycle period perturbation
+  const jittered = new Float32Array(n);
+  const basePeriod = sr / 250; // 96 samples
+  let seed = 424242;
+  const nextRand = () => {
+    seed = (seed + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  let pos = 0;
+  while (pos < n) {
+    // Gaussian-like ~1% std cycle-to-cycle period perturbation (sum of 3 uniforms)
+    const g = (nextRand() + nextRand() + nextRand() - 1.5) * 2; // approx N(0, 1)
+    const period = basePeriod * (1 + 0.01 * g);
+    const cycleLen = Math.max(20, period);
+    const end = Math.min(n, Math.ceil(pos + cycleLen));
+    for (let i = Math.floor(pos); i < end; i++) {
+      const phi = (2 * Math.PI * (i - pos)) / cycleLen;
+      jittered[i] = 0.6 * (0.7 * Math.sin(phi) + 0.25 * Math.sin(2 * phi));
+    }
+    pos += cycleLen;
+  }
+  const jitteredFeat = extractFeatures(jittered, sr);
+
+  // 3. Pure rigid sine & sawtooth
+  const rigidSine = makeSine(250, dur, sr, 0.6);
+  const rigidSaw = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    let s = 0;
+    for (let h = 1; h <= 6; h++) s += Math.sin(2 * Math.PI * 250 * h * t) / h;
+    rigidSaw[i] = 0.4 * s;
+  }
+  const rigidSineFeat = extractFeatures(rigidSine, sr);
+  const rigidSawFeat = extractFeatures(rigidSaw, sr);
+
+  // Direct computeCycleJitter sanity on empty/invalid inputs
+  assert.equal(computeCycleJitter(new Float32Array(0), sr, [], 240), 0);
+
+  // Assertions:
+  assert.ok(
+    glideFeat.jitter < 0.005,
+    `Smooth pitch glide (220->440 Hz) should have near-zero jitter (< 0.005), got ${glideFeat.jitter}`
+  );
+  assert.ok(
+    jitteredFeat.jitter >= 0.006,
+    `1% cycle-jittered 250 Hz tone should have jitter >= 0.006, got ${jitteredFeat.jitter}`
+  );
+  assert.ok(
+    jitteredFeat.jitter > glideFeat.jitter * 2,
+    `1% jittered tone (${jitteredFeat.jitter}) must exceed 2x smooth glide (${glideFeat.jitter})`
+  );
+  assert.ok(
+    rigidSineFeat.jitter < 0.001,
+    `Pure rigid sine should have jitter < 0.001, got ${rigidSineFeat.jitter}`
+  );
+  assert.ok(
+    rigidSawFeat.jitter < 0.001,
+    `Pure rigid saw should have jitter < 0.001, got ${rigidSawFeat.jitter}`
+  );
 });
 
 test("computeRoughness: harmonic tone low (< 0.16) vs beating cluster high (> 0.28)", () => {

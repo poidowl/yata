@@ -1,0 +1,122 @@
+# yata v0.3 — Reproducible Real-Audio & Protected Shelf Audit (`RESULTS.md`)
+
+Generated: `2026-11-24T04:29:25.672Z` by `node bench/real_audio_audit/run_real_audio_audit.mjs`
+Manifest: [`manifest.json`](./manifest.json) (20 trimmed 24kHz mono clips from 16 Wikimedia Commons sources + 9 `tokiko-axis` clips).
+
+> **Brutal Honesty First**: On synthetic unit tests, all 32 falsifiers pass 100%. On **real human/animal recordings and `tokiko-axis` Japanese speech**, running all 32 axes with unilateral veto power (`--policy veto_all`) causes a high false-positive rate. This report quantifies that exact gap, lists every `CONTESTED` axis, and separates **LLM visual readability** from **detector precision/recall**.
+
+## A. False-Positive Rate (FPR): `core_veto` (F1–F6) vs `veto_all` (F1–F32)
+
+A **False Positive** here means a clip on the Protected Shelf (loved `tokiko` speech or benign real PD/CC0 audio) is rejected (`REJECTED_UNKAWAII`). Lower FPR / higher Survival Rate is better on the Protected Shelf; higher True-Positive Rate (TPR) is better on expected-unkawaii real audio.
+
+| Evaluation Group | Clips | `core_veto` (F1–F6) Survival | `core_veto` FPR | `veto_all` (F1–F32) Survival | `veto_all` FPR |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| **`tokiko-axis` Japanese Speech** (`kawaii`/`amae`/`genki` × 3) | 9 | **88.9%** (8/9) | 11.1% | **0.0%** (0/9) | 100.0% |
+| **Benign Real PD/CC0 Audio** (deduped by SHA-256) | 10 | **50.0%** (5/10) | 50.0% | **10.0%** (1/10) | 90.0% |
+| **Combined Protected Shelf** (`tokiko` + Benign Real) | 19 | **68.4%** (13/19) | 31.6% | **5.3%** (1/19) | 94.7% |
+
+### Expected-Unkawaii Real Audio Detection (True-Positive Recall)
+
+On the **5** unique expected-unkawaii real clips (cat hiss, alarm siren, 60Hz hum+click injection, wild boar growl, giant canine growl):
+- `core_veto` (F1–F6) caught **3/5** (60.0%)
+- `veto_all` (F1–F32) caught **5/5** (100.0%)
+
+This confirms why v0.3 introduces **`--policy core_veto`** (defaulting to Core-6 for hard veto while surfacing `TOOLBOX_FALSIFIERS` F7–F32 as non-vetoing diagnostics, and separating `F30` into `ORTHOGONAL_AXES`).
+
+## B. Axes Marked `CONTESTED` by the Protected Shelf
+
+Any falsifier that rejects ≥ 1 clip on the Combined Protected Shelf is formally marked **`CONTESTED`** by `auditFalsifiersAgainstShelf` (`src/shelf.mjs`). Its veto power is suspended until calibrated or reclassified.
+
+```text
+[PROTECTED SHELF AUDIT] items=19 | falsifiers=32
+SURVIVAL: core6=68.4% (13/19) | full=5.3% (1/19)
+CONTESTED (13/32):
+  - F24_CALCULATED_PITCH_LFO [toolbox|CONTESTED] fp=11/19 (57.9%) | rejected: tokiko:kawaii:なる, tokiko:amae:なる, tokiko:genki:なる, tokiko:kawaii:わたし、にほんご、ちょっとしゃべれます, tokiko:genki:わたし、にほんご、ちょっとしゃべれます, tokiko:kawaii:おはよう、きょうは、いいてんきだね, tokiko:genki:おはよう、きょうは、いいてんきだね, clip_01 (human_singing_polyphonic), clip_06 (human_baby_laugh), p4_baby (animal_small_squirrel), p5_baby (animal_small_dog_bark)
+  - F23_ERRATIC_PITCH_WARBLE [toolbox|CONTESTED] fp=9/19 (47.4%) | rejected: tokiko:amae:わたし、にほんご、ちょっとしゃべれます, tokiko:amae:おはよう、きょうは、いいてんきだね, tokiko:genki:おはよう、きょうは、いいてんきだね, clip_02 (human_singing_ensemble), clip_05 (acoustic_guitar_lullaby), clip_06 (human_baby_laugh), p2_baby (animal_young_cat_meow), p4_baby (animal_small_squirrel), p5_baby (animal_small_dog_bark)
+  - F14_HELMHOLTZ_ROUGHNESS [toolbox|CONTESTED] fp=7/19 (36.8%) | rejected: tokiko:amae:わたし、にほんご、ちょっとしゃべれます, clip_02 (human_singing_ensemble), clip_05 (acoustic_guitar_lullaby), clip_09 (bird_song), p1_baby (animal_baby_lamb), p4_baby (animal_small_squirrel), p5_baby (animal_small_dog_bark)
+  - F26_INTERNAL_REBOUND_SHOCK [toolbox|CONTESTED] fp=3/19 (15.8%) | rejected: tokiko:amae:わたし、にほんご、ちょっとしゃべれます, tokiko:genki:わたし、にほんご、ちょっとしゃべれます, tokiko:amae:おはよう、きょうは、いいてんきだね
+  - F5_ABRUPT_TAIL [core|CONTESTED] fp=3/19 (15.8%) | rejected: clip_01 (human_singing_polyphonic), p1_baby (animal_baby_lamb), p2_baby (animal_young_cat_meow)
+  - F1_HARSH_EDGE [core|CONTESTED] fp=2/19 (10.5%) | rejected: tokiko:amae:わたし、にほんご、ちょっとしゃべれます, clip_09 (bird_song)
+  - F12_MENACING_LOW_REGISTER [toolbox|CONTESTED] fp=2/19 (10.5%) | rejected: clip_05 (acoustic_guitar_lullaby), p2_baby (animal_young_cat_meow)
+  - F3_PURE_NOISE [core|CONTESTED] fp=2/19 (10.5%) | rejected: clip_09 (bird_song), p1_baby (animal_baby_lamb)
+  - F4_NO_COMMON_CAUSE [core|CONTESTED] fp=2/19 (10.5%) | rejected: clip_09 (bird_song), p4_baby (animal_small_squirrel)
+  - F11_PUMPING_TREMOLO [toolbox|CONTESTED] fp=1/19 (5.3%) | rejected: p5_baby (animal_small_dog_bark)
+  - F13_SUBBASS_RUMBLE [toolbox|CONTESTED] fp=1/19 (5.3%) | rejected: p2_baby (animal_young_cat_meow)
+  - F15_PIERCING_WHISTLE [toolbox|CONTESTED] fp=1/19 (5.3%) | rejected: p4_baby (animal_small_squirrel)
+  - F28_MAINS_HUM_DRONE [toolbox|CONTESTED] fp=1/19 (5.3%) | rejected: clip_09 (bird_song)
+CLEARED: 19/32 axes (0 false positives on shelf)
+```
+
+| Axis | Role | Status | Shelf FP Count | Shelf FPR | Rejected Protected Clips |
+| :--- | :--- | :--- | ---: | ---: | :--- |
+| `F24_CALCULATED_PITCH_LFO` | toolbox | **CONTESTED** | 11/19 | 57.9% | `tokiko_naru_kawaii`, `tokiko_naru_amae`, `tokiko_naru_genki`, `tokiko_watashi_kawaii`, `tokiko_watashi_genki`, `tokiko_ohayo_kawaii`, `tokiko_ohayo_genki`, `clip_01`, `clip_06`, `p4_baby`, `p5_baby` |
+| `F23_ERRATIC_PITCH_WARBLE` | toolbox | **CONTESTED** | 9/19 | 47.4% | `tokiko_watashi_amae`, `tokiko_ohayo_amae`, `tokiko_ohayo_genki`, `clip_02`, `clip_05`, `clip_06`, `p2_baby`, `p4_baby`, `p5_baby` |
+| `F14_HELMHOLTZ_ROUGHNESS` | toolbox | **CONTESTED** | 7/19 | 36.8% | `tokiko_watashi_amae`, `clip_02`, `clip_05`, `clip_09`, `p1_baby`, `p4_baby`, `p5_baby` |
+| `F26_INTERNAL_REBOUND_SHOCK` | toolbox | **CONTESTED** | 3/19 | 15.8% | `tokiko_watashi_amae`, `tokiko_watashi_genki`, `tokiko_ohayo_amae` |
+| `F5_ABRUPT_TAIL` | core | **CONTESTED** | 3/19 | 15.8% | `clip_01`, `p1_baby`, `p2_baby` |
+| `F1_HARSH_EDGE` | core | **CONTESTED** | 2/19 | 10.5% | `tokiko_watashi_amae`, `clip_09` |
+| `F12_MENACING_LOW_REGISTER` | toolbox | **CONTESTED** | 2/19 | 10.5% | `clip_05`, `p2_baby` |
+| `F3_PURE_NOISE` | core | **CONTESTED** | 2/19 | 10.5% | `clip_09`, `p1_baby` |
+| `F4_NO_COMMON_CAUSE` | core | **CONTESTED** | 2/19 | 10.5% | `clip_09`, `p4_baby` |
+| `F11_PUMPING_TREMOLO` | toolbox | **CONTESTED** | 1/19 | 5.3% | `p5_baby` |
+| `F13_SUBBASS_RUMBLE` | toolbox | **CONTESTED** | 1/19 | 5.3% | `p2_baby` |
+| `F15_PIERCING_WHISTLE` | toolbox | **CONTESTED** | 1/19 | 5.3% | `p4_baby` |
+| `F28_MAINS_HUM_DRONE` | toolbox | **CONTESTED** | 1/19 | 5.3% | `clip_09` |
+
+### Per-Clip Breakdown: `tokiko-axis` Speech (9 clips)
+
+| Clip ID | Utterance | Preset | `core_veto` | `veto_all` Triggered Axes | F0 med | Jitter |
+| :--- | :--- | :--- | :--- | :--- | ---: | ---: |
+| `tokiko_naru_kawaii` | なる | `kawaii` | PASS | F24 | 0 Hz | 0.02287 |
+| `tokiko_naru_amae` | なる | `amae` | PASS | F24 | 0 Hz | 0.02387 |
+| `tokiko_naru_genki` | なる | `genki` | PASS | F24 | 0 Hz | 0.01155 |
+| `tokiko_watashi_kawaii` | わたし、にほんご、ちょっとしゃべれます | `kawaii` | PASS | F24 | 0 Hz | 0.0318 |
+| `tokiko_watashi_amae` | わたし、にほんご、ちょっとしゃべれます | `amae` | F1 | F1, F14, F23, F26 | 0 Hz | 0.04301 |
+| `tokiko_watashi_genki` | わたし、にほんご、ちょっとしゃべれます | `genki` | PASS | F24, F26 | 0 Hz | 0.03025 |
+| `tokiko_ohayo_kawaii` | おはよう、きょうは、いいてんきだね | `kawaii` | PASS | F24 | 0 Hz | 0.02866 |
+| `tokiko_ohayo_amae` | おはよう、きょうは、いいてんきだね | `amae` | PASS | F23, F26 | 0 Hz | 0.03595 |
+| `tokiko_ohayo_genki` | おはよう、きょうは、いいてんきだね | `genki` | PASS | F23, F24 | 0 Hz | 0.03486 |
+
+### Per-Clip Breakdown: Real Wikimedia Commons PD/CC0 Audio (20 clips)
+
+| Clip ID | Suite | Group | Title | SHA-256 Match | `core_veto` | `veto_all` Triggered Axes |
+| :--- | :--- | :--- | :--- | :---: | :--- | :--- |
+| `clip_01` | general_eye_exam | `benign_real_audio` | Georgian polyphonic folk song 'Chakrulo' (1957) | ✅ | F5 | F5, F24 |
+| `clip_02` | general_eye_exam | `benign_real_audio` | Mozart 'Die Zauberflote' vocal ensemble (Ferenc Fricsay, 1953) | ✅ | PASS | F14, F23 |
+| `clip_03` | general_eye_exam | `historical_recording` | Metropolitan Quartet 'Darling Nellie Gray' (1909 78rpm) | ✅ | PASS | F14, F17, F23 |
+| `clip_04` | general_eye_exam | `historical_recording` | Au Clair de la Lune (1860 phonautogram, oldest human voice) | ✅ | F4, F5 | F4, F5, F23 |
+| `clip_05` | general_eye_exam | `benign_real_audio` | Catalan folk lullaby 'El Noi de la Mare' (acoustic guitar) | ✅ | PASS | F12, F14, F23 |
+| `clip_06` | general_eye_exam | `benign_real_audio` | Real baby laughing | ✅ | PASS | F23, F24 |
+| `clip_07` | general_eye_exam | `expected_unkawaii` | Cat hissing aggressively | ✅ | PASS | F13, F14, F23, F25 |
+| `clip_08` | general_eye_exam | `expected_unkawaii` | Periodic alarm / siren beep | ✅ | F5, F6 | F5, F6, F7, F9, F11, F17, F22, F26, F27, F28 |
+| `clip_09` | general_eye_exam | `benign_real_audio` | Red-winged Blackbird song | ✅ | F1, F3, F4 | F1, F3, F4, F14, F28 |
+| `clip_10` | general_eye_exam | `expected_unkawaii` | Synthetic perturbation of clip_05 (+60Hz/120Hz hum + 2-sample click @ 1.20s) | ✅ | F4, F6 | F4, F6, F9, F12, F13, F14, F23, F28 |
+| `p1_baby` | animal_pairs | `benign_real_audio` | Mudchute farm lamb bleat | ✅ | F3, F5 | F3, F5, F14 |
+| `p1_adult` | animal_pairs | `neutral_adult_animal` | Mudchute farm adult sheep bleat | ✅ | F6 | F6, F14, F15, F23, F31 |
+| `p2_baby` | animal_pairs | `benign_real_audio` | Young female cat meow | ✅ | F5 | F5, F12, F13, F23 |
+| `p2_adult` | animal_pairs | `expected_unkawaii` | Cat hissing aggressively | ✅ | PASS | F13, F14, F23, F25 |
+| `p3_baby` | animal_pairs | `benign_real_audio` | Real baby laughing | ✅ | PASS | F23, F24 |
+| `p3_adult` | animal_pairs | `benign_real_audio` | Adult male Georgian folk singing ('Chakrulo', 1957) | ✅ | PASS | CLEAN |
+| `p4_baby` | animal_pairs | `benign_real_audio` | Three-striped palm squirrel chirping | ✅ | F4 | F4, F14, F15, F23, F24 |
+| `p4_adult` | animal_pairs | `expected_unkawaii` | Wild boar growling | ✅ | F5 | F5, F14, F17, F18, F23 |
+| `p5_baby` | animal_pairs | `benign_real_audio` | Small dog bark | ✅ | PASS | F11, F14, F23, F24 |
+| `p5_adult` | animal_pairs | `expected_unkawaii` | Giant canine deep growl | ✅ | PASS | F14, F23 |
+
+## C. Important Distinction: LLM Visual Readability vs Detector Precision/Recall
+
+In v0.2, we ran two **blind LLM eye exams** (all filenames, labels, and ground truth hidden from the evaluator LLM):
+1. **General Real-Audio Eye Exam** (`clip_01`–`clip_10`): LLM identification score rose from **25/100** (v0.1: 16 scalar numbers only) to **80/100** (v0.2: compact text audio vision, ≤32 lines/clip).
+2. **Baby/Small vs Adult/Large Animal Exam** (`pair_1`–`pair_5`): Blind pair discrimination rose from **3/5** (v0.1 scalars) to **4/5** (v0.2 compact text audio vision).
+
+**What those numbers DO and DO NOT prove:**
+- **DO prove**: `yata`'s token-efficient audio vision (`renderTextVision`) dramatically improves an LLM's ability to *read* pitch contours, spectral tilt, rhythmic cadence, and localized faults from real audio.
+- **DO NOT prove**: High detector precision/recall or low false-positive rate for the 32 falsifier thresholds (`F1`–`F32`). As Section A & B above show honestly, `veto_all` has a high FPR on real benign audio and `tokiko` speech, which is why **visual readability** and **falsifier veto accuracy** must always be reported separately.
+
+### Exact Blind Eye-Exam Rubric & Prompts
+
+- **General Real-Audio Exam (`clip_01`–`clip_10`)**:
+  - *Prompt*: Given ONLY anonymized `clip_01..clip_10` packets (Condition A: v0.1 16 scalar features; Condition B: v0.2 `renderTextVision(..., { mode: 'compact' })`), identify the likely sound source category, acoustic texture, and any localized faults (e.g., exact timestamp of click or hum frequency) without seeing filenames or ground truth.
+  - *Rubric*: 10 points per clip (100 total) — 5 pts for broad acoustic class (speech/singing/instrument/animal/alarm/bird), 5 pts for specific physical cue (polyphony, historical bandlimit, aggressive hiss, periodic siren, localized click @ 1.20s + 60Hz hum).
+- **Baby/Small vs Adult/Large Animal Exam (`pair_1`–`pair_5`)**:
+  - *Prompt*: `For each pair (Pair_1..Pair_5), decide whether A or B is the BABY/SMALL/FRIENDLY voice and which is the ADULT/LARGE/MENACING voice.` (A/B order randomized per pair; filenames stripped).
+  - *Rubric*: 1 point per pair (5 total), binary accuracy against ground truth.

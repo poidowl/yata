@@ -4,6 +4,8 @@
  * Exports:
  *   - ORIGINAL_6_FALSIFIERS: F1–F6 (v0.1 backward-compatible core)
  *   - DEFAULT_FALSIFIERS:    F1–F32 in exact numerical order
+ *   - ORTHOGONAL_AXES:       Axes confirmed neither kawaii nor unkawaii (freedom-of-expression map)
+ *   - TOOLBOX_FALSIFIERS:    F7–F32 excluding ORTHOGONAL_AXES (diagnostic/toolbox axes)
  *   - createFalsifiers(thresholdOverrides = {}, baseFalsifiers = DEFAULT_FALSIFIERS)
  *
  * Zero external dependencies. Pure ES Module.
@@ -25,6 +27,32 @@ export const DEFAULT_FALSIFIERS = Object.freeze([
   ...SPATIAL_FALSIFIERS,          // F28–F30
   ...SPECTRAL_EXTRA_FALSIFIERS,   // F31–F32
 ]);
+
+/**
+ * Orthogonal axes confirmed neither kawaii nor unkawaii (freedom-of-expression map).
+ * These remain in DEFAULT_FALSIFIERS for backward compatibility, while being formally
+ * separated from TOOLBOX_FALSIFIERS so they are not treated as unkawaii vetoes.
+ */
+export const ORTHOGONAL_AXES = Object.freeze([
+  Object.freeze({
+    id: "F30_STEREO_PHASE_DISCOMFORT",
+    domain: "environment_digital_spatial",
+    name: "Stereo Phase Inversion / Severe L-R Imbalance",
+    status: "orthogonal",
+    reason: "Owner ear-judge 2026-11-24: confirmed neither kawaii nor unkawaii (orthogonal spatial axis).",
+    decidedAt: "2026-11-24",
+  }),
+]);
+
+const CORE_FALSIFIER_ID_SET = new Set(ORIGINAL_6_FALSIFIERS.map((f) => f.id));
+const ORTHOGONAL_AXIS_ID_SET = new Set(ORTHOGONAL_AXES.map((a) => a.id));
+
+/**
+ * Diagnostic / toolbox falsifiers: F7–F32 excluding confirmed ORTHOGONAL_AXES.
+ */
+export const TOOLBOX_FALSIFIERS = Object.freeze(
+  DEFAULT_FALSIFIERS.filter((f) => !CORE_FALSIFIER_ID_SET.has(f.id) && !ORTHOGONAL_AXIS_ID_SET.has(f.id))
+);
 
 /**
  * Create a fresh falsifier array with per-ID threshold overrides without mutating DEFAULT_FALSIFIERS.

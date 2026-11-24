@@ -6,6 +6,7 @@
  *   - hannWindow(size)
  *   - computeMelFilterbank(fftSize, sampleRate, melBands, fMin, fMax)
  *   - estimateF0Parabolic(frame, sampleRate, fMin, fMax)
+ *   - computeCycleJitter(samples, sampleRate, f0Track, hopSize)
  *   - computeRoughness(mag, sampleRate, fftSize, topK)
  *   - computeCepstrumComb(meanLogMag, sampleRate, fftSize, medianF0)
  *   - computeModulationDft(series, hopSec, minHz, maxHz)
@@ -375,8 +376,152 @@ export function estimateF0Parabolic(frame, sampleRate, fMin = 55, fMax = 1000) {
 }
 
 /**
- * Plomp-Levelt / Sethares sensory roughness across top-K local spectral peaks.
+ * Cycle-to-cycle local period jitter via 2nd-order detrended Relative Average Perturbation (RAP):
+ *   RAP = mean_k( |T_k - 0.5 * (T_{k-1} + T_{k+1})| ) / mean(T)
+ *
+ * Unlike frame-to-frame F0 differencing, 2nd-order cycle-period detrending is invariant to
+ * smooth pitch glides (where T_k ≈ 0.5 * (T_{k-1} + T_{k+1})) while accurately measuring
+ * true cycle-to-cycle period perturbation.
+ *
+ * @param {Float32Array|ArrayLike<number>} samples
+ * @param {number} sampleRate
+ * @param {ArrayLike<number>} f0Track - Per-frame F0 in Hz (<= 0 for unvoiced frames)
+ * @param {number} hopSize - Samples per frame hop
+ * @returns {number} Relative cycle-to-cycle jitter (>= 0)
+ */
+export function computeCycleJitter(samples, sampleRate, f0Track, hopSize) {
+  const n = samples?.length ?? 0;
+  const numFrames = f0Track?.length ?? 0;
+  if (n < 16 || sampleRate <= 0 || numFrames === 0 || !Number.isFinite(hopSize) || hopSize <= 0) {
+    return 0;
+  }
+
+  let rapDiffSum = 0;
+  let periodSum = 0;
+  let rapCount = 0;
+
+  const refinePeak = (idx, sign) => {
+    if (idx <= 0 || idx >= n - 1) return idx;
+    const y0 = sign * samples[idx - 1];
+    const y1 = sign * samples[idx];
+    const y2 = sign * samples[idx + 1];
+    const denom = y0 - 2 * y1 + y2;
+    if (denom < -1e-12) {
+      let delta = (0.5 * (y0 - y2)) / denom;
+      if (delta < -0.5) delta = -0.5;
+      else if (delta > 0.5) delta = 0.5;
+      return idx + delta;
+    }
+    return idx;
+  };
+
+  const flushRun = (periods) => {
+    if (periods.length < 3) return;
+    for (let k = 1; k + 1 < periods.length; k++) {
+      const avgNeighbor = 0.5 * (periods[k - 1] + periods[k + 1]);
+      rapDiffSum += Math.abs(periods[k] - avgNeighbor);
+      periodSum += periods[k];
+      rapCount++;
+    }
+  };
+
+  let f = 0;
+  while (f < numFrames) {
+    while (f < numFrames && !(f0Track[f] > 40)) f++;
+    if (f >= numFrames) break;
+    const fStart = f;
+    while (f < numFrames && f0Track[f] > 40) f++;
+    const fEnd = f - 1;
+
+    const sStart = Math.max(1, Math.floor(fStart * hopSize));
+    const sEnd = Math.min(n - 2, Math.floor((fEnd + 1) * hopSize));
+    if (sEnd - sStart < 8) continue;
+
+    const f0Init = f0Track[fStart];
+    const tInit = sampleRate / f0Init;
+    const firstWindowEnd = Math.min(sEnd, sStart + Math.max(4, Math.ceil(tInit)));
+
+    // Choose dominant polarity in the opening period so inverted glottal pulses track cleanly
+    let maxPos = -Infinity;
+    let maxPosIdx = sStart;
+    let minNeg = Infinity;
+    let minNegIdx = sStart;
+    for (let i = sStart; i <= firstWindowEnd; i++) {
+      const v = samples[i];
+      if (v > maxPos) {
+        maxPos = v;
+        maxPosIdx = i;
+      }
+      if (v < minNeg) {
+        minNeg = v;
+        minNegIdx = i;
+      }
+    }
+    const sign = Math.abs(minNeg) > maxPos * 1.15 ? -1 : 1;
+    let prevPos = refinePeak(sign > 0 ? maxPosIdx : minNegIdx, sign);
+
+    let runPeriods = [];
+    let guard = 0;
+    const maxCycles = Math.ceil((sEnd - sStart) / Math.max(2, sampleRate / 1200)) + 4;
+
+    while (guard++ < maxCycles) {
+      const fIdx = Math.min(fEnd, Math.max(fStart, Math.floor(prevPos / hopSize)));
+      const localF0 = f0Track[fIdx];
+      if (!(localF0 > 40)) break;
+      const tExp = sampleRate / localF0;
+
+      const lo = Math.max(Math.floor(prevPos) + 1, Math.round(prevPos + 0.72 * tExp));
+      const hi = Math.min(sEnd, Math.round(prevPos + 1.28 * tExp));
+      if (lo >= hi || lo >= sEnd) break;
+
+      let bestIdx = -1;
+      let bestVal = -Infinity;
+      for (let i = lo; i <= hi; i++) {
+        const v = sign * samples[i];
+        if (v >= sign * samples[i - 1] && v >= sign * samples[i + 1] && v > bestVal) {
+          bestVal = v;
+          bestIdx = i;
+        }
+      }
+      if (bestIdx < 0) {
+        for (let i = lo; i <= hi; i++) {
+          const v = sign * samples[i];
+          if (v > bestVal) {
+            bestVal = v;
+            bestIdx = i;
+          }
+        }
+      }
+      if (bestIdx < 0) break;
+
+      const currPos = refinePeak(bestIdx, sign);
+      const period = currPos - prevPos;
+      if (period >= 0.65 * tExp && period <= 1.35 * tExp) {
+        runPeriods.push(period);
+      } else {
+        flushRun(runPeriods);
+        runPeriods = [];
+      }
+      prevPos = currPos;
+    }
+
+    flushRun(runPeriods);
+  }
+
+  if (rapCount === 0 || periodSum <= 1e-9) return 0;
+  return rapDiffSum / periodSum;
+}
+
+/**
+ * Plomp-Levelt / Sethares (1993) sensory roughness across top-K local spectral peaks.
  * Harmonic tones score low (< 0.16); closely-spaced beating clusters score high (> 0.28).
+ *
+ * Academic reference:
+ *   Sethares, W. A. (1993). "Local consonance and the relationship between timbre and scale."
+ *   Journal of the Acoustical Society of America (JASA), 94(3), 1218–1228.
+ *   Parametrizes Plomp & Levelt (1965) critical-band dissonance curves via:
+ *     d(f1, f2) = a1 * a2 * (exp(-3.5 * s * |f2 - f1|) - exp(-5.75 * s * |f2 - f1|)),
+ *     s = 0.24 / (0.021 * min(f1, f2) + 19).
  *
  * @param {Float32Array|ArrayLike<number>} mag - Linear magnitude spectrum (length fftSize/2 + 1)
  * @param {number} sampleRate
