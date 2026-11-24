@@ -2,7 +2,7 @@
 
 > **音声から「かわいくなさ」を多次元的に発見する。それに失敗したら「かわいい」。**
 
-**yata**（八咫鏡 — 音という鏡）は、音声から「かわいくなさ（＝聴き手の身体が『一緒にいたくない』と感じる兆候）」を **32次元** で検出し、LLM が少ないトークンで音を「視る」ための **LLM 音声可視化（Text / SVG / PNG）** まで備えた、**ゼロ依存・純 JavaScript (ESM)** の検証スイートです。
+**yata**（八咫鏡 — 音という鏡）は、音声から「かわいくなさ（＝聴き手の身体が『一緒にいたくない』と感じる兆候）」を **64次元** で検出し、LLM が少ないトークンで音を「視る」ための **LLM 音声可視化（Text / SVG / PNG）** まで備えた、**ゼロ依存・純 JavaScript (ESM)** の検証スイートです。
 
 人声・ささやき・韻律・間/リズム・UI音/効果音・電子音・空間/ステレオ・録音/デジタル劣化・心理音響まで、TTS に閉じず音全般を対象とします。
 
@@ -15,28 +15,38 @@
 
 1. **「かわいい」は全部は書けない。でも「かわいくない」は書ける。**
 2. 音は「鏡」であり、威圧・トゲ・計算・空洞・破綻・息苦しさ・不自然な間といった「一緒にいたくないなにか」が映ったとき、ヒトはかわいくないと感じる。
-3. 32次元の反証軸（Falsifiers `F1`–`F32`）をすべてすり抜けて反証に失敗した音だけを `SURVIVED_KAWAII_CANDIDATE` として残す。
+3. 64次元の反証軸（Falsifiers `F1`–`F64`）をすべてすり抜けて反証に失敗した音だけを `SURVIVED_KAWAII_CANDIDATE` として残す。
 4. すり抜けた反例が見つかったら、新しい検出軸を1本追加して篩（ふるい）を細かくする。
 
 ---
 
-## 32次元の「かわいくなさ」反証軸 (`F1`–`F32`)
+## 64次元の「かわいくなさ」反証軸 (`F1`–`F64`)
 
 | カテゴリ | 軸 ID | 検出対象 |
 | :--- | :--- | :--- |
-| **Core (v0.1 互換)** | `F1`–`F6` | 鋭いエッジ/高域攻撃、機械的硬直、純ノイズ、無相関チャネル、ぶつ切り語尾、フルスケール破綻 |
+| **Core (v0.1 互換)** | `F1`–`F6` | 鋭いエッジ/高域攻撃（ささやき保護付き）、機械的硬直、純ノイズ、無相関チャネル、ぶつ切り語尾、フルスケール破綻 |
 | **波形・ダイナミクス** | `F7`–`F11` | サブフルスケール平坦クリップ、DCオフセット、微小クリック/欠落、音圧の壁（息苦しさ）、機械的トレモロ |
 | **攻撃性・心理音響** | `F12`–`F16`, `F31` | 威圧的低音域、超低域ランブル、ヘルムホルツ粗さ（うなり）、耳障りな高域ホイッスル、歯擦音フィズ、力み（ささやき保護付き） |
 | **空洞・音色停滞** | `F17`–`F20`, `F32` | 金属的コム共振、箱鳴り/こもり、電話帯域制限、無菌純音ビープ、音色の完全停滞 |
 | **韻律・制御・間** | `F21`–`F27` | 低HNRノイズ沼、平坦モノトーン、不安定ピッチ揺れ、作為的LFOビブラート、Auto-Tune階段、語中リバウンド衝撃、メトロノーム硬直 |
 | **環境・デジタル・空間** | `F28`–`F30` | 50/60Hz 電源ハム、ビットクラッシュ/折り返し、ステレオ位相反転・極端な偏り（モノラル自動スキップ） |
+| **反霧ミラー (v0.9)** | `F33`–`F40` | 遠隔張り上げ、チップマンク過剰高ピッチ、合成チューブ平坦（80–200Hz欠落＋高域塗りつぶし）、調音継ぎ目、非連動高域エキサイタ、スペクトル鈍化、硬直音節拍子、対称声門スパイク |
+| **韻律・調音ダイナミクス (v0.10)** | `F41`–`F48` | 語尾下落欠如、音節ダイナミクス平坦、無声子音枯渇、HNRコントラスト平坦、鈍重調音、ピッチアクセント硬直、機械的ポーズ詰め込み、均一アタック固定 |
+| **空間・コーデック・位相 (v0.10)** | `F49`–`F56` | 過剰残響テイル、プリエコー滲み、帯域穴あき、倍音位相コーラス、高域帯域カットオフ、コンプポンピング、倍音間バズ床、位相固定インパルスバズ |
+| **微細表現・声区・聴覚疲労 (v0.10)** | `F57`–`F64` | 語尾減衰単調、高次フォルマント凍結、近接低中域ブーミー、歯擦音引き伸ばし、ボーカルフライ引きずり、声区破綻ジャンプ、微細トレモロ緊張、外耳道疲労指数 |
 
 全軸の一覧は `node unkawaii_detector.mjs --list-falsifiers` で確認できます。
 
-### 判定ポリシーと v0.4–v0.8 の主な改善
+### 判定ポリシーと v0.4–v0.10 の主な改善
 
-- **既定ポリシー = `core_veto`**: `F1`–`F6`（`ORIGINAL_6_FALSIFIERS`）のみでハード拒否を行い、`F7`–`F32`（`TOOLBOX_FALSIFIERS`）は非拒否の診断ヒント、`F30`（ステレオ逆相）は直交軸（`ORTHOGONAL_AXES`）として分離します。
-- **`--policy shelf_veto --contested ...`**: Protected Shelf 監査（`auditFalsifiersAgainstShelf`）で `CONTESTED` になった軸の拒否権を自動停止します。全32軸ハード拒否が必要な場合のみ `--policy veto_all` を明示指定します。
+- **既定ポリシー = `core_veto`**: `F1`–`F6`（`ORIGINAL_6_FALSIFIERS`）のみでハード拒否を行い、`F7`–`F64`（`TOOLBOX_FALSIFIERS`、`F30` 除く57軸）は非拒否の診断ヒント、`F30`（ステレオ逆相）は直交軸（`ORTHOGONAL_AXES`）として分離します。
+- **`--policy shelf_veto --contested ...`**: Protected Shelf 監査（`auditFalsifiersAgainstShelf`）で `CONTESTED` になった軸の拒否権を自動停止します。全64軸ハード拒否が必要な場合のみ `--policy veto_all` を明示指定します。
+- **v0.10 64軸直交ミラー（`F41`–`F64`・追加 FFT ゼロ）**:
+  - 3つの新規モジュール（`src/falsifiers/dynamics.mjs`、`src/falsifiers/acoustics.mjs`、`src/falsifiers/fatigue.mjs`）で 24 軸を追加し、39 クリップ（実音29＋VOICEVOX女性6＋`tokiko`4）の 64×64 相関監査で **`1,977 / 2,016` ペア（`98.07%`）の直交性（`|r| < 0.60`）** を達成。
+  - **オーナー耳による Goodhart 罠修正**: `F35_SYNTHETIC_TUBE_FLATNESS` から生ジッタ下限ペナルティ（`jitter < 0.048`）を撤去。生ジッタ追従が合成側に喉の痰がらみノイズを誘発する問題を解消し、物理的な低域ボディ欠落＋高域塗りつぶし検出へ純化。
+- **v0.9 反霧ミラー（`F33`–`F40`）& `F1` ささやき保護**:
+  - `F1_HARSH_EDGE` に Arnal 4–16 Hz 発話変調 vs 30–150 Hz 粗さ帯を用いた `isSoftHumanWhisper` ガードを追加し、人間の柔らかいささやきを通しつつ猫の威嚇・怒ったトラ・鋭いエッジを捕捉。
+  - 合成音声の「霧・継ぎ目・エキサイタ分離・硬直拍子」を捉える `F33`–`F40` を追加（`F36_COARTICULATION_SEAM` / `F37_DECOUPLED_HF_EXCITER` は生声・VOICEVOX vs 合成で `AUC = 1.000`）。
 - **v0.8 Core-6 実音キャリブレーション、F5 観測可否（`observed` / `[UNOBSERVED]`）& 未見 PD/CC0 ホールドアウト評価**:
   - **Core-6 物理修正**: `F5_ABRUPT_TAIL` が録音末尾 15ms に音が残る途中切り出し（`tailTruncatedAtEof`）を誤爆せず `observed: false`（`[UNOBSERVED]`）として「自然な余韻（`observed: true, score: 0`）」と明確に分離。`F3_PURE_NOISE` にスペクトル平坦度ガード（`>= 0.25`）、`F4_NO_COMMON_CAUSE` に RMS×重心相関、`F1_HARSH_EDGE` に無声ラフヒス／非周期ラフうなり検出を追加。
   - **未見 PD/CC0 ホールドアウト評価（ゼロ調整）**: 閾値調整に一切使っていない Public Domain / CC0 音源 9 本（人間の「しーっ」・ささやき・発話・子犬・怒ったトラ・路面電車警告音・食洗機）での実測を [`bench/real_audio_audit/HELDOUT_RESULTS.md`](bench/real_audio_audit/HELDOUT_RESULTS.md) に公開。
@@ -72,7 +82,7 @@ node unkawaii_detector.mjs sample.wav
 node unkawaii_detector.mjs sample.wav --format json
 node unkawaii_detector.mjs sample.wav --shelf bench/real_audio_audit/ear_precedents.json --scope tokiko_japanese_speech
 node unkawaii_detector.mjs sample.wav --policy shelf_veto --contested F24_CALCULATED_PITCH_LFO,F23_ERRATIC_PITCH_WARBLE
-node unkawaii_detector.mjs sample.wav --policy veto_all    # 全32軸でハード拒否
+node unkawaii_detector.mjs sample.wav --policy veto_all    # 全64軸でハード拒否
 node unkawaii_detector.mjs sample.wav --falsifiers core   # v0.1 の6軸のみで検証
 
 # 2. LLM 音声可視化（高密度テキスト / 60Hz MEL下限 / 異常区間ズーム / 0.5s 時間分割ミラー / 最小反事実 WAV / SVG / PNG）
@@ -95,11 +105,11 @@ node unkawaii_detector.mjs --timeline-diff a.wav b.wav
 node unkawaii_detector.mjs --dialogue speaker_a.wav speaker_b.wav
 node unkawaii_detector.mjs --dialogue speaker_a.wav speaker_b.wav --format json
 
-# 4. 反例発見ループ（合成コーパスで v0.1 6軸 vs 全32軸を比較）
+# 4. 反例発見ループ（合成コーパスで v0.1 6軸 vs 全64軸を比較）
 node unkawaii_detector.mjs --discover
 node unkawaii_detector.mjs --discover --view
 
-# 5. 全32軸の一覧
+# 5. 全64軸の一覧
 node unkawaii_detector.mjs --list-falsifiers
 ```
 
@@ -168,7 +178,7 @@ console.log(renderDialogueMap(dlg));
 const customFalsifiers = [
   ...DEFAULT_FALSIFIERS,
   {
-    id: "F33_CUSTOM_UNKAWAII",
+    id: "F65_CUSTOM_UNKAWAII",
     domain: "custom",
     name: "My Newly Discovered Unkawaii Dimension",
     detect(f) {
@@ -204,7 +214,7 @@ npm run discover  # 反例発見ループ
 - `src/wav.mjs`, `src/dsp.mjs`, `src/features.mjs` — ゼロ依存 WAV I/O・Radix-2 FFT/STFT・音響特徴量・呼吸/間プロファイル・Voice Compass・過剰整えレンズ・`AudioProfile`
 - `src/dialogue.mjs` — 2トラック関係対話ミラー（ターン交代・被り衝突・共有沈黙）
 - `src/counterfactual.mjs` — ホットスポット検出＆最小局所反事実オーディオ生成（`soften_mps` / `breath_tail`）
-- `src/falsifiers/*.mjs`, `src/report.mjs`, `src/shelf.mjs` — 32次元反証軸レジストリ・ポリシー分離（`core_veto` / `shelf_veto` / `veto_all`）・Protected Shelf 監査
+- `src/falsifiers/*.mjs`, `src/report.mjs`, `src/shelf.mjs` — 64次元反証軸レジストリ・ポリシー分離（`core_veto` / `shelf_veto` / `veto_all`）・Protected Shelf 監査
 - `src/visualize/*.mjs` — 段階的テキスト可視化（60Hz MEL下限）・時間分割ミラー＆窓別差分・6パネル SVG・純 JS PNG エンコーダ＆可視化
 - `src/synth.mjs`, `src/discovery.mjs` — 決定論的合成コーパス＆反例発見ループ
 - `bench/` — ベンチマーク・3択ブラインド鏡審査デモ（[`mirror_audit_demo.html`](bench/mirror_audit_demo.html)）・実音監査（[`real_audio_audit/RESULTS.md`](bench/real_audio_audit/RESULTS.md)）

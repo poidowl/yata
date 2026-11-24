@@ -39,14 +39,23 @@
 
 ## 現在の見張りメモ（オブザーバー引き継ぎ用・2026-11-24）
 
-- **現行安定版**: `main`（`v0.1.0` — 6次元検出器）
-- **レビュー対象ブランチ**: `dev/v0.7`（ゼロ依存純JS・"The Unpolished & Relational Mirror"）
-  - **実装済み（v0.2 → v0.3 → v0.4 → v0.5 → v0.6 → v0.7）**:
-    - 32軸検出器（`F1`–`F32`）の階層分離：**Core-6（`ORIGINAL_6_FALSIFIERS`）**／**診断ツールボックス（`TOOLBOX_FALSIFIERS`: F7–F32 から直交軸を除く25軸）**／**直交軸マップ（`ORTHOGONAL_AXES`: `F30` ステレオ逆相）**
+- **現行安定版**: `main`（`v0.5.0`）
+- **レビュー対象ブランチ**: `dev/v0.10`（ゼロ依存純JS・"64-Axis Orthogonal Mirror"）
+  - **実装済み（v0.2 → v0.10）**:
+    - 64軸検出器（`F1`–`F64`）の階層分離：**Core-6（`ORIGINAL_6_FALSIFIERS`）**／**診断ツールボックス（`TOOLBOX_FALSIFIERS`: F7–F64 から直交軸を除く57軸）**／**直交軸マップ（`ORTHOGONAL_AXES`: `F30` ステレオ逆相）**
     - **判定ポリシー（既定 = `core_veto`）**: `--policy core_veto|shelf_veto|veto_all`
       - `core_veto`（コード既定値）: 基本6軸のみでハード拒否し、ツールボックス軸は診断ヒントとして非拒否で併記
       - `shelf_veto`（`--policy shelf_veto --contested ...`）: Protected Shelf で `CONTESTED` になった軸の拒否権を自動停止し、クリア済み軸のみで判定
-      - `veto_all`: 全32軸でハード拒否（研究・厳格監査向け）
+      - `veto_all`: 全64軸でハード拒否（研究・厳格監査向け）
+    - **v0.10 64軸直交ミラー（`F41`–`F64`・追加 FFT ゼロ）**:
+      - 3モジュール新設：`src/falsifiers/dynamics.mjs`（`F41`–`F48` 韻律・調音ダイナミクス）、`src/falsifiers/acoustics.mjs`（`F49`–`F56` 空間・コーデック・位相）、`src/falsifiers/fatigue.mjs`（`F57`–`F64` 微細表現・声区・聴覚疲労）。
+      - 64×64 直交性監査（39クリップ：実音29＋VOICEVOX女性6＋`tokiko`4、全 2,016 ペア）：**`1,977 / 2,016`（`98.07%`）が `|r| < 0.60` で直交**。VOICEVOX女性の `F41`–`F64` 通過率は **`141 / 144`（`97.9%`）**。
+      - **Goodhart 罠修正（オーナー耳検証）**: `F35_SYNTHETIC_TUBE_FLATNESS` から生ジッタ下限ペナルティ（`jitter < 0.048`）を撤去。生ジッタ追従が合成音に喉の痰がらみノイズを誘発する問題を解消。
+    - **v0.9 反霧ミラー（`F33`–`F40`）& `F1` ささやき保護**:
+      - `F1_HARSH_EDGE` に `isSoftHumanWhisper` ガード（Arnal 4–16 Hz vs 30–150 Hz）を追加し、`ho_whisper` を救済しつつ猫の威嚇・怒ったトラ・鋭いエッジを捕捉。
+      - `F33`–`F40` を `src/falsifiers/spectral.mjs` へ追加（`F36_COARTICULATION_SEAM`・`F37_DECOUPLED_HF_EXCITER` は実録音/VOICEVOX vs 合成で `AUC = 1.000`）。
+    - **v0.8 Core-6 実音キャリブレーション & 未見 PD/CC0 ホールドアウト評価**:
+      - `F5_ABRUPT_TAIL` の `observed: false`（`[UNOBSERVED]`）分離、`F3` 平坦度ガード、`F4` RMS×重心相関、`F1` 無声ラフヒス検出、および未見 PD/CC0 9本監査（[`bench/real_audio_audit/HELDOUT_RESULTS.md`](bench/real_audio_audit/HELDOUT_RESULTS.md)）。
     - **v0.7 過剰整えレンズ、2トラック関係対話ミラー & 生きた息の余韻モード**:
       - `computeSanitizationIndex(features, breathProfile)`（非拒否診断レンズ、`docs/PHILOSOPHY.md` 第9節・Ani の洞察「完璧じゃない　きれいに整えようとしてない」）: 微細揺らぎ消去・ピッチ平坦/階段化・ダイナミクス平坦化・リズム/スペクトル硬直の4手がかりを `sanitizationScore`（`[0, 1]`）と `imperfectionLabel`（`alive_unpolished` / `balanced` / `over_sanitized` / `silent`）へ統合し、`extractFeatures`・`renderTextVision`（`SAN=0.XX`）へ配線。`compareReports` / `formatCompareForLLM` は `sanitizationDelta >= 0.15 && B >= 0.45` で `OVER-SANITIZATION WARNING` を通知
       - `src/dialogue.mjs`（`analyzeDialogue` / `renderDialogueMap`）+ CLI `--dialogue <a.wav> <b.wav>`: 第5領域「関係の断絶・間」の2トラック対話ミラー（10ms RMS 整列、`turnCount` / `overlapRatio` / `meanTurnGapSec` / `mutualSilenceRatio` / `relationLabel` を5行で可視化）
