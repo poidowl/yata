@@ -196,6 +196,7 @@ async function synthesizeTokikoClips(kudaPath) {
 }
 
 function analyzePolicies(samples, sampleRate, label, contestedIds = []) {
+  const contestedSet = contestedIds instanceof Set ? contestedIds : new Set(contestedIds);
   const repCore = analyzeSamples(samples, sampleRate, {
     label,
     falsifiers: DEFAULT_FALSIFIERS,
@@ -210,25 +211,29 @@ function analyzePolicies(samples, sampleRate, label, contestedIds = []) {
     label,
     falsifiers: DEFAULT_FALSIFIERS,
     policy: "shelf_veto",
-    contestedAxes: contestedIds,
+    contestedIds: contestedSet,
   });
+
+  if (repShelf.policy !== "shelf_veto") {
+    throw new Error(`Expected policy="shelf_veto" for ${label}, got "${repShelf.policy}"`);
+  }
 
   const coreTriggered = repCore.falsifiers
     .filter((f) => f.triggered && ORIGINAL_6_FALSIFIERS.some((c) => c.id === f.id))
     .map((f) => f.id);
   const allTriggered = repAll.falsifiers.filter((f) => f.triggered).map((f) => f.id);
+  const shelfTriggered = repShelf.falsifiers
+    .filter((f) => f.triggered && !f.diagnostic)
+    .map((f) => f.id);
+  const verdictShelfVeto = repShelf.verdict;
 
-  const contestedSet = new Set(contestedIds);
-  let shelfTriggered;
-  let verdictShelfVeto;
-  if (repShelf.policy === "shelf_veto") {
-    shelfTriggered = repShelf.falsifiers
-      .filter((f) => f.triggered && !f.contested && !contestedSet.has(f.id))
-      .map((f) => f.id);
-    verdictShelfVeto = repShelf.verdict;
-  } else {
-    shelfTriggered = allTriggered.filter((id) => !contestedSet.has(id));
-    verdictShelfVeto = shelfTriggered.length === 0 ? "SURVIVED_KAWAII_CANDIDATE" : "REJECTED_UNKAWAII";
+  // Runtime invariant: summary verdict and per-item shelfTriggered can NEVER diverge
+  const expectedSurvived = shelfTriggered.length === 0;
+  const actualSurvived = verdictShelfVeto === "SURVIVED_KAWAII_CANDIDATE";
+  if (expectedSurvived !== actualSurvived) {
+    throw new Error(
+      `shelf_veto invariant violated on ${label}: verdict=${verdictShelfVeto} but shelfTriggered=[${shelfTriggered.join(", ")}]`
+    );
   }
 
   return {
@@ -257,6 +262,101 @@ function countShelfVetoSurvival(items, contestedSet) {
   return survived;
 }
 
+function evaluateAgainstContested(items, contestedSet) {
+  let survived = 0;
+  const failures = [];
+  for (const it of items) {
+    const caughtBy = (it.triggeredIds || []).filter((id) => !contestedSet.has(id));
+    if (caughtBy.length === 0) {
+      survived++;
+    } else {
+      failures.push({ id: it.id, label: it.label || it.id, caughtBy });
+    }
+  }
+  const total = items.length;
+  return {
+    survived,
+    total,
+    survivalRate: total ? Number((survived / total).toFixed(4)) : 1,
+    fpr: total ? Number(((total - survived) / total).toFixed(4)) : 0,
+    failures,
+  };
+}
+
+function computeGeneralization(tokikoAudit, benignRealAudit, combinedShelfAudit, expectedUnkawaiiEntries) {
+  const combinedItems = combinedShelfAudit.items || [];
+  let looSurvived = 0;
+  const looFailures = [];
+  const looRecallCounts = [];
+
+  for (let i = 0; i < combinedItems.length; i++) {
+    const otherContested = new Set();
+    for (let j = 0; j < combinedItems.length; j++) {
+      if (j === i) continue;
+      for (const axId of combinedItems[j].triggeredIds || []) {
+        otherContested.add(axId);
+      }
+    }
+    const item = combinedItems[i];
+    const caughtBy = (item.triggeredIds || []).filter((id) => !otherContested.has(id));
+    if (caughtBy.length === 0) {
+      looSurvived++;
+    } else {
+      looFailures.push({ id: item.id, label: item.label || item.id, caughtBy });
+    }
+
+    const foldCaught = expectedUnkawaiiEntries.filter((c) =>
+      (c.allTriggered || []).some((id) => !otherContested.has(id))
+    ).length;
+    looRecallCounts.push(foldCaught);
+  }
+
+  const realContestedSet = new Set(benignRealAudit.contestedIds || []);
+  const tokikoContestedSet = new Set(tokikoAudit.contestedIds || []);
+
+  const realToTokiko = {
+    trainDomain: "benign_real_audio",
+    testDomain: "tokiko_axis",
+    trainSize: benignRealAudit.shelfSize,
+    trainContestedCount: realContestedSet.size,
+    ...evaluateAgainstContested(tokikoAudit.items || [], realContestedSet),
+  };
+
+  const tokikoToReal = {
+    trainDomain: "tokiko_axis",
+    testDomain: "benign_real_audio",
+    trainSize: tokikoAudit.shelfSize,
+    trainContestedCount: tokikoContestedSet.size,
+    ...evaluateAgainstContested(benignRealAudit.items || [], tokikoContestedSet),
+  };
+
+  const looTotal = combinedItems.length;
+  const meanLooRecall =
+    looRecallCounts.length > 0
+      ? Number((looRecallCounts.reduce((a, b) => a + b, 0) / looRecallCounts.length).toFixed(2))
+      : 0;
+
+  return {
+    leaveOneOut: {
+      survived: looSurvived,
+      total: looTotal,
+      survivalRate: looTotal ? Number((looSurvived / looTotal).toFixed(4)) : 1,
+      fpr: looTotal ? Number(((looTotal - looSurvived) / looTotal).toFixed(4)) : 0,
+      failures: looFailures,
+      expectedUnkawaiiRecall: {
+        total: expectedUnkawaiiEntries.length,
+        minCaught: looRecallCounts.length ? Math.min(...looRecallCounts) : 0,
+        maxCaught: looRecallCounts.length ? Math.max(...looRecallCounts) : 0,
+        meanCaught: meanLooRecall,
+      },
+    },
+    crossDomain: {
+      realToTokiko,
+      tokikoToReal,
+    },
+  };
+}
+
 function buildMarkdownReport(summary) {
   const {
     generatedAt,
@@ -267,6 +367,7 @@ function buildMarkdownReport(summary) {
     benignRealAudit,
     combinedShelfAudit,
     shelfVetoSummary,
+    generalization,
     expectedUnkawaiiSummary,
     perClipReal,
     perClipTokiko,
@@ -278,7 +379,7 @@ function buildMarkdownReport(summary) {
   lines.push(`Generated: \`${generatedAt}\` by \`node bench/real_audio_audit/run_real_audio_audit.mjs\``);
   lines.push(`Manifest: [\`manifest.json\`](./manifest.json) (${realClipCount} trimmed 24kHz mono clips from 16 Wikimedia Commons sources with verified licenses + ${tokikoCount} \`tokiko-axis\` clips).`);
   lines.push("");
-  lines.push("> **Brutal Honesty First**: On synthetic unit tests, all 32 falsifiers pass 100%. On **real human/animal recordings and `tokiko-axis` Japanese speech**, running all 32 axes with unilateral veto power (`--policy veto_all`) causes a high false-positive rate. This report quantifies that exact gap across **`core_veto`** (v0.4 default), **`shelf_veto`** (suspends veto on shelf-contested axes), and **`veto_all`**, lists every `CONTESTED` axis, and separates **LLM visual readability** from **detector precision/recall**.");
+  lines.push("> **Brutal Honesty First**: On synthetic unit tests, all 32 falsifiers pass 100%. On **real human/animal recordings and `tokiko-axis` Japanese speech**, running all 32 axes with unilateral veto power (`--policy veto_all`) causes a high false-positive rate. This report quantifies that exact gap across **`core_veto`** (v0.4 default), **`shelf_veto`** (suspends veto on shelf-contested axes), and **`veto_all`**, reports **out-of-sample Leave-One-Out (LOO) & cross-domain generalization** (not just in-sample 100%), lists every `CONTESTED` axis, and separates **LLM visual readability** from **detector precision/recall**.");
   lines.push("");
 
   // Section A
@@ -286,7 +387,7 @@ function buildMarkdownReport(summary) {
   lines.push("");
   lines.push("A **False Positive** here means a clip on the Protected Shelf (loved `tokiko` speech or benign real Wikimedia Commons audio) is rejected (`REJECTED_UNKAWAII`). Lower FPR / higher Survival Rate is better on the Protected Shelf; higher True-Positive Rate (TPR) is better on expected-unkawaii real audio.");
   lines.push("");
-  lines.push("| Evaluation Group | Clips | `core_veto` (F1–F6) Survival (FPR) | `shelf_veto` (Cleared Axes) Survival (FPR) | `veto_all` (F1–F32) Survival (FPR) |");
+  lines.push("| Evaluation Group | Clips | `core_veto` (F1–F6) Survival (FPR) | `shelf_veto` (In-Sample) Survival (FPR) | `veto_all` (F1–F32) Survival (FPR) |");
   lines.push("| :--- | ---: | ---: | ---: | ---: |");
   lines.push(
     `| **\`tokiko-axis\` Japanese Speech** (\`kawaii\`/\`amae\`/\`genki\` × 3) | ${tokikoAudit.shelfSize} | **${pct(tokikoAudit.shelfSurvivalRate.core6Survived, tokikoAudit.shelfSize)}** (${tokikoAudit.shelfSurvivalRate.core6Survived}/${tokikoAudit.shelfSize}; FPR ${pct(tokikoAudit.shelfSize - tokikoAudit.shelfSurvivalRate.core6Survived, tokikoAudit.shelfSize)}) | **${pct(shelfVetoSummary.tokikoSurvived, tokikoAudit.shelfSize)}** (${shelfVetoSummary.tokikoSurvived}/${tokikoAudit.shelfSize}; FPR ${pct(tokikoAudit.shelfSize - shelfVetoSummary.tokikoSurvived, tokikoAudit.shelfSize)}) | **${pct(tokikoAudit.shelfSurvivalRate.fullSurvived, tokikoAudit.shelfSize)}** (${tokikoAudit.shelfSurvivalRate.fullSurvived}/${tokikoAudit.shelfSize}; FPR ${pct(tokikoAudit.shelfSize - tokikoAudit.shelfSurvivalRate.fullSurvived, tokikoAudit.shelfSize)}) |`
@@ -299,12 +400,46 @@ function buildMarkdownReport(summary) {
   );
   lines.push("");
 
-  lines.push("### Expected-Unkawaii Real Audio Detection (True-Positive Recall)");
+  // Out-of-sample generalization subsection
+  const { leaveOneOut: loo, crossDomain } = generalization;
+  const r2t = crossDomain.realToTokiko;
+  const t2r = crossDomain.tokikoToReal;
+  lines.push("### Out-of-Sample Generalization (`shelf_veto`: Leave-One-Out & Cross-Domain)");
+  lines.push("");
+  lines.push("In-sample `shelf_veto` survival (`19/19 = 100.0%`) is true by definition when `contestedIds` are chosen on the same 19 clips. To measure honest out-of-sample generalization, we hold out clips before computing `contestedIds`:");
+  lines.push("");
+  lines.push("| Generalization Protocol | Train Shelf -> Test Set | Out-of-Sample Survival (FPR) | Held-Out Failures (Clip -> Catching Axis) |");
+  lines.push("| :--- | :--- | ---: | :--- |");
+  const formatFailures = (fails) =>
+    fails.length === 0
+      ? "none"
+      : fails.map((f) => `\`${f.id}\` (${f.caughtBy.map(shortAxisId).join(", ")})`).join("; ");
+  lines.push(
+    `| **Leave-One-Out (LOO)** | Other ${loo.total - 1} shelf clips -> held-out clip (×${loo.total}) | **${pct(loo.survived, loo.total)}** (${loo.survived}/${loo.total}; FPR ${pct(loo.total - loo.survived, loo.total)}) | ${formatFailures(loo.failures)} |`
+  );
+  lines.push(
+    `| **Cross-Domain: Real -> \`tokiko\`** | ${r2t.trainSize} Benign Real (${r2t.trainContestedCount} contested) -> ${r2t.total} \`tokiko\` | **${pct(r2t.survived, r2t.total)}** (${r2t.survived}/${r2t.total}; FPR ${pct(r2t.total - r2t.survived, r2t.total)}) | ${formatFailures(r2t.failures)} |`
+  );
+  lines.push(
+    `| **Cross-Domain: \`tokiko\` -> Real** | ${t2r.trainSize} \`tokiko\` (${t2r.trainContestedCount} contested) -> ${t2r.total} Benign Real | **${pct(t2r.survived, t2r.total)}** (${t2r.survived}/${t2r.total}; FPR ${pct(t2r.total - t2r.survived, t2r.total)}) | ${formatFailures(t2r.failures)} |`
+  );
+  lines.push("");
+
+  lines.push("### Expected-Unkawaii Real Audio Detection (True-Positive Recall & Exact Reasons)");
   lines.push("");
   lines.push(`On the **${expectedUnkawaiiCount}** unique expected-unkawaii real clips (cat hiss, alarm siren, 60Hz hum+click injection, wild boar growl, giant canine growl):`);
   lines.push(`- \`core_veto\` (F1–F6) caught **${expectedUnkawaiiSummary.coreCaught}/${expectedUnkawaiiCount}** (${pct(expectedUnkawaiiSummary.coreCaught, expectedUnkawaiiCount)})`);
-  lines.push(`- \`shelf_veto\` (${combinedShelfAudit.clearedCount} shelf-cleared axes) caught **${expectedUnkawaiiSummary.shelfCaught}/${expectedUnkawaiiCount}** (${pct(expectedUnkawaiiSummary.shelfCaught, expectedUnkawaiiCount)})`);
+  lines.push(`- \`shelf_veto\` (${combinedShelfAudit.clearedCount} shelf-cleared axes) caught **${expectedUnkawaiiSummary.shelfCaught}/${expectedUnkawaiiCount}** (${pct(expectedUnkawaiiSummary.shelfCaught, expectedUnkawaiiCount)}) — LOO across ${loo.total} folds: **${loo.expectedUnkawaiiRecall.minCaught}–${loo.expectedUnkawaiiRecall.maxCaught}/${expectedUnkawaiiCount}** (mean ${loo.expectedUnkawaiiRecall.meanCaught}/${expectedUnkawaiiCount})`);
   lines.push(`- \`veto_all\` (F1–F32) caught **${expectedUnkawaiiSummary.allCaught}/${expectedUnkawaiiCount}** (${pct(expectedUnkawaiiSummary.allCaught, expectedUnkawaiiCount)})`);
+  lines.push("");
+  lines.push("| Clip ID | Title | `core_veto` Triggered | `shelf_veto` Triggered (Cleared Axes) | `veto_all` Triggered |");
+  lines.push("| :--- | :--- | :--- | :--- | :--- |");
+  for (const c of expectedUnkawaiiSummary.clips) {
+    const coreTxt = c.coreTriggered.length ? c.coreTriggered.map((id) => `\`${id}\``).join(", ") : "MISS";
+    const shelfTxt = c.shelfTriggered.length ? c.shelfTriggered.map((id) => `\`${id}\``).join(", ") : "MISS";
+    const allTxt = c.allTriggered.length ? c.allTriggered.map((id) => `\`${id}\``).join(", ") : "MISS";
+    lines.push(`| \`${c.id}\` | ${c.title} | ${coreTxt} | ${shelfTxt} | ${allTxt} |`);
+  }
   lines.push("");
   lines.push("This confirms why v0.4 makes **`--policy core_veto`** the default (Core-6 hard veto + `TOOLBOX_FALSIFIERS` F7–F32 as non-vetoing diagnostics, `F30` in `ORTHOGONAL_AXES`), and provides **`--policy shelf_veto --contested ...`** to automatically suspend veto power on every axis marked `CONTESTED` by the Protected Shelf.");
   lines.push("");
@@ -458,7 +593,7 @@ async function main() {
 
   // Analyze all real clips across core_veto, shelf_veto, veto_all
   const perClipReal = realLoaded.map(({ clip, actualSha, sha256Match, samples, sampleRate }) => {
-    const analysis = analyzePolicies(samples, sampleRate, clip.id, contestedIds);
+    const analysis = analyzePolicies(samples, sampleRate, clip.id, contestedSet);
     return {
       id: clip.id,
       suite: clip.suite,
@@ -477,7 +612,7 @@ async function main() {
 
   // Analyze all tokiko clips across core_veto, shelf_veto, veto_all
   const perClipTokiko = tokikoItems.map((item) => {
-    const analysis = analyzePolicies(item.samples, item.sampleRate, item.id, contestedIds);
+    const analysis = analyzePolicies(item.samples, item.sampleRate, item.id, contestedSet);
     return {
       id: item.id,
       utterance: item.utterance,
@@ -486,6 +621,33 @@ async function main() {
       ...analysis,
     };
   });
+
+  // Strict runtime invariant: per-item shelf_veto verdicts MUST match shelfTriggered.length === 0 AND summary counts
+  for (const rec of [...perClipReal, ...perClipTokiko]) {
+    const survived = rec.verdictShelfVeto === "SURVIVED_KAWAII_CANDIDATE";
+    if (survived !== (rec.shelfTriggered.length === 0)) {
+      throw new Error(
+        `Per-clip shelf_veto mismatch on ${rec.id}: verdictShelfVeto=${rec.verdictShelfVeto}, shelfTriggered=[${rec.shelfTriggered.join(", ")}]`
+      );
+    }
+  }
+  const perClipTokikoShelfSurvived = perClipTokiko.filter(
+    (c) => c.verdictShelfVeto === "SURVIVED_KAWAII_CANDIDATE"
+  ).length;
+  if (perClipTokikoShelfSurvived !== shelfVetoSummary.tokikoSurvived) {
+    throw new Error(
+      `Summary vs per-clip mismatch on tokiko shelf_veto: summary=${shelfVetoSummary.tokikoSurvived}, perClip=${perClipTokikoShelfSurvived}`
+    );
+  }
+  const benignShelfIds = new Set(benignShelfItems.map((b) => b.id));
+  const perClipBenignShelfSurvived = perClipReal.filter(
+    (c) => benignShelfIds.has(c.id) && c.verdictShelfVeto === "SURVIVED_KAWAII_CANDIDATE"
+  ).length;
+  if (perClipBenignShelfSurvived !== shelfVetoSummary.benignRealSurvived) {
+    throw new Error(
+      `Summary vs per-clip mismatch on benign real shelf_veto: summary=${shelfVetoSummary.benignRealSurvived}, perClip=${perClipBenignShelfSurvived}`
+    );
+  }
 
   // Deduplicate expected_unkawaii real audio by SHA-256
   const seenUnkawaiiSha = new Set();
@@ -511,6 +673,14 @@ async function main() {
     })),
   };
 
+  // Out-of-sample generalization: Leave-One-Out (LOO) & Cross-Domain
+  const generalization = computeGeneralization(
+    tokikoAudit,
+    benignRealAudit,
+    combinedShelfAudit,
+    expectedUnkawaiiEntries
+  );
+
   const generatedAt = new Date().toISOString();
   const resultsObj = {
     schema: "yata_real_audio_audit/v0.4",
@@ -529,6 +699,7 @@ async function main() {
     benignRealAudit,
     combinedShelfAudit,
     shelfVetoSummary,
+    generalization,
     expectedUnkawaiiSummary,
     perClipTokiko,
     perClipReal,

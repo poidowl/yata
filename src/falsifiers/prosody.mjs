@@ -159,6 +159,8 @@ export const PROSODY_FALSIFIERS = [
     name: "Hard-Quantized Auto-Tune Pitch Staircase",
     detect(f, override) {
       const voicedFrameCount = num(f.voicedFrameCount);
+      const voicedRatio = num(f.voicedRatio);
+      const hnrDb = num(f.meanVoicedHnrDb);
       const flatStepRatio = num(f.flatStepRatio);
       const snapJumpCount = num(f.snapJumpCount);
       const f0Range = num(f.f0RangeSemitones);
@@ -167,9 +169,14 @@ export const PROSODY_FALSIFIERS = [
       const minJumps = num(opts?.snapJumpCount, 2);
       const minPlateauFlat = num(opts?.plateauFlatRatio, 0.75);
       const minPlateauRange = num(opts?.plateauRangeSemitones, 1.5);
+      const minVoicedRatio = num(opts?.minVoicedRatio, 0.55);
+      const minHnrDb = num(opts?.minVoicedHnrDb, 6.0);
+
+      const eligible =
+        voicedFrameCount >= 15 && voicedRatio >= minVoicedRatio && hnrDb >= minHnrDb;
 
       let score = 0;
-      if (voicedFrameCount >= 15) {
+      if (eligible) {
         const fScore = clamp01((flatStepRatio - (minFlat - 0.35)) / 0.7);
         const jScore = clamp01(snapJumpCount / (minJumps * 2));
         const snapScore = Math.min(fScore, jScore);
@@ -181,8 +188,8 @@ export const PROSODY_FALSIFIERS = [
         score = round3(Math.max(snapScore, plateauScore));
       }
       const triggered = isNumericOverride
-        ? voicedFrameCount >= 15 && score >= threshold
-        : voicedFrameCount >= 15 &&
+        ? eligible && score >= threshold
+        : eligible &&
           ((flatStepRatio >= minFlat && snapJumpCount >= minJumps) ||
             (flatStepRatio >= minPlateauFlat && f0Range >= minPlateauRange));
 
@@ -190,7 +197,7 @@ export const PROSODY_FALSIFIERS = [
         triggered,
         score,
         threshold,
-        evidence: `flatStepRatio=${flatStepRatio}, snapJumps=${snapJumpCount}, f0Range=${f0Range}st`,
+        evidence: `flatStepRatio=${flatStepRatio}, snapJumps=${snapJumpCount}, f0Range=${f0Range}st, voicedRatio=${voicedRatio}, hnr=${hnrDb}dB`,
         hint: "Loosen pitch-correction retune speed so transitions glide naturally instead of snapping to discrete steps.",
       };
     },

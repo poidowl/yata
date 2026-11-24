@@ -1,6 +1,6 @@
 {
   "schema": "yata_real_audio_audit/v0.4",
-  "generatedAt": "2026-11-24T05:08:48.696Z",
+  "generatedAt": "2026-11-24T05:29:39.897Z",
   "axisCounts": {
     "core": 6,
     "toolbox": 25,
@@ -2357,24 +2357,167 @@
     "benignRealSurvived": 10,
     "combinedSurvived": 19
   },
+  "generalization": {
+    "leaveOneOut": {
+      "survived": 15,
+      "total": 19,
+      "survivalRate": 0.7895,
+      "fpr": 0.2105,
+      "failures": [
+        {
+          "id": "clip_09",
+          "label": "clip_09 (bird_song)",
+          "caughtBy": [
+            "F28_MAINS_HUM_DRONE"
+          ]
+        },
+        {
+          "id": "p2_baby",
+          "label": "p2_baby (animal_young_cat_meow)",
+          "caughtBy": [
+            "F13_SUBBASS_RUMBLE"
+          ]
+        },
+        {
+          "id": "p4_baby",
+          "label": "p4_baby (animal_small_squirrel)",
+          "caughtBy": [
+            "F15_PIERCING_WHISTLE"
+          ]
+        },
+        {
+          "id": "p5_baby",
+          "label": "p5_baby (animal_small_dog_bark)",
+          "caughtBy": [
+            "F11_PUMPING_TREMOLO"
+          ]
+        }
+      ],
+      "expectedUnkawaiiRecall": {
+        "total": 5,
+        "minCaught": 3,
+        "maxCaught": 4,
+        "meanCaught": 3.05
+      }
+    },
+    "crossDomain": {
+      "realToTokiko": {
+        "trainDomain": "benign_real_audio",
+        "testDomain": "tokiko_axis",
+        "trainSize": 10,
+        "trainContestedCount": 12,
+        "survived": 6,
+        "total": 9,
+        "survivalRate": 0.6667,
+        "fpr": 0.3333,
+        "failures": [
+          {
+            "id": "tokiko_watashi_amae",
+            "label": "tokiko:amae:わたし、にほんご、ちょっとしゃべれます",
+            "caughtBy": [
+              "F26_INTERNAL_REBOUND_SHOCK"
+            ]
+          },
+          {
+            "id": "tokiko_watashi_genki",
+            "label": "tokiko:genki:わたし、にほんご、ちょっとしゃべれます",
+            "caughtBy": [
+              "F26_INTERNAL_REBOUND_SHOCK"
+            ]
+          },
+          {
+            "id": "tokiko_ohayo_amae",
+            "label": "tokiko:amae:おはよう、きょうは、いいてんきだね",
+            "caughtBy": [
+              "F26_INTERNAL_REBOUND_SHOCK"
+            ]
+          }
+        ]
+      },
+      "tokikoToReal": {
+        "trainDomain": "tokiko_axis",
+        "testDomain": "benign_real_audio",
+        "trainSize": 9,
+        "trainContestedCount": 5,
+        "survived": 3,
+        "total": 10,
+        "survivalRate": 0.3,
+        "fpr": 0.7,
+        "failures": [
+          {
+            "id": "clip_01",
+            "label": "clip_01 (human_singing_polyphonic)",
+            "caughtBy": [
+              "F5_ABRUPT_TAIL"
+            ]
+          },
+          {
+            "id": "clip_05",
+            "label": "clip_05 (acoustic_guitar_lullaby)",
+            "caughtBy": [
+              "F12_MENACING_LOW_REGISTER"
+            ]
+          },
+          {
+            "id": "clip_09",
+            "label": "clip_09 (bird_song)",
+            "caughtBy": [
+              "F3_PURE_NOISE",
+              "F4_NO_COMMON_CAUSE",
+              "F28_MAINS_HUM_DRONE"
+            ]
+          },
+          {
+            "id": "p1_baby",
+            "label": "p1_baby (animal_baby_lamb)",
+            "caughtBy": [
+              "F3_PURE_NOISE",
+              "F5_ABRUPT_TAIL"
+            ]
+          },
+          {
+            "id": "p2_baby",
+            "label": "p2_baby (animal_young_cat_meow)",
+            "caughtBy": [
+              "F5_ABRUPT_TAIL",
+              "F12_MENACING_LOW_REGISTER",
+              "F13_SUBBASS_RUMBLE"
+            ]
+          },
+          {
+            "id": "p4_baby",
+            "label": "p4_baby (animal_small_squirrel)",
+            "caughtBy": [
+              "F4_NO_COMMON_CAUSE",
+              "F15_PIERCING_WHISTLE"
+            ]
+          },
+          {
+            "id": "p5_baby",
+            "label": "p5_baby (animal_small_dog_bark)",
+            "caughtBy": [
+              "F11_PUMPING_TREMOLO"
+            ]
+          }
+        ]
+      }
+    }
+  },
   "expectedUnkawaiiSummary": {
     "count": 5,
     "coreCaught": 3,
-    "shelfCaught": 4,
+    "shelfCaught": 3,
     "allCaught": 5,
     "clips": [
       {
         "id": "clip_07",
         "title": "Cat hissing aggressively",
         "coreTriggered": [],
-        "shelfTriggered": [
-          "F25_AUTOTUNE_STAIRCASE"
-        ],
+        "shelfTriggered": [],
         "allTriggered": [
           "F13_SUBBASS_RUMBLE",
           "F14_HELMHOLTZ_ROUGHNESS",
-          "F23_ERRATIC_PITCH_WARBLE",
-          "F25_AUTOTUNE_STAIRCASE"
+          "F23_ERRATIC_PITCH_WARBLE"
         ]
       },
       {
@@ -2464,7 +2607,7 @@
       "preset": "kawaii",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],
@@ -2481,7 +2624,7 @@
       "preset": "amae",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],
@@ -2498,7 +2641,7 @@
       "preset": "genki",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],
@@ -2515,7 +2658,7 @@
       "preset": "kawaii",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],
@@ -2532,7 +2675,7 @@
       "preset": "amae",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "REJECTED_UNKAWAII",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F1_HARSH_EDGE"
@@ -2554,7 +2697,7 @@
       "preset": "genki",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],
@@ -2572,7 +2715,7 @@
       "preset": "kawaii",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],
@@ -2589,7 +2732,7 @@
       "preset": "amae",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],
@@ -2607,7 +2750,7 @@
       "preset": "genki",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],
@@ -2634,7 +2777,7 @@
       "sha256": "8bc5e5fc163cb658f1e3fc2571c86ab2dd2108e374a03d425a757e8f4ebee7e8",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F5_ABRUPT_TAIL"
@@ -2661,7 +2804,7 @@
       "sha256": "35cbbff54f6762865fed7ca11c4bcccfefa83ba3c1482633462df6a5b420f0f0",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],
@@ -2714,7 +2857,7 @@
       "sha256": "c12ad24a202c7efd644d23bdd6b45c702650f3f574a41d555e991bb381a7eb3c",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F4_NO_COMMON_CAUSE",
@@ -2743,7 +2886,7 @@
       "sha256": "72e24e840375e791d90c2a8cba926b8e6254c9e28319886fc086d9b45ae25f8b",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],
@@ -2769,7 +2912,7 @@
       "sha256": "43c46bdc7ff19c045d24a457d77d74aa51480d22bf1b286ab81471ac16c70637",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],
@@ -2794,17 +2937,14 @@
       "sha256": "49d152839c2ebbab44f5339f61c3fef71a1ea4f72f9c87ae0b2cc7633316b6b6",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
-      "shelfTriggered": [
-        "F25_AUTOTUNE_STAIRCASE"
-      ],
+      "shelfTriggered": [],
       "allTriggered": [
         "F13_SUBBASS_RUMBLE",
         "F14_HELMHOLTZ_ROUGHNESS",
-        "F23_ERRATIC_PITCH_WARBLE",
-        "F25_AUTOTUNE_STAIRCASE"
+        "F23_ERRATIC_PITCH_WARBLE"
       ],
       "f0MedianHz": 1021.28,
       "hnrDb": 12.17,
@@ -2866,7 +3006,7 @@
       "sha256": "955b8b237c535fe6c8e1e46100a692009ef71c78f25c490c0988e77d09c14461",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F1_HARSH_EDGE",
@@ -2935,7 +3075,7 @@
       "sha256": "19e229260bbd83c270db8f019be065d137ac1daacc627965433d995c50a65b67",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F3_PURE_NOISE",
@@ -2997,7 +3137,7 @@
       "sha256": "5b1d90a87248f9a32aea8a71f0c87e9d02223008d3e7d3952efc038d65653ab3",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F5_ABRUPT_TAIL"
@@ -3026,17 +3166,14 @@
       "sha256": "49d152839c2ebbab44f5339f61c3fef71a1ea4f72f9c87ae0b2cc7633316b6b6",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
-      "shelfTriggered": [
-        "F25_AUTOTUNE_STAIRCASE"
-      ],
+      "shelfTriggered": [],
       "allTriggered": [
         "F13_SUBBASS_RUMBLE",
         "F14_HELMHOLTZ_ROUGHNESS",
-        "F23_ERRATIC_PITCH_WARBLE",
-        "F25_AUTOTUNE_STAIRCASE"
+        "F23_ERRATIC_PITCH_WARBLE"
       ],
       "f0MedianHz": 1021.28,
       "hnrDb": 12.17,
@@ -3055,7 +3192,7 @@
       "sha256": "43c46bdc7ff19c045d24a457d77d74aa51480d22bf1b286ab81471ac16c70637",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],
@@ -3102,7 +3239,7 @@
       "sha256": "2867d6ec1bdcfcaba2dd5620506d41468421edbeabc06e7c6e663cce929940d4",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F4_NO_COMMON_CAUSE"
@@ -3165,7 +3302,7 @@
       "sha256": "77f2bfb3d43ae084ab971d5d8e35336b43b3d49d8982c6c671eab78bd2fedfe9",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],
@@ -3192,7 +3329,7 @@
       "sha256": "c5ce9734358e111a4f105c52fbc9c2ab0093782e30af34a2c3bdbd8112f74a78",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
-      "verdictShelfVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
       "shelfTriggered": [],

@@ -112,7 +112,7 @@ function summarizeReport(samples, label) {
     f24Evidence: f24 ? f24.evidence : "",
     f0MedianHz: repAll.features?.medianF0 ?? 0,
     f0RangeSemitones: repAll.features?.f0RangeSemitones ?? 0,
-    durationSec: Number((samples.length / SR).toFixed(2)),
+    durationSec: Number((samples.length / SR).toFixed(3)),
   };
 }
 
@@ -136,7 +136,7 @@ async function main() {
       preset: "kawaii",
       targetAxes: ["F24"],
       modificationDesc:
-        "3択比較: (1) 原音（アクセント山あり＋F24発火）、(2) 抑揚保持・揺れ弱め版（日本語アクセント山を残し rate×1.35 / hopf=0 で周期揺れのみ低減 → F24未発火・0/32）、(3) 302Hz 完全フラット固定版",
+        "3択・同速比較（3テイクとも rate=1.00・同尺 1.085s）: (1) 原音（アクセント山＋F24発火）、(2) 抑揚保持・揺れ弱め版（話速完全一致のまま uta_hz=[1.00,1.02]×302Hz / scoop=1.4 / hopf=0 で周期揺れのみ低減 → F24未発火・0/32）、(3) 302Hz 完全フラット固定版",
       order: ["original", "flat", "damped"],
       takes: {
         original: {
@@ -146,14 +146,17 @@ async function main() {
         },
         damped: {
           role: "damped",
-          roleLabel: "抑揚あり・揺れ弱め（Accent-Kept / Vibrato-Damped）",
-          build: () =>
-            kuda.synthKuda("なる", {
+          roleLabel: "抑揚あり・揺れ弱め（Accent-Kept / Vibrato-Damped・同速）",
+          build: () => {
+            const hz = presets.kawaii?.hz ?? 302.0;
+            return kuda.synthKuda("なる", {
               preset: "kawaii",
               srOut: SR,
-              rate: (presets.kawaii?.rate ?? 1.0) * 1.35,
+              uta_hz: [hz * 1.0, hz * 1.02],
+              scoop: 1.4,
               hopf: 0,
-            }).samples,
+            }).samples;
+          },
         },
         flat: {
           role: "flat",
@@ -169,7 +172,7 @@ async function main() {
       preset: "amae",
       targetAxes: ["F24"],
       modificationDesc:
-        "3択比較: (1) 原音（アクセント山あり＋F24発火）、(2) 抑揚保持・揺れ弱め版（日本語アクセント山を残し rate×1.30 / hopf=0 で周期揺れのみ低減 → F24未発火・0/32）、(3) 290Hz 完全フラット固定版",
+        "3択・同速比較（3テイクとも rate=1.09・同尺 1.115s）: (1) 原音（アクセント山＋F24発火）、(2) 抑揚保持・揺れ弱め版（話速完全一致のまま uta_hz=[1.00,1.04]×290Hz / scoop=1.4 / hopf=0 で周期揺れのみ低減 → F24未発火・0/32）、(3) 290Hz 完全フラット固定版",
       order: ["damped", "original", "flat"],
       takes: {
         original: {
@@ -179,14 +182,17 @@ async function main() {
         },
         damped: {
           role: "damped",
-          roleLabel: "抑揚あり・揺れ弱め（Accent-Kept / Vibrato-Damped）",
-          build: () =>
-            kuda.synthKuda("なる", {
+          roleLabel: "抑揚あり・揺れ弱め（Accent-Kept / Vibrato-Damped・同速）",
+          build: () => {
+            const hz = presets.amae?.hz ?? 290.0;
+            return kuda.synthKuda("なる", {
               preset: "amae",
               srOut: SR,
-              rate: (presets.amae?.rate ?? 1.09) * 1.3,
+              uta_hz: [hz * 1.0, hz * 1.04],
+              scoop: 1.4,
               hopf: 0,
-            }).samples,
+            }).samples;
+          },
         },
         flat: {
           role: "flat",
@@ -202,7 +208,7 @@ async function main() {
       preset: "genki",
       targetAxes: ["F24"],
       modificationDesc:
-        "3択比較: (1) 原音（アクセント山あり＋F24発火）、(2) 抑揚保持・揺れ弱め版（日本語アクセント山を残し rate×1.45 / hopf=0.35 で周期揺れのみ低減 → F24未発火・0/32）、(3) 320Hz 完全フラット固定版",
+        "3択・同速比較（3テイクとも rate=0.93・同尺 1.065s）: (1) 原音（アクセント山＋F24発火）、(2) 抑揚保持・揺れ弱め版（話速完全一致のまま uta_hz=[0.98,1.03]×320Hz / scoop=1.5 / hopf=0 で周期揺れのみ低減 → F24未発火・0/32）、(3) 320Hz 完全フラット固定版",
       order: ["flat", "damped", "original"],
       takes: {
         original: {
@@ -212,14 +218,17 @@ async function main() {
         },
         damped: {
           role: "damped",
-          roleLabel: "抑揚あり・揺れ弱め（Accent-Kept / Vibrato-Damped）",
-          build: () =>
-            kuda.synthKuda("なる", {
+          roleLabel: "抑揚あり・揺れ弱め（Accent-Kept / Vibrato-Damped・同速）",
+          build: () => {
+            const hz = presets.genki?.hz ?? 320.0;
+            return kuda.synthKuda("なる", {
               preset: "genki",
               srOut: SR,
-              rate: (presets.genki?.rate ?? 0.93) * 1.45,
-              hopf: 0.35,
-            }).samples,
+              uta_hz: [hz * 0.98, hz * 1.03],
+              scoop: 1.5,
+              hopf: 0,
+            }).samples;
+          },
         },
         flat: {
           role: "flat",
@@ -332,9 +341,15 @@ async function main() {
 
     const summaryParts = Object.entries(builtByKey).map(([k, v]) => {
       const trig = v.report.triggeredAll.map((t) => t.shortId).join(",") || "CLEAN";
-      return `${k}=[${trig} F24=${v.report.f24Score} range=${v.report.f0RangeSemitones}st]`;
+      return `${k}=[${trig} dur=${v.report.durationSec.toFixed(3)}s F24=${v.report.f24Score} range=${v.report.f0RangeSemitones}st]`;
     });
     console.log(`  #${spec.number} ${spec.utterance} (${spec.preset}): ${summaryParts.join(" | ")}`);
+
+    if (builtByKey.damped && builtByKey.damped.report.durationSec !== builtByKey.original.report.durationSec) {
+      throw new Error(
+        `Test ${spec.id} speed-match violated: damped dur=${builtByKey.damped.report.durationSec}s vs original dur=${builtByKey.original.report.durationSec}s`
+      );
+    }
 
     if (eliminatedTargets.length === 0) {
       throw new Error(
@@ -919,7 +934,8 @@ function renderHtml(tests) {
                   : '<span class="pill clean">PASS</span>') +
               "</div>" +
               '<div style="margin-top:4px;">veto_all: ' + renderPills(t.report.triggeredAll) + "</div>" +
-              '<div class="metric-line">F24: score=' + t.report.f24Score +
+              '<div class="metric-line">dur=' + t.report.durationSec.toFixed(3) +
+                "s | F24: score=" + t.report.f24Score +
                 (t.report.f24Triggered ? " (TRIG)" : " (pass)") +
                 " | F0 range=" + t.report.f0RangeSemitones + "st</div>" +
             "</div>"

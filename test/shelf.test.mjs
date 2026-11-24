@@ -243,20 +243,28 @@ describe("v0.3: ORTHOGONAL_AXES, Protected Shelf Audit, and core_veto Policy", (
     const coreRep = analyzeSamples(shortTail, SR, { label: "staccato_core", policy: "core_veto" });
     assert.equal(coreRep.verdict, "REJECTED_UNKAWAII");
 
-    // Under shelf_veto with audit.contestedIds, F5_ABRUPT_TAIL veto is suspended -> SURVIVED_KAWAII_CANDIDATE
+    // Under shelf_veto with audit.contestedIds (Array or Set), F5_ABRUPT_TAIL veto is suspended -> SURVIVED_KAWAII_CANDIDATE
+    for (const contestedInput of [audit.contestedIds, new Set(audit.contestedIds)]) {
+      const shelfRep = analyzeSamples(shortTail, SR, {
+        label: "staccato_shelf",
+        policy: "shelf_veto",
+        contestedIds: contestedInput,
+      });
+      assert.equal(shelfRep.policy, "shelf_veto");
+      assert.equal(shelfRep.verdict, "SURVIVED_KAWAII_CANDIDATE");
+      assert.equal(shelfRep.triggeredCount, 0);
+      assert.ok(shelfRep.diagnosticCount >= 1);
+      const f5Res = shelfRep.falsifiers.find((f) => f.id === "F5_ABRUPT_TAIL");
+      assert.equal(f5Res.triggered, true);
+      assert.equal(f5Res.diagnostic, true);
+      assert.equal(f5Res.contested, true);
+    }
+
     const shelfRep = analyzeSamples(shortTail, SR, {
       label: "staccato_shelf",
       policy: "shelf_veto",
       contestedIds: audit.contestedIds,
     });
-    assert.equal(shelfRep.policy, "shelf_veto");
-    assert.equal(shelfRep.verdict, "SURVIVED_KAWAII_CANDIDATE");
-    assert.equal(shelfRep.triggeredCount, 0);
-    assert.ok(shelfRep.diagnosticCount >= 1);
-    const f5Res = shelfRep.falsifiers.find((f) => f.id === "F5_ABRUPT_TAIL");
-    assert.equal(f5Res.triggered, true);
-    assert.equal(f5Res.diagnostic, true);
-    assert.equal(f5Res.contested, true);
 
     const llmText = formatForLLM(shelfRep);
     assert.ok(llmText.includes("policy=shelf_veto"));

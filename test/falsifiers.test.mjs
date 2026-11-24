@@ -850,4 +850,48 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
       assert.ok(f2.score >= 0.7, `Expected F2 score >= 0.7, got ${f2.score}`);
     }
   });
+
+  it("v0.4 regression: F25_AUTOTUNE_STAIRCASE does NOT fire on unvoiced broadband hiss noise (while still catching ce_F25)", () => {
+    // 1. Broadband unvoiced cat-hiss-like friction noise (high-passed white noise bursts + weak sporadic resonance)
+    const nHiss = Math.round(SR * 1.2);
+    const hiss = new Float32Array(nHiss);
+    const rand = mulberry32(707);
+    let prev = 0;
+    for (let i = 0; i < nHiss; i++) {
+      const t = i / SR;
+      const env = smoothEnv(t, 1.2, 0.05, 0.12);
+      const w = rand() * 2 - 1;
+      const hp = w - 0.85 * prev;
+      prev = w;
+      hiss[i] = 0.35 * env * hp;
+    }
+    const hissRep = analyzeSamples(hiss, SR, { label: "broadband_hiss", policy: "veto_all" });
+    const f25Hiss = getFalsifierResult(hissRep, "F25_AUTOTUNE_STAIRCASE");
+    assert.equal(
+      f25Hiss.triggered,
+      false,
+      `Unvoiced broadband hiss should NOT trigger F25_AUTOTUNE_STAIRCASE (evidence: ${f25Hiss.evidence})`
+    );
+    assert.equal(f25Hiss.score, 0);
+
+    // 2. Hard-quantized voiced autotune staircase STILL triggers F25 cleanly
+    const nAuto = Math.round(SR * 0.8);
+    const autotune = new Float32Array(nAuto);
+    const notes = [300, 356.76, 400.45, 336.74];
+    let phase = 0;
+    for (let i = 0; i < nAuto; i++) {
+      const t = i / SR;
+      const env = smoothEnv(t, 0.8, 0.06, 0.14);
+      const noteIdx = Math.min(notes.length - 1, Math.floor((t / 0.8) * notes.length));
+      phase += (2 * Math.PI * notes[noteIdx]) / SR;
+      autotune[i] = 0.42 * env * (0.65 * Math.sin(phase) + 0.25 * Math.sin(2 * phase));
+    }
+    const autoRep = analyzeSamples(autotune, SR, { label: "ce_F25_check", policy: "veto_all" });
+    const f25Auto = getFalsifierResult(autoRep, "F25_AUTOTUNE_STAIRCASE");
+    assert.equal(
+      f25Auto.triggered,
+      true,
+      `Voiced autotune staircase should still trigger F25_AUTOTUNE_STAIRCASE (evidence: ${f25Auto.evidence})`
+    );
+  });
 });
