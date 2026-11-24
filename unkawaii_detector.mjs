@@ -95,13 +95,13 @@ export {
 const USAGE = `Usage:
   node unkawaii_detector.mjs <file.wav> [--format llm|json] [--verbose] [--falsifiers all|core]
                                         [--policy core_veto|veto_all|shelf_veto] [--contested <ID1,ID2,...>]
-                                        [--precedents <path.json> | --shelf <path.json>]
+                                        [--precedents <path.json> | --shelf <path.json>] [--scope <scope>]
                                         [--view [micro|compact|full]] [--zoom [auto|<t0>..<t1>]] [--timeline]
                                         [--charset ascii|unicode] [--width <N>]
                                         [--svg <out.svg>] [--png <out.png>]
   node unkawaii_detector.mjs --compare <a.wav> <b.wav> [--format llm|json] [--verbose] [--falsifiers all|core]
                                                        [--policy core_veto|veto_all|shelf_veto] [--contested <ID1,ID2,...>]
-                                                       [--precedents <path.json> | --shelf <path.json>]
+                                                       [--precedents <path.json> | --shelf <path.json>] [--scope <scope>]
                                                        [--view [micro|compact|full]] [--svg <out.svg>] [--png <out.png>]
   node unkawaii_detector.mjs --diff <a.wav> <b.wav> [--falsifiers all|core] [--policy core_veto|veto_all|shelf_veto]
                                                     [--contested <ID1,ID2,...>]
@@ -137,6 +137,7 @@ function parseCliArgs(argv) {
     policy: "core_veto",
     contestedIds: [],
     precedentsPath: null,
+    scope: null,
     timeline: false,
     view: null, // null | "micro" | "compact" | "full"
     zoom: null, // null | "auto" | { startSec, endSec }
@@ -242,6 +243,15 @@ function parseCliArgs(argv) {
       continue;
     }
 
+    if (arg === "--scope") {
+      const val = argv[++i];
+      if (!val || val.startsWith("-")) {
+        throw new Error("--scope requires a non-empty scope name (e.g. tokiko_japanese_speech)");
+      }
+      opts.scope = val.trim();
+      continue;
+    }
+
     if (arg === "--timeline") {
       opts.timeline = true;
       continue;
@@ -335,7 +345,9 @@ function runCli(argv) {
   }
 
   const falsifiers = opts.falsifiersSet === "core" ? ORIGINAL_6_FALSIFIERS : DEFAULT_FALSIFIERS;
-  const precedentsOpt = opts.precedentsPath ? { precedents: loadEarPrecedents(opts.precedentsPath) } : {};
+  const precedentsOpt = opts.precedentsPath
+    ? { precedents: loadEarPrecedents(opts.precedentsPath), scope: opts.scope }
+    : {};
 
   if (opts.mode === "list") {
     const list = falsifiers.map((f) => ({ id: f.id, domain: f.domain, name: f.name }));

@@ -50,16 +50,17 @@
     - **v0.5 神経科学 DSP レンズ & 時間分割ミラー**:
       - `computeMpsRoughness`（Arnal et al. 2015/2025: `4–16 Hz` 発話帯 vs `30–150 Hz` 粗さ帯）および `computeSubharmonicRatio`（Wilden 1998 / Fitch 2002 / Anikin 2020: 非線形サブハーモニクス $f_0/2$）を `extractFeatures` とコンパクト視覚（`MPS30-150`, `SUBH`）へ統合
       - `extractSegmentTimeline` / `renderSegmentTimeline` / `--timeline`（`0.5s` 窓の Presence × MPS 30–150 Hz × F0 の4行スパークライン）
-    - **v0.5 永続耳判例メモリ（`--shelf` / `--precedents`）**:
-      - オーナーのブラインド3択・2択鏡審査結果（`🪞 原音派 = 5 / 🎯 抑揚あり・揺れ弱め派 = 0 / 📏 フラット派 = 0 / 🤷 どれも同じ = 1`, `p < 0.01`）を [MIRROR_AUDIT_VERDICT.md](bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md) と [ear_precedents.json](bench/real_audio_audit/ear_precedents.json) に永続化し、`loadEarPrecedents` / `applyEarPrecedents` で `[EAR-OVERRULED 5-0]` / `[ORTHOGONAL]` / `[EAR-TIE]` を LLM 出力に併記
+    - **v0.5 永続耳判例メモリ（`--shelf` / `--precedents` + `--scope`）**:
+      - オーナーのブラインド3択・2択鏡審査結果（**コミット `245ed15` 版**での投票：`🪞 原音派 = 5 / 🎯 抑揚あり・揺れ弱め派 = 0 / 📏 フラット派 = 0 / 🤷 どれも同じ = 1`；独立等確率のもとで全5回原音になる単純確率 $1/108 \approx 0.0093$、両側検定ではない；`#6` は `genki`；話速一致版 `ebd8ffb` は未再投票）を [MIRROR_AUDIT_VERDICT.md](bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md) と [ear_precedents.json](bench/real_audio_audit/ear_precedents.json) に永続化。
+      - `loadEarPrecedents` / `applyEarPrecedents(report, precedents, { scope })` は **`scope` 一致時のみ**（または `general_audio`/`global` のみ）適用し、別ドメイン（鳥の声等）への誤適用を防止しつつ、`[EAR-OVERRULED 5-0 @ tokiko_japanese_speech (245ed15)]` のように出所付きで LLM 出力に併記
     - **Protected Shelf 監査 & 実音監査レポート**: [bench/real_audio_audit/RESULTS.md](bench/real_audio_audit/RESULTS.md)（Wikimedia Commons 20クリップ + `tokiko` 9クリップ）
       - `mpsRoughness30_150`: `tokiko` 棚 mean **0.0123**（max `0.0193`）／統合保護棚19本 mean **0.0208**（max `0.0767`）vs 期待かわいくない実音5本 mean **0.0813**（max `0.2459`；`tokiko` max 超え **4/5**、統合棚 max 超え **2/5**）
       - `subharmonicRatio`: 統合保護棚 mean **0.0677**（max `0.1663`）vs 期待かわいくない実音 mean **0.0769**（max `0.1285`；単体ゼロFP分離は 0/5 のため非拒否診断レンズとして運用）
     - **3択ブラインド鏡審査デモ**: [bench/mirror_audit_demo.html](bench/mirror_audit_demo.html)
     - **DSP / 視覚の v0.3–v0.4 基盤**: 周期ベース（cycle-to-cycle）の `jitter` 計測と `F2_PURE_ROBOT` のゼロジッタ定常ロボ音修正、`<80 Hz` ランブル F0 誤認ガード、`60 Hz` MEL 下限のテキスト視覚拡張
   - **オーナー耳ジャッジ結果**:
-    - v0.2 合成25新軸: `👏 でかした/OK: 24` / `🤨 かわいくねーよ: 0` / `F30 ステレオ逆相 = 直交軸（かわいいでもかわいくないでもない）第1号`
-    - v0.4 ブラインド鏡審査（[MIRROR_AUDIT_VERDICT.md](bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md)）: `原音派 5–0`（`p < 0.01`）＋ `#4 わたし` tie → `F24` の単独拒否権を正式に否定し、耳判例メモリへ記録
+    - v0.2 合成25新軸（`fefbc73`）: `👏 でかした/OK: 24` / `🤨 かわいくねーよ: 0` / `F30 ステレオ逆相 = 直交軸（かわいいでもかわいくないでもない）第1号`
+    - v0.4 ブラインド鏡審査（`245ed15`、[MIRROR_AUDIT_VERDICT.md](bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md)）: `原音派 5–0`（単純確率 `1/108`、真ん中テイクに話速変更 `1.30–1.45×` を含む旧版での結果）＋ `#4 わたし` tie → `F24` の単独拒否権を否定し、スコープ付き耳判例メモリへ記録
   - **重要：LLM 視覚の読解力と、検出器の誤爆率（FPR）を明確に区別すること**:
     - **LLM 視覚の読解力（目隠し視力検査・ラベル全隠し）**: 一般実音10本で **v0.1（数値のみ）25/100 → v0.2（コンパクト視覚）80/100**、動物・子ども vs 大人5ペアで **v0.1 3/5 → v0.2 4/5**。
     - **検出器の誤爆率（実音＋`tokiko` 保護棚19本の再現監査: [RESULTS.md](bench/real_audio_audit/RESULTS.md)）**:

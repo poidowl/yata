@@ -38,48 +38,81 @@ function formatWhere(where) {
   return parts.length ? ` [${parts.join(", ")}]` : "";
 }
 
+const GLOBAL_PRECEDENT_SCOPES = new Set(["general_audio", "global", "all", "*"]);
+
+function matchesPrecedentScope(precScope, activeScope) {
+  if (!precScope || typeof precScope !== "string") return true;
+  const pNorm = precScope.trim().toLowerCase();
+  if (GLOBAL_PRECEDENT_SCOPES.has(pNorm)) return true;
+  if (!activeScope || typeof activeScope !== "string") return false;
+  return activeScope.trim().toLowerCase() === pNorm;
+}
+
 function formatPrecedentTag(prec) {
   if (!prec || typeof prec !== "object") return "";
   const status = String(prec.status || "").toLowerCase();
+  const scope = typeof prec.scope === "string" && prec.scope.trim() ? prec.scope.trim() : null;
+  const commit =
+    typeof prec.testedCommit === "string" && prec.testedCommit.trim()
+      ? prec.testedCommit.trim()
+      : null;
+  const ctx =
+    scope && !GLOBAL_PRECEDENT_SCOPES.has(scope.toLowerCase())
+      ? commit
+        ? ` @ ${scope} (${commit})`
+        : ` @ ${scope}`
+      : commit
+        ? ` (${commit})`
+        : "";
+
   if (status === "ear_overruled") {
     const v = prec.votes;
     if (v && Number.isFinite(v.original)) {
-      const against = (Number.isFinite(v.damped) ? v.damped : 0) + (Number.isFinite(v.flat) ? v.flat : 0);
-      return `[EAR-OVERRULED ${v.original}-${against}]`;
+      const against =
+        (Number.isFinite(v.damped) ? v.damped : 0) + (Number.isFinite(v.flat) ? v.flat : 0);
+      return `[EAR-OVERRULED ${v.original}-${against}${ctx}]`;
     }
-    return "[EAR-OVERRULED]";
+    return `[EAR-OVERRULED${ctx}]`;
   }
-  if (status === "orthogonal") return "[ORTHOGONAL]";
-  if (status === "ear_tie_observed") return "[EAR-TIE]";
-  return status ? `[EAR:${status.toUpperCase()}]` : "";
+  if (status === "orthogonal") return `[ORTHOGONAL${ctx}]`;
+  if (status === "ear_tie_observed") return `[EAR-TIE${ctx}]`;
+  return status ? `[EAR:${status.toUpperCase()}${ctx}]` : "";
 }
 
 /**
  * Annotate a report with recorded human ear-judge precedents (non-mutating).
+ * Scoped precedents (e.g. `tokiko_japanese_speech`) only apply when `opts.scope`
+ * matches `prec.scope`, while `general_audio`/`global` precedents always apply.
  *
  * @param {object} report
  * @param {object|null} precedents - Loaded via loadEarPrecedents or plain { precedents: { [id]: {...} } } / { [id]: {...} }
+ * @param {{ scope?: string | null }} [opts={}]
  * @returns {object}
  */
-export function applyEarPrecedents(report, precedents) {
+export function applyEarPrecedents(report, precedents, opts = {}) {
   if (!report || !precedents || typeof precedents !== "object") return report;
   const map =
     precedents.precedents && typeof precedents.precedents === "object"
       ? precedents.precedents
       : precedents;
+  const activeScope = typeof opts?.scope === "string" && opts.scope.trim() ? opts.scope.trim() : null;
 
   const falsifiers = Array.isArray(report.falsifiers)
     ? report.falsifiers.map((dim) => {
         const prec = Object.prototype.hasOwnProperty.call(map, dim.id) ? map[dim.id] : null;
         if (!prec || typeof prec !== "object") return dim;
+        if (!matchesPrecedentScope(prec.scope, activeScope)) return dim;
         const tag = formatPrecedentTag(prec);
         return {
           ...dim,
           earPrecedent: {
             status: prec.status ?? "unknown",
+            judge: prec.judge ?? null,
             votes: prec.votes ?? null,
-            pValue: prec.pValue ?? null,
+            exactAllOriginalProb: prec.exactAllOriginalProb ?? null,
             scope: prec.scope ?? null,
+            testedCommit: prec.testedCommit ?? null,
+            condition: prec.condition ?? null,
             note: prec.note ?? "",
             tag,
           },
@@ -91,6 +124,7 @@ export function applyEarPrecedents(report, precedents) {
   return {
     ...report,
     earPrecedentsApplied: true,
+    earPrecedentsScope: activeScope,
     falsifiers,
   };
 }
@@ -108,7 +142,8 @@ export function applyEarPrecedents(report, precedents) {
  *   thresholds?: Record<string, number | Record<string, number>>,
  *   policy?: "core_veto" | "veto_all" | "shelf_veto",
  *   contestedIds?: Iterable<string>,
- *   precedents?: object
+ *   precedents?: object,
+ *   scope?: string | null
  * }} [options={}]
  */
 export function analyzeSamples(samples, sampleRate, options = {}) {
@@ -206,7 +241,7 @@ export function analyzeSamples(samples, sampleRate, options = {}) {
   }
 
   if (options.precedents) {
-    report = applyEarPrecedents(report, options.precedents);
+    report = applyEarPrecedents(report, options.precedents, { scope: options.scope ?? null });
   }
 
   return report;

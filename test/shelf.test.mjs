@@ -348,59 +348,99 @@ describe("v0.3: ORTHOGONAL_AXES, Protected Shelf Audit, and core_veto Policy", (
     }
   });
 
-  it("v0.5: loadEarPrecedents & --shelf annotate F24 with [EAR-OVERRULED 5-0] in report and formatForLLM", () => {
+  it("v0.5: loadEarPrecedents & --shelf enforce scope matching and include provenance in tags", () => {
     const precPath = path.resolve("bench/real_audio_audit/ear_precedents.json");
     const precedents = loadEarPrecedents(precPath);
     assert.ok(precedents.precedents.F24_CALCULATED_PITCH_LFO);
     assert.equal(precedents.precedents.F24_CALCULATED_PITCH_LFO.status, "ear_overruled");
+    assert.equal(precedents.precedents.F24_CALCULATED_PITCH_LFO.testedCommit, "245ed15");
     assert.equal(precedents.precedents.F30_STEREO_PHASE_DISCOMFORT.status, "orthogonal");
 
     const corpus = buildCorpus({ sampleRate: SR, seed: 2026 });
     const ceF24 = corpus.counterexamples.find((x) => x.id === "ce_F24");
     assert.ok(ceF24);
 
-    // Programmatic API via options.precedents
+    // Without matching scope (e.g. bird_calls or omitted), tokiko_japanese_speech precedent MUST NOT leak onto F24
+    const unscopedRep = analyzeSamples(ceF24.samples, ceF24.sampleRate, {
+      label: "ce_f24_unscoped",
+      precedents,
+    });
+    assert.equal(
+      unscopedRep.falsifiers.find((f) => f.id === "F24_CALCULATED_PITCH_LFO").earPrecedentTag,
+      undefined
+    );
+    // Meanwhile general_audio precedent (F30) STILL applies even without --scope
+    assert.equal(
+      unscopedRep.falsifiers.find((f) => f.id === "F30_STEREO_PHASE_DISCOMFORT").earPrecedentTag,
+      "[ORTHOGONAL (fefbc73)]"
+    );
+
+    const birdRep = analyzeSamples(ceF24.samples, ceF24.sampleRate, {
+      label: "ce_f24_bird",
+      precedents,
+      scope: "bird_calls",
+    });
+    assert.equal(
+      birdRep.falsifiers.find((f) => f.id === "F24_CALCULATED_PITCH_LFO").earPrecedentTag,
+      undefined
+    );
+
+    // With matching scope ("tokiko_japanese_speech"), F24 gets annotated with scope + commit provenance
     const rep = analyzeSamples(ceF24.samples, ceF24.sampleRate, {
       label: "ce_f24_prec",
       precedents,
+      scope: "tokiko_japanese_speech",
     });
     const f24 = rep.falsifiers.find((f) => f.id === "F24_CALCULATED_PITCH_LFO");
     assert.equal(f24.triggered, true);
-    assert.equal(f24.earPrecedentTag, "[EAR-OVERRULED 5-0]");
+    assert.equal(f24.earPrecedentTag, "[EAR-OVERRULED 5-0 @ tokiko_japanese_speech (245ed15)]");
 
     const llmText = formatForLLM(rep);
     assert.ok(llmText.includes("F24_CALCULATED_PITCH_LFO"), "Expected F24 in LLM output");
     assert.ok(
-      llmText.includes("[EAR-OVERRULED 5-0]"),
-      `Expected [EAR-OVERRULED 5-0] tag in formatForLLM output, got:\n${llmText}`
+      llmText.includes("[EAR-OVERRULED 5-0 @ tokiko_japanese_speech (245ed15)]"),
+      `Expected scoped provenance tag in formatForLLM output, got:\n${llmText}`
     );
 
     // Standalone applyEarPrecedents non-mutating check
     const rawRep = analyzeSamples(ceF24.samples, ceF24.sampleRate, { label: "raw" });
-    const annotated = applyEarPrecedents(rawRep, precedents);
+    const annotated = applyEarPrecedents(rawRep, precedents, { scope: "tokiko_japanese_speech" });
     assert.equal(
       rawRep.falsifiers.find((f) => f.id === "F24_CALCULATED_PITCH_LFO").earPrecedentTag,
       undefined
     );
     assert.equal(
       annotated.falsifiers.find((f) => f.id === "F24_CALCULATED_PITCH_LFO").earPrecedentTag,
-      "[EAR-OVERRULED 5-0]"
+      "[EAR-OVERRULED 5-0 @ tokiko_japanese_speech (245ed15)]"
     );
 
-    // CLI --shelf flag
+    // CLI --shelf + --scope flags
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "yata-prec-"));
     try {
       const wavPath = path.join(tmpDir, "ce_f24.wav");
       fs.writeFileSync(wavPath, encodeWavBuffer(ceF24.samples, ceF24.sampleRate));
       const cliPath = path.resolve("unkawaii_detector.mjs");
-      const cliOut = execFileSync(
+
+      // Unscoped CLI MUST NOT leak tokiko precedent onto F24
+      const cliUnscoped = execFileSync(
         process.execPath,
         [cliPath, wavPath, "--shelf", precPath],
         { encoding: "utf8" }
       );
       assert.ok(
-        cliOut.includes("[EAR-OVERRULED 5-0]"),
-        `Expected [EAR-OVERRULED 5-0] in CLI --shelf output, got:\n${cliOut}`
+        !cliUnscoped.includes("EAR-OVERRULED"),
+        `Did not expect scoped tokiko precedent without --scope, got:\n${cliUnscoped}`
+      );
+
+      // Scoped CLI MUST annotate F24 with provenance
+      const cliScoped = execFileSync(
+        process.execPath,
+        [cliPath, wavPath, "--shelf", precPath, "--scope", "tokiko_japanese_speech"],
+        { encoding: "utf8" }
+      );
+      assert.ok(
+        cliScoped.includes("[EAR-OVERRULED 5-0 @ tokiko_japanese_speech (245ed15)]"),
+        `Expected scoped provenance tag in CLI --shelf --scope output, got:\n${cliScoped}`
       );
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
