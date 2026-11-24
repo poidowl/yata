@@ -1464,11 +1464,11 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     : 0;
   const waveKurtMean = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].frameKurt)) : 0;
   // F65: High-frequency auditory-filter phase graininess (Patterson 1987 / Kohlrausch 1995)
-  // Measures time-domain waveform kurtosis inside 1.2–4.5 kHz bandpass (2400 Hz, Q=0.8).
-  // Phase-dispersed natural voices cluster near Gaussian (~3.0–3.2), whereas phase-locked
-  // pulse trains ("machine-gun graininess") exceed 3.50 even when broadband waveKurtMean is normal.
+  // Measures median time-domain waveform kurtosis inside 1.2–4.5 kHz bandpass (2400 Hz, Q=0.8)
+  // specifically on voiced, non-sibilant vowel-core frames (f0 >= 155 Hz, hfRatio < 0.35) so
+  // low-F0 male glottal-period gaps (~8ms) and voiceless plosive/sibilant bursts do not false-trigger.
   let hfBandWaveKurt = 3.0;
-  if (n >= 512 && sampleRate >= 8000 && maxRms > 1e-4) {
+  if (n >= 512 && sampleRate >= 8000 && maxRms > 1e-4 && frames.length > 0) {
     const fc = 2400;
     const Q = 0.8;
     const w0 = (2 * Math.PI * fc) / sampleRate;
@@ -1489,9 +1489,12 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     const win = 512;
     const step = 256;
     const hfRmsThr = Math.max(0.012, maxRms * 0.04);
-    let kSum = 0;
-    let kCnt = 0;
+    const kVals = [];
     for (let s = 0; s + win <= n; s += step) {
+      const centerSec = (s + win * 0.5) / sampleRate;
+      const fi = Math.min(frames.length - 1, Math.max(0, Math.round(centerSec / hopSec)));
+      const fr = frames[fi];
+      if (!fr || !fr.voiced || fr.f0 < 155 || fr.hfRatio >= 0.35) continue;
       let e = 0;
       for (let i = 0; i < win; i++) {
         const v = bp[s + i];
@@ -1506,10 +1509,12 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
         const z2 = z * z;
         m4 += z2 * z2;
       }
-      kSum += m4 / win;
-      kCnt++;
+      kVals.push(m4 / win);
     }
-    if (kCnt >= 4) hfBandWaveKurt = kSum / kCnt;
+    if (kVals.length >= 4) {
+      kVals.sort((a, b) => a - b);
+      hfBandWaveKurt = kVals[Math.floor(kVals.length / 2)];
+    }
   }
   const proximityBoomRatio = activeCount
     ? meanOf(activeIndices.map((i) => frameExtras[i].proximityBoomRatio))

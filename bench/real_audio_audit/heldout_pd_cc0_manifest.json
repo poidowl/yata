@@ -101,6 +101,30 @@
       "sourceSha256": "1e84b61bd4c0ab4ea8323b2ca36ba828b2ed1f8cc9635ccbb32d9c675c94f66c",
       "wavSha256": "586f503f473020403c79503b2328d5d504c809e4ca6c856dc0b72a0c6ab808bc",
       "split": "heldout"
+    },
+    {
+      "id": "ho_ja_oku_no_hosomichi",
+      "group": "benign_human",
+      "license": "Public domain",
+      "title": "LibriVox Japanese female reading: Oku no Hosomichi",
+      "sourceUrl": "https://archive.org/download/oku_no_hosomichi_librivox/okunohosomichi_01-09_basho.mp3",
+      "trimStartSec": 25,
+      "trimDurationSec": 3.5,
+      "sourceSha256": "13de31fab242d847e356bf75cb25e7acf8215718da5f28336c93bdee22879607",
+      "wavSha256": "77b5d35d1e0aa298ecf3949201c4fe4023de3bdad04fd9922b9e083d75d21729",
+      "split": "heldout"
+    },
+    {
+      "id": "ho_ja_furusato",
+      "group": "benign_human",
+      "license": "Public domain",
+      "title": "LibriVox Japanese reading: Furusato",
+      "sourceUrl": "https://archive.org/download/furusato_1308_librivox/furusato_00_shimazaki.mp3",
+      "trimStartSec": 22,
+      "trimDurationSec": 3.5,
+      "sourceSha256": "9c8e427ea6256ec9340368202fd62ac137125c5ca35f6413a6a718bc439b7e2d",
+      "wavSha256": "c23905e0849f1cc371dca5ab5623c7942cc4e3ad0f0db03ceb4b342fe3ba5768",
+      "split": "heldout"
     }
   ],
   "wavShaNote": "wavSha256 made with ffmpeg 7.1.5 (Debian 13); other ffmpeg/libvorbis builds can decode .ogg to different PCM, so trust sourceSha256 first"

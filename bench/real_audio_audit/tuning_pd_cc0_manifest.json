@@ -17,6 +17,54 @@
       "formerId": "ho_whisper",
       "split": "tuning",
       "burnedBy": "deae5cb (v0.9): F1 isSoftHumanWhisper guard was fitted after this clip's held-out FP was seen in 24b16da"
+    },
+    {
+      "id": "tu_ja_hyakunin",
+      "group": "benign_human",
+      "license": "Public domain",
+      "title": "LibriVox Japanese female reading: Ogura Hyakunin Isshu",
+      "sourceUrl": "https://archive.org/download/hyakunin_isshu_librivox/hyakunin_001-010_teika.mp3",
+      "trimStartSec": 18,
+      "trimDurationSec": 3.5,
+      "sourceSha256": "6fc881b438ce882e1a354066dd334a6e03202c815b922bbd3fa59a34fbb382bc",
+      "wavSha256": "958f14a817f9f3509bcf655744240dd814594a75092b5deae52b0b846b4c1e4c",
+      "split": "tuning"
+    },
+    {
+      "id": "tu_ja_gongitsune",
+      "group": "benign_human",
+      "license": "CC0",
+      "title": "LibriVox Japanese reading: Gongitsune (Nankichi Niimi)",
+      "sourceUrl": "https://archive.org/download/gongitsune_um_librivox/gongitsune_01_niimi.mp3",
+      "trimStartSec": 22,
+      "trimDurationSec": 3.5,
+      "sourceSha256": "1eee1ff69a11a92764f56ac1d389ded8268ab8481808178c696e956e9f28f3cd",
+      "wavSha256": "0579dcfe3842925f7b8a593cb8787747012f2492481a5edf5578d3746ad22ce4",
+      "split": "tuning"
+    },
+    {
+      "id": "tu_ja_akairosoku",
+      "group": "benign_human",
+      "license": "CC0",
+      "title": "LibriVox Japanese reading: Akai Rosoku to Ningyo",
+      "sourceUrl": "https://archive.org/download/akai_rosoku_um_librivox/akairosokutoningyo_01_ogawa.mp3",
+      "trimStartSec": 22,
+      "trimDurationSec": 3.5,
+      "sourceSha256": "d817d1c702ad6831a69e0752eee0d1dca0fb83113409ae1764a7bff4fa245e44",
+      "wavSha256": "3a28d588124707939ede1ffbd0d9c2c1b0d01b160a44dc9ab6b64f854feb397d",
+      "split": "tuning"
+    },
+    {
+      "id": "tu_ja_megane",
+      "group": "benign_human",
+      "license": "Public domain",
+      "title": "LibriVox Japanese reading: Megane",
+      "sourceUrl": "https://archive.org/download/megane_1407_librivox/megane_01_shimazaki.mp3",
+      "trimStartSec": 22,
+      "trimDurationSec": 3.5,
+      "sourceSha256": "02e157a869628627ab03ea9f20ab11a0d9d0e5513761a8fcf0beaedfdaf81acf",
+      "wavSha256": "c670d15432b49ea61176c4c74d04b3322b3134d1f2fbca39ebec657468dfab38",
+      "split": "tuning"
     }
   ],
   "wavShaNote": "wavSha256 made with ffmpeg 7.1.5 (Debian 13); other ffmpeg/libvorbis builds can decode .ogg to different PCM, so trust sourceSha256 first"
