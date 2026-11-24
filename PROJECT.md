@@ -70,9 +70,9 @@ Every feature discovered in the 4-Explorer Survey is assigned to a milestone (no
 
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|--------------|--------|
-| M1 | Core WAV, Pure-JS DSP & Audio Profile | `src/wav.mjs`, `src/dsp.mjs`, `src/features.mjs`, `test/wav.test.mjs`, `test/dsp.test.mjs` | none | IN_PROGRESS |
-| M2 | 32-Axis Falsifiers & Report Engine | `src/falsifiers/*.mjs`, `src/report.mjs`, `test/falsifiers.test.mjs` | M1 | PLANNED |
-| M3 | Token-Efficient LLM Audio Vision (Text/SVG/PNG) | `src/visualize/*.mjs`, `test/visualize.test.mjs` | M1 | PLANNED |
+| M1 | Core WAV, Pure-JS DSP & Audio Profile | `src/wav.mjs`, `src/dsp.mjs`, `src/features.mjs`, `test/wav.test.mjs`, `test/dsp.test.mjs` | none | DONE (17/17 tests passing, pushed to `dev/v0.2`) |
+| M2 | 32-Axis Falsifiers & Report Engine | `src/falsifiers/*.mjs`, `src/report.mjs`, `test/falsifiers.test.mjs` | M1 | IN_PROGRESS |
+| M3 | Token-Efficient LLM Audio Vision (Text/SVG/PNG) | `src/visualize/*.mjs`, `test/visualize.test.mjs` | M1 | IN_PROGRESS |
 | M4 | Synth Corpus, Discovery Loop, CLI, Demo Page, Benches & Docs | `src/synth.mjs`, `src/discovery.mjs`, `unkawaii_detector.mjs`, `bench/benchmark.mjs`, `bench/tokiko_axis_bench.mjs`, `bench/build_demo.mjs`, `bench/yata_audition_demo.html`, `package.json`, `README.md`, `test/synth.test.mjs`, `test/cli.test.mjs` | M2, M3 | PLANNED |
 | E2E | E2E Testing Track (Opaque-Box Tiers 1–4) | `TEST_INFRA.md`, `e2e/*.mjs`, `TEST_READY.md` | none (parallel) | DONE (27 tests, Iter 3 PASS, Auditor CLEAN) |
 | M5 | Final Milestone (E2E Tiers 1–4 Pass + Tier 5 Hardening) | Fix any E2E failures across Tiers 1–4, then Tier 5 white-box adversarial hardening | M4, E2E | PLANNED |
