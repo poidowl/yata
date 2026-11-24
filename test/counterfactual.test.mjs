@@ -389,6 +389,24 @@ describe("v0.6: Breath & Pause Profile, Timeline Diff & Minimal Counterfactual M
       diffDir < 0.05,
       `Expected trailing silence not to inflate directnessScore: bare=${bareFeat.directnessScore}, padded=${padFeat.directnessScore}, diff=${diffDir}`
     );
+
+    // 3. Undulating 220 Hz 0.5s tone vs +1.5s trailing silence (Observer #1 exact repro)
+    const undulBare = new Float32Array(nHalf);
+    const undulPad = new Float32Array(n2);
+    for (let i = 0; i < nHalf; i++) {
+      const t = i / SR;
+      const env = 0.55 + 0.45 * Math.sin(2 * Math.PI * 4 * t);
+      const v = 0.45 * env * Math.sin(2 * Math.PI * 220 * t);
+      undulBare[i] = v;
+      undulPad[i] = v;
+    }
+    const ubFeat = yata.extractFeatures(undulBare, SR);
+    const upFeat = yata.extractFeatures(undulPad, SR);
+    const undulDiff = Math.abs(upFeat.directnessScore - ubFeat.directnessScore);
+    assert.ok(
+      undulDiff < 0.03,
+      `Expected undulating 220Hz + trailing silence not to shift directnessScore: bare=${ubFeat.directnessScore}, padded=${upFeat.directnessScore}, diff=${undulDiff}`
+    );
   });
 });
 

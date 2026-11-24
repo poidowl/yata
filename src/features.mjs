@@ -1377,6 +1377,35 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
   };
 
   // --- v0.6 Voice Compass ("sound produced to be heard by someone, using a respiratory organ") ---
+  // Compute MPS on the leading/trailing-silence-trimmed active span so trailing recording silence
+  // never inflates 4–16 Hz modulation clarity (even on undulating signals).
+  const compassMaxRms = frames.reduce((m, fr) => Math.max(m, finite(fr?.rms, 0)), 0);
+  const compassThresh = Math.max(0.03, compassMaxRms * 0.12);
+  let trimFirst = -1;
+  let trimLast = -1;
+  for (let i = 0; i < frames.length; i++) {
+    if (finite(frames[i]?.rms, 0) >= compassThresh) {
+      if (trimFirst < 0) trimFirst = i;
+      trimLast = i;
+    }
+  }
+  let activeMps = mps;
+  if (trimFirst >= 0 && trimLast >= trimFirst && n > 0) {
+    const s0 = Math.max(0, Math.min(n, Math.floor(finite(frames[trimFirst].timeSec, 0) * core.sampleRate)));
+    const s1 = Math.max(
+      s0,
+      Math.min(n, Math.ceil((finite(frames[trimLast].timeSec, 0) + hopSec) * core.sampleRate))
+    );
+    if (s1 - s0 > 0 && (s0 > 0 || s1 < n)) {
+      const trimmedSlice =
+        typeof core.samples.subarray === "function"
+          ? core.samples.subarray(s0, s1)
+          : core.samples.slice(s0, s1);
+      activeMps = computeMpsRoughness(trimmedSlice, core.sampleRate);
+    }
+  }
+  featuresObj.activeMpsSpeech4_16 = roundTo(activeMps.mpsSpeech4_16, 4);
+  featuresObj.activeMpsRoughness30_150 = roundTo(activeMps.mpsRoughness30_150, 4);
   const compass = computeVoiceCompass(frames, featuresObj, breath);
   featuresObj.respiratoryScore = compass.respiratoryScore;
   featuresObj.directnessScore = compass.directnessScore;
@@ -1749,8 +1778,8 @@ export function computeVoiceCompass(frames, features = null, breathProfile = nul
   const internalModGate = clamp01(
     Math.max((trimmedRmsCv - 0.06) / 0.14, finite(breath.pauseCount, 0) > 0 ? 1 : 0)
   );
-  const mpsSpeech = Math.max(0, finite(feat.mpsSpeech4_16, 0));
-  const mpsRough = Math.max(0, finite(feat.mpsRoughness30_150, 0));
+  const mpsSpeech = Math.max(0, finite(feat.activeMpsSpeech4_16 ?? feat.mpsSpeech4_16, 0));
+  const mpsRough = Math.max(0, finite(feat.activeMpsRoughness30_150 ?? feat.mpsRoughness30_150, 0));
   const mpsRatio =
     mpsSpeech + mpsRough > 1e-6
       ? mpsSpeech / (mpsSpeech + mpsRough * 1.5 + 0.015)
@@ -2007,7 +2036,21 @@ export function extractSegmentTimeline(profile, samples, sampleRate, opts = { wi
     opts?.features && typeof opts.features === "object"
       ? opts.features
       : extractFeatures(sig, sr);
-  const voiceCompass = computeVoiceCompass(frames, fullFeatures, breath);
+  const voiceCompass =
+    Number.isFinite(fullFeatures?.respiratoryScore) && Number.isFinite(fullFeatures?.directnessScore)
+      ? {
+          respiratoryScore: fullFeatures.respiratoryScore,
+          directnessScore: fullFeatures.directnessScore,
+          label:
+            fullFeatures.respiratoryScore >= 0.5 && fullFeatures.directnessScore >= 0.5
+              ? "addressed_breath"
+              : fullFeatures.respiratoryScore >= 0.5
+                ? "distant_or_private_breath"
+                : fullFeatures.directnessScore >= 0.5
+                  ? "non_breath_signal"
+                  : "ambient_or_hollow",
+        }
+      : computeVoiceCompass(frames, fullFeatures, breath);
 
   return {
     schema: "unkawaii_timeline/v0.5",

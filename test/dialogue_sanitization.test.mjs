@@ -287,4 +287,32 @@ describe("v0.7: Over-Sanitization Lens, Relational Dialogue Mirror & Breath-Rele
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("preserves silence gap after a brief backchannel and never draws X in REL when overlap is 0%", () => {
+    // 1. Observer #1 exact repro: A speaks 0.0-0.5s, B gives 0.1s backchannel at 0.4-0.5s,
+    //    then 2.50s mutual silence, then B speaks solo at 3.0-3.5s.
+    const bcA = genToneBurstTrack(3.6, [[0.0, 0.5]], 300);
+    const bcB = genToneBurstTrack(3.6, [[0.4, 0.5], [3.0, 3.5]], 420);
+    const bcRes = yata.analyzeDialogue(bcA, SR, bcB, SR);
+    assert.equal(bcRes.backchannelCount, 1, `Expected backchannelCount=1, got ${bcRes.backchannelCount}`);
+    assert.equal(bcRes.turnCount, 1);
+    assert.ok(
+      bcRes.meanTurnGapSec >= 2.35 && bcRes.meanTurnGapSec <= 2.65,
+      `Expected ~2.50s gap preserved after backchannel, got ${bcRes.meanTurnGapSec}`
+    );
+    assert.equal(bcRes.relationLabel, "disconnected_monologue");
+    const bcMap = yata.renderDialogueMap(bcRes);
+    assert.equal(countLines(bcMap), 5);
+    assert.match(bcMap, /backch=1/);
+
+    // 2. Clean back-to-back handoff with 0% overlap MUST NOT draw 'X' in REL track
+    const btA = genToneBurstTrack(1.0, [[0.0, 0.5]], 300);
+    const btB = genToneBurstTrack(1.0, [[0.5, 1.0]], 420);
+    const btRes = yata.analyzeDialogue(btA, SR, btB, SR);
+    assert.equal(btRes.overlapRatio, 0, `Expected 0% overlap, got ${btRes.overlapRatio}`);
+    const btMap = yata.renderDialogueMap(btRes, { width: 25 }); // odd width forces A and B into same cell!
+    const relLine = btMap.split("\n").find((l) => l.startsWith("REL"));
+    assert.ok(relLine, "Expected REL line");
+    assert.ok(!relLine.includes("X"), `REL line must not draw 'X' when overlapRatio=0: ${relLine}`);
+  });
 });

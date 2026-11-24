@@ -1,6 +1,6 @@
 {
   "schema": "yata_real_audio_audit/v0.6",
-  "generatedAt": "2026-11-24T07:01:18.749Z",
+  "generatedAt": "2026-11-24T07:34:02.156Z",
   "axisCounts": {
     "core": 6,
     "toolbox": 25,
@@ -2828,8 +2828,8 @@
         },
         "directnessScore": {
           "count": 10,
-          "mean": 0.7145,
-          "min": 0.3736,
+          "mean": 0.7212,
+          "min": 0.3749,
           "max": 0.9913
         },
         "quadrants": {
@@ -2849,9 +2849,9 @@
         },
         "directnessScore": {
           "count": 2,
-          "mean": 0.801,
-          "min": 0.7097,
-          "max": 0.8922
+          "mean": 0.8075,
+          "min": 0.7071,
+          "max": 0.9079
         },
         "quadrants": {
           "addressed_breath": 1,
@@ -2870,9 +2870,9 @@
         },
         "directnessScore": {
           "count": 5,
-          "mean": 0.6405,
-          "min": 0.3371,
-          "max": 0.8607
+          "mean": 0.635,
+          "min": 0.3387,
+          "max": 0.8561
         },
         "quadrants": {
           "addressed_breath": 3,
@@ -2896,7 +2896,7 @@
         "group": "tokiko",
         "title": "amae:なる",
         "respiratoryScore": 1,
-        "directnessScore": 0.9631,
+        "directnessScore": 0.9648,
         "voiceCompassLabel": "addressed_breath"
       },
       {
@@ -2944,7 +2944,7 @@
         "group": "tokiko",
         "title": "amae:おはよう、きょうは、いいてんきだね",
         "respiratoryScore": 0.9998,
-        "directnessScore": 0.999,
+        "directnessScore": 0.9978,
         "voiceCompassLabel": "addressed_breath"
       },
       {
@@ -2960,7 +2960,7 @@
         "group": "benign_real_audio",
         "title": "Georgian polyphonic folk song 'Chakrulo' (1957)",
         "respiratoryScore": 0.7921,
-        "directnessScore": 0.9683,
+        "directnessScore": 0.9688,
         "voiceCompassLabel": "addressed_breath"
       },
       {
@@ -2968,7 +2968,7 @@
         "group": "benign_real_audio",
         "title": "Mozart 'Die Zauberflote' vocal ensemble (Ferenc Fricsay, 1953)",
         "respiratoryScore": 0.9791,
-        "directnessScore": 0.7749,
+        "directnessScore": 0.7833,
         "voiceCompassLabel": "addressed_breath"
       },
       {
@@ -2976,7 +2976,7 @@
         "group": "historical_recording",
         "title": "Metropolitan Quartet 'Darling Nellie Gray' (1909 78rpm)",
         "respiratoryScore": 0.9853,
-        "directnessScore": 0.7097,
+        "directnessScore": 0.7071,
         "voiceCompassLabel": "addressed_breath"
       },
       {
@@ -2984,7 +2984,7 @@
         "group": "historical_recording",
         "title": "Au Clair de la Lune (1860 phonautogram, oldest human voice)",
         "respiratoryScore": 0.474,
-        "directnessScore": 0.8922,
+        "directnessScore": 0.9079,
         "voiceCompassLabel": "non_breath_signal"
       },
       {
@@ -2992,7 +2992,7 @@
         "group": "benign_real_audio",
         "title": "Catalan folk lullaby 'El Noi de la Mare' (acoustic guitar)",
         "respiratoryScore": 0.7747,
-        "directnessScore": 0.528,
+        "directnessScore": 0.5325,
         "voiceCompassLabel": "addressed_breath"
       },
       {
@@ -3008,7 +3008,7 @@
         "group": "expected_unkawaii",
         "title": "Cat hissing aggressively",
         "respiratoryScore": 0.9719,
-        "directnessScore": 0.5378,
+        "directnessScore": 0.5376,
         "voiceCompassLabel": "addressed_breath"
       },
       {
@@ -3016,7 +3016,7 @@
         "group": "expected_unkawaii",
         "title": "Periodic alarm / siren beep",
         "respiratoryScore": 0.3382,
-        "directnessScore": 0.7399,
+        "directnessScore": 0.7378,
         "voiceCompassLabel": "non_breath_signal"
       },
       {
@@ -3024,7 +3024,7 @@
         "group": "benign_real_audio",
         "title": "Red-winged Blackbird song",
         "respiratoryScore": 0.6509,
-        "directnessScore": 0.382,
+        "directnessScore": 0.3754,
         "voiceCompassLabel": "distant_or_private_breath"
       },
       {
@@ -3032,7 +3032,7 @@
         "group": "expected_unkawaii",
         "title": "Synthetic perturbation of clip_05 (+60Hz/120Hz hum + 2-sample click @ 1.20s)",
         "respiratoryScore": 0.8288,
-        "directnessScore": 0.3371,
+        "directnessScore": 0.3387,
         "voiceCompassLabel": "distant_or_private_breath"
       },
       {
@@ -3040,7 +3040,7 @@
         "group": "benign_real_audio",
         "title": "Mudchute farm lamb bleat",
         "respiratoryScore": 0.5962,
-        "directnessScore": 0.7487,
+        "directnessScore": 0.7516,
         "voiceCompassLabel": "addressed_breath"
       },
       {
@@ -3048,7 +3048,7 @@
         "group": "neutral_adult_animal",
         "title": "Mudchute farm adult sheep bleat",
         "respiratoryScore": 0.9274,
-        "directnessScore": 0.6711,
+        "directnessScore": 0.6725,
         "voiceCompassLabel": "addressed_breath"
       },
       {
@@ -3056,7 +3056,7 @@
         "group": "benign_real_audio",
         "title": "Young female cat meow",
         "respiratoryScore": 0.7207,
-        "directnessScore": 0.3736,
+        "directnessScore": 0.3749,
         "voiceCompassLabel": "distant_or_private_breath"
       },
       {
@@ -3064,7 +3064,7 @@
         "group": "expected_unkawaii",
         "title": "Cat hissing aggressively",
         "respiratoryScore": 0.9719,
-        "directnessScore": 0.5378,
+        "directnessScore": 0.5376,
         "voiceCompassLabel": "addressed_breath"
       },
       {
@@ -3080,7 +3080,7 @@
         "group": "benign_real_audio",
         "title": "Adult male Georgian folk singing ('Chakrulo', 1957)",
         "respiratoryScore": 1,
-        "directnessScore": 0.9792,
+        "directnessScore": 0.9838,
         "voiceCompassLabel": "addressed_breath"
       },
       {
@@ -3096,7 +3096,7 @@
         "group": "expected_unkawaii",
         "title": "Wild boar growling",
         "respiratoryScore": 0.7582,
-        "directnessScore": 0.8607,
+        "directnessScore": 0.8561,
         "voiceCompassLabel": "addressed_breath"
       },
       {
@@ -3104,7 +3104,7 @@
         "group": "benign_real_audio",
         "title": "Small dog bark",
         "respiratoryScore": 1,
-        "directnessScore": 0.9255,
+        "directnessScore": 0.977,
         "voiceCompassLabel": "addressed_breath"
       },
       {
@@ -3112,7 +3112,7 @@
         "group": "expected_unkawaii",
         "title": "Giant canine deep growl",
         "respiratoryScore": 0.9699,
-        "directnessScore": 0.7269,
+        "directnessScore": 0.7049,
         "voiceCompassLabel": "addressed_breath"
       }
     ]
@@ -3163,7 +3163,7 @@
       "mpsRoughToSpeechRatio": 0.136,
       "subharmonicRatio": 0.0645,
       "respiratoryScore": 1,
-      "directnessScore": 0.9631,
+      "directnessScore": 0.9648,
       "voiceCompassLabel": "addressed_breath"
     },
     {
@@ -3314,7 +3314,7 @@
       "mpsRoughToSpeechRatio": 0.091,
       "subharmonicRatio": 0.0277,
       "respiratoryScore": 0.9998,
-      "directnessScore": 0.999,
+      "directnessScore": 0.9978,
       "voiceCompassLabel": "addressed_breath"
     },
     {
@@ -3375,7 +3375,7 @@
       "mpsRoughToSpeechRatio": 0.147,
       "subharmonicRatio": 0.1663,
       "respiratoryScore": 0.7921,
-      "directnessScore": 0.9683,
+      "directnessScore": 0.9688,
       "voiceCompassLabel": "addressed_breath"
     },
     {
@@ -3407,7 +3407,7 @@
       "mpsRoughToSpeechRatio": 0.637,
       "subharmonicRatio": 0.0531,
       "respiratoryScore": 0.9791,
-      "directnessScore": 0.7749,
+      "directnessScore": 0.7833,
       "voiceCompassLabel": "addressed_breath"
     },
     {
@@ -3442,7 +3442,7 @@
       "mpsRoughToSpeechRatio": 5.981,
       "subharmonicRatio": 0.124,
       "respiratoryScore": 0.9853,
-      "directnessScore": 0.7097,
+      "directnessScore": 0.7071,
       "voiceCompassLabel": "addressed_breath"
     },
     {
@@ -3478,7 +3478,7 @@
       "mpsRoughToSpeechRatio": 0.356,
       "subharmonicRatio": 0.014,
       "respiratoryScore": 0.474,
-      "directnessScore": 0.8922,
+      "directnessScore": 0.9079,
       "voiceCompassLabel": "non_breath_signal"
     },
     {
@@ -3511,7 +3511,7 @@
       "mpsRoughToSpeechRatio": 5.668,
       "subharmonicRatio": 0.1215,
       "respiratoryScore": 0.7747,
-      "directnessScore": 0.528,
+      "directnessScore": 0.5325,
       "voiceCompassLabel": "addressed_breath"
     },
     {
@@ -3576,7 +3576,7 @@
       "mpsRoughToSpeechRatio": 0.644,
       "subharmonicRatio": 0.1165,
       "respiratoryScore": 0.9719,
-      "directnessScore": 0.5378,
+      "directnessScore": 0.5376,
       "voiceCompassLabel": "addressed_breath"
     },
     {
@@ -3626,7 +3626,7 @@
       "mpsRoughToSpeechRatio": 8.099,
       "subharmonicRatio": 0.0007,
       "respiratoryScore": 0.3382,
-      "directnessScore": 0.7399,
+      "directnessScore": 0.7378,
       "voiceCompassLabel": "non_breath_signal"
     },
     {
@@ -3665,7 +3665,7 @@
       "mpsRoughToSpeechRatio": 3.148,
       "subharmonicRatio": 0.0179,
       "respiratoryScore": 0.6509,
-      "directnessScore": 0.382,
+      "directnessScore": 0.3754,
       "voiceCompassLabel": "distant_or_private_breath"
     },
     {
@@ -3709,7 +3709,7 @@
       "mpsRoughToSpeechRatio": 13.26,
       "subharmonicRatio": 0.1285,
       "respiratoryScore": 0.8288,
-      "directnessScore": 0.3371,
+      "directnessScore": 0.3387,
       "voiceCompassLabel": "distant_or_private_breath"
     },
     {
@@ -3745,7 +3745,7 @@
       "mpsRoughToSpeechRatio": 1.967,
       "subharmonicRatio": 0,
       "respiratoryScore": 0.5962,
-      "directnessScore": 0.7487,
+      "directnessScore": 0.7516,
       "voiceCompassLabel": "addressed_breath"
     },
     {
@@ -3785,7 +3785,7 @@
       "mpsRoughToSpeechRatio": 4.718,
       "subharmonicRatio": 0.0499,
       "respiratoryScore": 0.9274,
-      "directnessScore": 0.6711,
+      "directnessScore": 0.6725,
       "voiceCompassLabel": "addressed_breath"
     },
     {
@@ -3821,7 +3821,7 @@
       "mpsRoughToSpeechRatio": 3.619,
       "subharmonicRatio": 0.0575,
       "respiratoryScore": 0.7207,
-      "directnessScore": 0.3736,
+      "directnessScore": 0.3749,
       "voiceCompassLabel": "distant_or_private_breath"
     },
     {
@@ -3854,7 +3854,7 @@
       "mpsRoughToSpeechRatio": 0.644,
       "subharmonicRatio": 0.1165,
       "respiratoryScore": 0.9719,
-      "directnessScore": 0.5378,
+      "directnessScore": 0.5376,
       "voiceCompassLabel": "addressed_breath"
     },
     {
@@ -3915,7 +3915,7 @@
       "mpsRoughToSpeechRatio": 0.102,
       "subharmonicRatio": 0.1106,
       "respiratoryScore": 1,
-      "directnessScore": 0.9792,
+      "directnessScore": 0.9838,
       "voiceCompassLabel": "addressed_breath"
     },
     {
@@ -3992,7 +3992,7 @@
       "mpsRoughToSpeechRatio": 0.572,
       "subharmonicRatio": 0.1132,
       "respiratoryScore": 0.7582,
-      "directnessScore": 0.8607,
+      "directnessScore": 0.8561,
       "voiceCompassLabel": "addressed_breath"
     },
     {
@@ -4026,7 +4026,7 @@
       "mpsRoughToSpeechRatio": 0.326,
       "subharmonicRatio": 0.0867,
       "respiratoryScore": 1,
-      "directnessScore": 0.9255,
+      "directnessScore": 0.977,
       "voiceCompassLabel": "addressed_breath"
     },
     {
@@ -4058,7 +4058,7 @@
       "mpsRoughToSpeechRatio": 4.336,
       "subharmonicRatio": 0.0254,
       "respiratoryScore": 0.9699,
-      "directnessScore": 0.7269,
+      "directnessScore": 0.7049,
       "voiceCompassLabel": "addressed_breath"
     }
   ]

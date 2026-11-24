@@ -94,12 +94,21 @@ export function analyzeDialogue(samplesA, sampleRateA, samplesB, sampleRateB, op
   let countUnion = 0;
   let countNeither = 0;
 
-  // Turn-taking tracker
+  // Turn-taking & backchannel tracker
   let lastSoleSpeaker = null; // "A" | "B"
-  let lastSoleEndFrame = -1;
-  let sawOverlapSinceLastSole = false;
+  let lastActiveFrame = -1; // last frame where EITHER speaker was active (A, B, or X)
+  let currentOverlapRun = 0; // contiguous frames of simultaneous speech (X)
+  let backchannelCount = 0; // brief overlaps (<= 0.35s) such as "うん" during the other's turn
+  const backchannelMaxFrames = Math.max(1, Math.round(0.35 / frameSec));
   let turnCount = 0;
   const turnGaps = [];
+
+  const closeOverlapRun = () => {
+    if (currentOverlapRun > 0 && currentOverlapRun <= backchannelMaxFrames) {
+      backchannelCount++;
+    }
+    currentOverlapRun = 0;
+  };
 
   for (let k = 0; k < numFrames; k++) {
     const t0 = k * frameSec;
@@ -120,48 +129,43 @@ export function analyzeDialogue(samplesA, sampleRateA, samplesB, sampleRateB, op
       countB++;
       countBoth++;
       countUnion++;
-      if (lastSoleSpeaker !== null) {
-        sawOverlapSinceLastSole = true;
-      }
+      currentOverlapRun++;
+      lastActiveFrame = k;
     } else if (actA) {
+      closeOverlapRun();
       st = "A";
       countA++;
       countUnion++;
       if (lastSoleSpeaker === "B") {
         turnCount++;
-        const gapSec = sawOverlapSinceLastSole
-          ? 0
-          : Math.max(0, (k - lastSoleEndFrame - 1) * frameSec);
+        const gapSec =
+          lastActiveFrame >= 0 ? Math.max(0, (k - lastActiveFrame - 1) * frameSec) : 0;
         turnGaps.push(gapSec);
-        sawOverlapSinceLastSole = false;
-      } else if (lastSoleSpeaker === "A") {
-        sawOverlapSinceLastSole = false;
       }
       lastSoleSpeaker = "A";
-      lastSoleEndFrame = k;
+      lastActiveFrame = k;
     } else if (actB) {
+      closeOverlapRun();
       st = "B";
       countB++;
       countUnion++;
       if (lastSoleSpeaker === "A") {
         turnCount++;
-        const gapSec = sawOverlapSinceLastSole
-          ? 0
-          : Math.max(0, (k - lastSoleEndFrame - 1) * frameSec);
+        const gapSec =
+          lastActiveFrame >= 0 ? Math.max(0, (k - lastActiveFrame - 1) * frameSec) : 0;
         turnGaps.push(gapSec);
-        sawOverlapSinceLastSole = false;
-      } else if (lastSoleSpeaker === "B") {
-        sawOverlapSinceLastSole = false;
       }
       lastSoleSpeaker = "B";
-      lastSoleEndFrame = k;
+      lastActiveFrame = k;
     } else {
+      closeOverlapRun();
       st = ".";
       countNeither++;
     }
 
     statesArr[k] = st;
   }
+  closeOverlapRun();
 
   const activeRatioA = countA / numFrames;
   const activeRatioB = countB / numFrames;
@@ -193,6 +197,7 @@ export function analyzeDialogue(samplesA, sampleRateA, samplesB, sampleRateB, op
     activeRatioB: roundTo(activeRatioB, 4),
     bothActiveRatio: roundTo(bothActiveRatio, 4),
     overlapRatio: roundTo(overlapRatio, 4),
+    backchannelCount,
     turnCount,
     meanTurnGapSec: roundTo(meanTurnGapSec, 3),
     mutualSilenceRatio: roundTo(mutualSilenceRatio, 4),
@@ -218,6 +223,7 @@ export function renderDialogueMap(dialogue, opts = {}) {
   const dur = finite(dialogue?.durationSec, 0);
   const turns = Math.round(finite(dialogue?.turnCount, 0));
   const overlapPct = Math.round(clamp(finite(dialogue?.overlapRatio, 0), 0, 1) * 100);
+  const backchannels = Math.round(finite(dialogue?.backchannelCount, 0));
   const gapSec = finite(dialogue?.meanTurnGapSec, 0);
   const relLabel = dialogue?.relationLabel || "silent_void";
 
@@ -261,8 +267,10 @@ export function renderDialogueMap(dialogue, opts = {}) {
       }
       trackA += hasA ? onChar : offChar;
       trackB += hasB ? onChar : offChar;
-      if (hasX || (hasA && hasB)) {
+      if (hasX) {
         relTrack += "X";
+      } else if (hasA && hasB) {
+        relTrack += "/";
       } else if (cntA > 0) {
         relTrack += "A";
       } else if (cntB > 0) {
@@ -286,8 +294,9 @@ export function renderDialogueMap(dialogue, opts = {}) {
     assessment = `sluggish turn-taking (avg gap ${gapSec.toFixed(2)}s > 1.20s)`;
   }
 
+  const bcSuffix = backchannels > 0 ? ` backch=${backchannels}` : "";
   return [
-    `[YATA DIALOGUE] dur=${dur.toFixed(2)}s turns=${turns} overlap=${overlapPct}% gap=${gapSec.toFixed(2)}s [${relLabel}]`,
+    `[YATA DIALOGUE] dur=${dur.toFixed(2)}s turns=${turns} overlap=${overlapPct}%${bcSuffix} gap=${gapSec.toFixed(2)}s [${relLabel}]`,
     `TRACK A ${vSep}${trackA}${vSep}`,
     `TRACK B ${vSep}${trackB}${vSep}`,
     `REL     ${vSep}${relTrack}${vSep}`,
