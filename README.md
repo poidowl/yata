@@ -40,8 +40,9 @@
 - **v0.5 神経科学 DSP レンズ & 時間分割ミラー（`--timeline`）**:
   - **Arnal MPS 30–150 Hz 粗さ**（`mpsRoughness30_150` / `mpsSpeech4_16` / `mpsRoughToSpeechRatio` — Arnal et al. 2015/2025）と **非線形サブハーモニクス**（`subharmonicRatio` — Fitch et al. 2002 / Anikin 2020）を純 JS で実装し、コンパクトテキスト視覚（`MPS30-150`, `SUBH`）へ統合。
   - `extractSegmentTimeline` / `renderSegmentTimeline` / `--timeline` により、`0.5s` 窓ごとの存在感 `PRES(active%)`（有声・連動の質＋その半秒で音が鳴っていた割合）× MPS 30–150 Hz 粗さ × F0 を4行で一覧表示。
-- **v0.6 呼吸・間プロファイル、窓別タイムライン差分 & 最小反事実オーディオミラー**:
+- **v0.6 呼吸・間プロファイル、Voice Compass、窓別タイムライン差分 & 最小反事実オーディオミラー**:
   - **呼吸・間プロファイル（`computeBreathPauseProfile`）**: `activeDutyCycle` / `pauseCount` / `meanPauseSec` / `longestContinuousSec` / `breathlessWallRatio` / `cadenceLabel`（`silent` / `brief_glance` / `phrased_breath` / `continuous_wall`）を `extractFeatures` と `extractSegmentTimeline` へ統合し、`renderSegmentTimeline` のヘッダ（4行枠維持）に `duty=XX% pauses=N maxRun=X.Xs [cadenceLabel]` を表示。
+  - **Voice Compass（`computeVoiceCompass`・非拒否診断レンズ）**: 「声＝誰かに聞かせるために出した音で、呼吸器を使ったもの」（[`docs/PHILOSOPHY.md`](docs/PHILOSOPHY.md) 第8節）を `respiratoryScore` × `directnessScore` の2軸4象限（`addressed_breath` / `distant_or_private_breath` / `non_breath_signal` / `ambient_or_hollow`）へ分解し、`extractFeatures`・`extractSegmentTimeline`・`renderTextVision`（`RESP=0.XX DIR=0.XX [label]`）へ統合。
   - **窓別タイムライン差分（`renderTimelineDiff` / `--timeline-diff` / `--compare ... --timeline`）**: 2音の `0.5s` 窓ごとの変化（`dPRES`, `dACT%`, `dMPS`, `dF0`）を5行で表示し、最も変化した半秒窓（`HOTSPOT`）を特定。
   - **最小反事実オーディオミラー（`src/counterfactual.mjs` / `--counterfactual <out.wav>`）**: `findTimelineHotspot` で最も粗い半秒窓を特定し、`generateCounterfactualSlice` がその窓 `[startSec..endSec]` **だけ**をゼロ位相ローパス＋30–150 Hz エンベロープ粗さ減衰＋コサインクロスフェードで局所緩和（窓外のサンプルはビット単位で原音と同一）した試聴用 WAV と差分を同時出力。
 - **v0.5 耳判例メモリ（`--shelf` / `--precedents` + `--scope`）**:
@@ -105,6 +106,7 @@ import {
   extractAudioProfile,
   extractSegmentTimeline,
   computeBreathPauseProfile,
+  computeVoiceCompass,
   findTimelineHotspot,
   generateCounterfactualSlice,
   DEFAULT_FALSIFIERS,

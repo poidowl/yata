@@ -80,6 +80,7 @@ describe("v0.6: Breath & Pause Profile, Timeline Diff & Minimal Counterfactual M
   it("re-exports all v0.6 public API symbols", () => {
     for (const sym of [
       "computeBreathPauseProfile",
+      "computeVoiceCompass",
       "renderTimelineDiff",
       "findTimelineHotspot",
       "generateCounterfactualSlice",
@@ -278,4 +279,83 @@ describe("v0.6: Breath & Pause Profile, Timeline Diff & Minimal Counterfactual M
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("Voice Compass separates warm phrased voice (addressed_breath) vs mechanical alarm/beep (non_breath_signal) vs silence (ambient_or_hollow)", () => {
+    const corpus = yata.buildCorpus(SR);
+    const warmVoice = corpus.positives.find((p) => p.id === "pos_warm_voice");
+    assert.ok(warmVoice, "Expected pos_warm_voice in synthetic corpus");
+
+    // 1. Warm phrased voice -> high respiratoryScore & directnessScore -> addressed_breath
+    const warmProf = yata.extractAudioProfile(warmVoice.samples, warmVoice.sampleRate);
+    const warmFeat = yata.extractFeatures(warmVoice.samples, warmVoice.sampleRate);
+    const warmBreath = yata.computeBreathPauseProfile(warmProf.frames, warmFeat.durationSec);
+    const warmCompass = yata.computeVoiceCompass(warmProf.frames, warmFeat, warmBreath);
+    const warmTl = yata.extractSegmentTimeline(warmProf, warmVoice.samples, warmVoice.sampleRate);
+
+    assert.equal(warmCompass.label, "addressed_breath");
+    assert.ok(warmCompass.respiratoryScore >= 0.5 && warmCompass.respiratoryScore <= 1);
+    assert.ok(warmCompass.directnessScore >= 0.5 && warmCompass.directnessScore <= 1);
+    assert.equal(warmFeat.respiratoryScore, warmCompass.respiratoryScore);
+    assert.equal(warmFeat.directnessScore, warmCompass.directnessScore);
+    assert.equal(warmTl.voiceCompass.label, "addressed_breath");
+
+    // 2. Rigid mechanical alarm/beep (square-gated 1200 Hz pure tone pulses) -> non_breath_signal
+    const beepDur = 1.6;
+    const beepN = Math.round(SR * beepDur);
+    const alarmBeep = new Float32Array(beepN);
+    for (let i = 0; i < beepN; i++) {
+      const t = i / SR;
+      const cycle = t % 0.4;
+      if (cycle < 0.2) {
+        alarmBeep[i] = 0.65 * Math.sin(2 * Math.PI * 1200 * t);
+      }
+    }
+    const beepProf = yata.extractAudioProfile(alarmBeep, SR);
+    const beepFeat = yata.extractFeatures(alarmBeep, SR);
+    const beepBreath = yata.computeBreathPauseProfile(beepProf.frames, beepFeat.durationSec);
+    const beepCompass = yata.computeVoiceCompass(beepProf.frames, beepFeat, beepBreath);
+
+    assert.equal(beepCompass.label, "non_breath_signal", `Got ${JSON.stringify(beepCompass)}`);
+    assert.ok(
+      warmCompass.respiratoryScore > beepCompass.respiratoryScore + 0.2,
+      `Expected warm voice RESP (${warmCompass.respiratoryScore}) > alarm beep RESP (${beepCompass.respiratoryScore}) + 0.20`
+    );
+    assert.ok(beepCompass.directnessScore >= 0.5, `Expected alarm beep DIR >= 0.5, got ${beepCompass.directnessScore}`);
+
+    // 3. Silence -> ambient_or_hollow, finite in [0, 1]
+    const silence = new Float32Array(Math.round(SR * 0.5));
+    const silFeat = yata.extractFeatures(silence, SR);
+    const silTl = yata.extractSegmentTimeline(null, silence, SR);
+    assert.equal(silFeat.respiratoryScore, 0);
+    assert.equal(silFeat.directnessScore, 0);
+    assert.equal(silTl.voiceCompass.label, "ambient_or_hollow");
+
+    // 4. Ultra-short 15ms clip -> all finite in [0, 1], zero NaN/Infinity
+    const shortClip = new Float32Array(Math.round(SR * 0.015));
+    for (let i = 0; i < shortClip.length; i++) {
+      shortClip[i] = 0.3 * Math.sin((2 * Math.PI * 440 * i) / SR);
+    }
+    const shortFeat = yata.extractFeatures(shortClip, SR);
+    const shortTl = yata.extractSegmentTimeline(null, shortClip, SR);
+    for (const v of [
+      shortFeat.respiratoryScore,
+      shortFeat.directnessScore,
+      shortTl.voiceCompass.respiratoryScore,
+      shortTl.voiceCompass.directnessScore,
+    ]) {
+      assert.ok(Number.isFinite(v) && v >= 0 && v <= 1, `Voice Compass score out of [0,1]: ${v}`);
+    }
+
+    // 5. renderTextVision surfaces RESP/DIR/[label] in compact & full while strictly obeying line budgets
+    const warmRep = yata.analyzeSamples(warmVoice.samples, warmVoice.sampleRate, { label: "pos_warm_voice" });
+    const micro = yata.renderTextVision(warmProf, warmRep, { mode: "micro", charset: "ascii" });
+    const compact = yata.renderTextVision(warmProf, warmRep, { mode: "compact", charset: "ascii" });
+    const full = yata.renderTextVision(warmProf, warmRep, { mode: "full", charset: "ascii" });
+
+    assert.ok(countLines(micro) <= 15, `micro exceeded 15 lines: ${countLines(micro)}`);
+    assert.ok(countLines(compact) <= 32, `compact exceeded 32 lines: ${countLines(compact)}`);
+    assert.match(compact, /RESP=\d\.\d\d DIR=\d\.\d\d \[addressed_breath\]/);
+    assert.match(full, /VOICE COMPASS: RESP=\d\.\d\d DIR=\d\.\d\d \[addressed_breath\]/);
+  });
 });
+

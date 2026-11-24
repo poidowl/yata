@@ -47,8 +47,9 @@
       - `core_veto`（コード既定値）: 基本6軸のみでハード拒否し、ツールボックス軸は診断ヒントとして非拒否で併記
       - `shelf_veto`（`--policy shelf_veto --contested ...`）: Protected Shelf で `CONTESTED` になった軸の拒否権を自動停止し、クリア済み軸のみで判定
       - `veto_all`: 全32軸でハード拒否（研究・厳格監査向け）
-    - **v0.6 呼吸・間プロファイル、窓別タイムライン差分 & 最小反事実オーディオミラー**:
+    - **v0.6 呼吸・間プロファイル、Voice Compass、窓別タイムライン差分 & 最小反事実オーディオミラー**:
       - `computeBreathPauseProfile(frames, durationSec)`: `activeDutyCycle` / `pauseCount` / `meanPauseSec` / `longestContinuousSec` / `breathlessWallRatio` / `cadenceLabel`（`silent` | `brief_glance` | `phrased_breath` | `continuous_wall`）を `extractFeatures` と `extractSegmentTimeline` へ統合し、`renderSegmentTimeline` の4行ヘッダへ `duty=XX% pauses=N maxRun=X.Xs [cadenceLabel]` を併記
+      - `computeVoiceCompass(frames, features, breathProfile)`（非拒否診断レンズ、`docs/PHILOSOPHY.md` 第8節）: オーナーの声の定義「誰かに聞かせるために出した音で、呼吸器を使ったもの」を `respiratoryScore`（有限肺・呼吸弧・有機発声）× `directnessScore`（300–3500 Hz 伝達帯域・4–16 Hz 変調・図地分離）の2軸4象限（`addressed_breath` / `distant_or_private_breath` / `non_breath_signal` / `ambient_or_hollow`）へ写像し、`extractFeatures`・`extractSegmentTimeline`・`renderTextVision`（`RESP=0.XX DIR=0.XX [label]`）と実音監査 Section E へ統合
       - `renderTimelineDiff(timelineA, timelineB)` + CLI `--timeline-diff` / `--compare ... --timeline` / `--diff ... --timeline`: 5行の窓別差分（`dPRES`, `dACT%`, `dMPS`, `dF0`）で最大変化の半秒窓（`HOTSPOT`）を特定
       - `src/counterfactual.mjs`（`findTimelineHotspot` / `generateCounterfactualSlice`）+ CLI `--counterfactual <out.wav>`（任意 `--cf-window <t0>..<t1>`）: ホットスポット半秒窓**のみ**をゼロ位相ローパス＋30–150 Hz エンベロープ粗さ減衰＋コサインクロスフェードで局所緩和（窓外はビット単位で原音と同一）
     - **v0.5 神経科学 DSP レンズ & 時間分割ミラー**:

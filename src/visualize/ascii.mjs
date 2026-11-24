@@ -404,7 +404,28 @@ function computeSummaryStats(prof, rep) {
   const meanHf = finite(rep.features?.meanHfRatio, frames.length ? hfSum / frames.length : 0);
   const mpsRough = finite(rep.features?.mpsRoughness30_150, 0);
   const subh = finite(rep.features?.subharmonicRatio, 0);
-  return { peak, rmsDb, medF0, meanHnr, meanHf, mpsRough, subh };
+  const respiratoryScore = clamp(finite(rep.features?.respiratoryScore, 0), 0, 1);
+  const directnessScore = clamp(finite(rep.features?.directnessScore, 0), 0, 1);
+  const voiceCompassLabel =
+    respiratoryScore >= 0.5 && directnessScore >= 0.5
+      ? "addressed_breath"
+      : respiratoryScore >= 0.5
+        ? "distant_or_private_breath"
+        : directnessScore >= 0.5
+          ? "non_breath_signal"
+          : "ambient_or_hollow";
+  return {
+    peak,
+    rmsDb,
+    medF0,
+    meanHnr,
+    meanHf,
+    mpsRough,
+    subh,
+    respiratoryScore,
+    directnessScore,
+    voiceCompassLabel,
+  };
 }
 
 function formatWhere(where) {
@@ -520,14 +541,15 @@ export function renderTextVision(profile, report = null, opts = {}) {
   // -------------------------------------------------------------------------
   if (mode === "compact") {
     const lines = [];
+    const compassTag = `RESP=${fmtNum(stats.respiratoryScore, 2)} DIR=${fmtNum(stats.directnessScore, 2)} [${stats.voiceCompassLabel}]`;
     lines.push(`=== YATA VISION [${rep.label}] ===`);
     lines.push(
       `VERDICT: ${rep.verdict} (${rep.triggeredCount}/${rep.totalFalsifiers}) | dur=${fmtNum(prof.durationSec, 2)}s sr=${prof.sampleRate}Hz | pk=${fmtNum(stats.peak, 2)} rms=${fmtNum(stats.rmsDb, 1)}dB F0=${Math.round(stats.medF0)}Hz HNR=${fmtNum(stats.meanHnr, 1)}dB MPS30-150=${fmtNum(stats.mpsRough, 2)} SUBH=${fmtNum(stats.subh, 2)}`
     );
     lines.push(
       win.active
-        ? `ZOOM: ${fmtNum(win.startSec, 2)}s..${fmtNum(win.endSec, 2)}s (reason=${win.reason})`
-        : `WINDOW: 0.00s..${fmtNum(prof.durationSec, 2)}s (full) | onsets=${prof.markers.onsets.length} clips=${prof.markers.clips.length} tail=${fmtNum(prof.markers.tailWindow.startSec, 2)}..${fmtNum(prof.markers.tailWindow.endSec, 2)}s`
+        ? `ZOOM: ${fmtNum(win.startSec, 2)}s..${fmtNum(win.endSec, 2)}s (reason=${win.reason}) | ${compassTag}`
+        : `WINDOW: 0.00s..${fmtNum(prof.durationSec, 2)}s (full) | onsets=${prof.markers.onsets.length} clips=${prof.markers.clips.length} tail=${fmtNum(prof.markers.tailWindow.startSec, 2)}..${fmtNum(prof.markers.tailWindow.endSec, 2)}s | ${compassTag}`
     );
     lines.push(`ENV  ${vSep}${envLine}${vSep}`);
     lines.push(`F0   ${vSep}${f0Line}${vSep}`);
@@ -595,6 +617,9 @@ export function renderTextVision(profile, report = null, opts = {}) {
   );
   lines.push(
     `STATS: peak=${fmtNum(stats.peak, 3)} | rms=${fmtNum(stats.rmsDb, 1)}dB | F0=${Math.round(stats.medF0)}Hz | HNR=${fmtNum(stats.meanHnr, 1)}dB | meanHF=${fmtNum(stats.meanHf, 3)} | MPS30-150=${fmtNum(stats.mpsRough, 3)} | SUBH=${fmtNum(stats.subh, 3)}`
+  );
+  lines.push(
+    `VOICE COMPASS: RESP=${fmtNum(stats.respiratoryScore, 2)} DIR=${fmtNum(stats.directnessScore, 2)} [${stats.voiceCompassLabel}]`
   );
   lines.push(
     win.active

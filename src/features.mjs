@@ -1271,7 +1271,7 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
   // --- v0.6 Breath & Pause Profile ---
   const breath = computeBreathPauseProfile(frames, durationSec);
 
-  return {
+  const featuresObj = {
     // === 16 v0.1 backward-compatible scalar keys ===
     sampleRate: core.sampleRate,
     durationSec: roundTo(durationSec, 3),
@@ -1375,6 +1375,13 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     longestContinuousSec: breath.longestContinuousSec,
     breathlessWallRatio: breath.breathlessWallRatio,
   };
+
+  // --- v0.6 Voice Compass ("sound produced to be heard by someone, using a respiratory organ") ---
+  const compass = computeVoiceCompass(frames, featuresObj, breath);
+  featuresObj.respiratoryScore = compass.respiratoryScore;
+  featuresObj.directnessScore = compass.directnessScore;
+
+  return featuresObj;
 }
 
 /**
@@ -1497,6 +1504,280 @@ export function computeBreathPauseProfile(frames, durationSec) {
   };
 }
 
+function clamp01(v) {
+  if (!Number.isFinite(v)) return 0;
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+/**
+ * Voice Compass (v0.6 diagnostic lens — NEVER a hard veto):
+ * Decomposes the definition "a voice is a sound produced to be heard by someone,
+ * using a respiratory organ" into two orthogonal [0, 1] axes:
+ *   1. respiratoryScore: finite-lung phrasing & breath support + natural dynamic/breath arc
+ *      + organic voiced-harmonic / breath coupling.
+ *   2. directnessScore: communicative band focus (300–3500 Hz) + syllabic/call modulation
+ *      clarity (4–16 Hz vs 30–150 Hz harshness/diffuse noise) + figure-ground clarity.
+ *
+ * @param {Array<object>} frames
+ * @param {object|null} [features=null]
+ * @param {object|null} [breathProfile=null]
+ * @returns {{
+ *   respiratoryScore: number,
+ *   directnessScore: number,
+ *   label: "addressed_breath" | "distant_or_private_breath" | "non_breath_signal" | "ambient_or_hollow",
+ * }}
+ */
+export function computeVoiceCompass(frames, features = null, breathProfile = null) {
+  const fList = Array.isArray(frames) ? frames : [];
+  const feat = features && typeof features === "object" ? features : {};
+
+  let durationSec = finite(feat.durationSec, 0);
+  if (durationSec <= 0 && fList.length >= 2) {
+    const dt = Math.max(1e-4, finite(fList[1].timeSec - fList[0].timeSec, 0.01));
+    durationSec = Math.max(0, finite(fList[fList.length - 1].timeSec - fList[0].timeSec, 0) + dt);
+  }
+
+  const breath =
+    breathProfile && typeof breathProfile === "object"
+      ? breathProfile
+      : computeBreathPauseProfile(fList, durationSec);
+
+  const maxRms = fList.reduce((m, fr) => Math.max(m, finite(fr?.rms, 0)), 0);
+  const activeThresh = Math.max(0.03, maxRms * 0.12);
+  const activeFrames = fList.filter((fr) => finite(fr?.rms, 0) >= activeThresh);
+
+  if (
+    activeFrames.length === 0 ||
+    finite(breath.activeDutyCycle, 0) < 0.01 ||
+    (Number.isFinite(feat.peak) && feat.peak < 1e-4)
+  ) {
+    return {
+      respiratoryScore: 0,
+      directnessScore: 0,
+      label: "ambient_or_hollow",
+    };
+  }
+
+  // --- Shared fallbacks when called with partial/null features ---
+  const activeRms = activeFrames.map((fr) => finite(fr.rms, 0));
+  const voicedFrames = activeFrames.filter((fr) => Boolean(fr.voiced) && finite(fr.f0, 0) > 0);
+  const voicedRatio = Number.isFinite(feat.voicedRatio)
+    ? clamp01(feat.voicedRatio)
+    : activeFrames.length > 0
+      ? voicedFrames.length / activeFrames.length
+      : 0;
+
+  const meanActiveRms = meanOf(activeRms);
+  const activeRmsCv = Number.isFinite(feat.activeRmsCv)
+    ? Math.max(0, feat.activeRmsCv)
+    : meanActiveRms > 1e-6
+      ? stdOf(activeRms, meanActiveRms) / meanActiveRms
+      : 0;
+
+  let maxAttackSlope = Number.isFinite(feat.maxAttackSlope) ? Math.max(0, feat.maxAttackSlope) : 0;
+  if (!Number.isFinite(feat.maxAttackSlope) && fList.length >= 2 && maxRms > 1e-6) {
+    for (let i = 1; i < fList.length; i++) {
+      const slope = (finite(fList[i].rms, 0) - finite(fList[i - 1].rms, 0)) / maxRms;
+      if (slope > maxAttackSlope) maxAttackSlope = slope;
+    }
+  }
+
+  let tailDecaySec = Number.isFinite(feat.tailDecaySec) ? Math.max(0, feat.tailDecaySec) : 0;
+  if (!Number.isFinite(feat.tailDecaySec) && activeFrames.length >= 3) {
+    const lastAct = activeFrames[activeFrames.length - 1];
+    let highTime = lastAct.timeSec;
+    for (let i = activeFrames.length - 1; i >= 0; i--) {
+      if (finite(activeFrames[i].rms, 0) >= maxRms * 0.65) {
+        highTime = finite(activeFrames[i].timeSec, lastAct.timeSec);
+        break;
+      }
+    }
+    tailDecaySec = Math.max(0, finite(lastAct.timeSec, 0) - highTime);
+  }
+
+  let shimmer = Number.isFinite(feat.shimmer) ? Math.max(0, feat.shimmer) : 0;
+  let jitter = Number.isFinite(feat.jitter) ? Math.max(0, feat.jitter) : 0;
+  if ((!Number.isFinite(feat.shimmer) || !Number.isFinite(feat.jitter)) && voicedFrames.length >= 2) {
+    let shSum = 0;
+    let jiSum = 0;
+    let cnt = 0;
+    for (let i = 1; i < voicedFrames.length; i++) {
+      const prev = voicedFrames[i - 1];
+      const curr = voicedFrames[i];
+      if (finite(curr.timeSec, 0) - finite(prev.timeSec, 0) <= 0.025) {
+        shSum += Math.abs(curr.rms - prev.rms) / Math.max(prev.rms, 1e-6);
+        jiSum += Math.abs(curr.f0 - prev.f0) / Math.max(prev.f0, 1);
+        cnt++;
+      }
+    }
+    if (!Number.isFinite(feat.shimmer)) shimmer = cnt > 0 ? shSum / cnt : 0;
+    if (!Number.isFinite(feat.jitter)) jitter = cnt > 0 ? jiSum / cnt : 0;
+  }
+
+  let commonCauseCoupling = Number.isFinite(feat.commonCauseCoupling)
+    ? clamp01(feat.commonCauseCoupling)
+    : 0;
+  if (!Number.isFinite(feat.commonCauseCoupling) && activeFrames.length >= 3) {
+    const cHf = Math.abs(
+      pearson(
+        activeFrames.map((fr) => finite(fr.rms, 0)),
+        activeFrames.map((fr) => finite(fr.hfRatio, 0))
+      )
+    );
+    const cF0 =
+      voicedFrames.length >= 4
+        ? Math.abs(
+            pearson(
+              voicedFrames.map((fr) => finite(fr.rms, 0)),
+              voicedFrames.map((fr) => finite(fr.f0, 0))
+            )
+          )
+        : 0;
+    commonCauseCoupling = clamp01(Math.max(cHf, cF0));
+  }
+
+  const meanSpectralFlatness = Number.isFinite(feat.meanSpectralFlatness)
+    ? clamp01(feat.meanSpectralFlatness)
+    : clamp01(meanOf(activeFrames.map((fr) => finite(fr.spectralFlatness, 0))));
+
+  const meanTop1PeakShare = Number.isFinite(feat.meanTop1PeakShare) ? clamp01(feat.meanTop1PeakShare) : 0;
+  const ioiCv = Number.isFinite(feat.ioiCv) ? Math.max(0, feat.ioiCv) : 0;
+  const onsetCount = Number.isFinite(feat.onsetCount) ? feat.onsetCount : 0;
+
+  let f0RangeSemitones = Number.isFinite(feat.f0RangeSemitones) ? Math.max(0, feat.f0RangeSemitones) : -1;
+  if (f0RangeSemitones < 0 && voicedFrames.length >= 4) {
+    const semi = voicedFrames.map((fr) => 12 * Math.log2(Math.max(fr.f0, 1) / 100));
+    f0RangeSemitones = Math.max(0, percentile(semi, 0.95) - percentile(semi, 0.05));
+  }
+
+  // =========================================================================
+  // Axis 1: respiratoryScore ("呼吸器を使ったもの" — Finite-Lung Signature)
+  // =========================================================================
+  const longestRun = Math.max(0, finite(breath.longestContinuousSec, 0));
+  const breathlessWallRatio = clamp01(breath.breathlessWallRatio);
+
+  // 1a. Finite-lung phrasing & breath support (biological range 0.15s–2.5s)
+  let phraseLenScore;
+  if (longestRun < 0.15) {
+    phraseLenScore = clamp01(longestRun / 0.15);
+  } else if (longestRun <= 2.5) {
+    phraseLenScore = 1;
+  } else {
+    phraseLenScore = Math.max(0.2, 1 - (longestRun - 2.5) / 2.5);
+  }
+  const isMetronomic = onsetCount >= 4 && ioiCv < 0.06;
+  const metronomicPenalty = isMetronomic ? 0.35 : 1;
+  const lungSupport = clamp01(phraseLenScore * (1 - 0.45 * breathlessWallRatio) * metronomicPenalty);
+
+  // 1b. Natural dynamic / breath arc ("時間の矢": smooth onset, natural taper, living micro-variation)
+  const onsetSmooth = 1 - clamp01((maxAttackSlope - 0.35) / 0.65);
+  const tailScore = clamp01(tailDecaySec / 0.12);
+  const swellScore = clamp01(activeRmsCv / 0.30);
+  const organicShimmer = clamp01((shimmer - 0.008) / 0.035) * (1 - 0.5 * clamp01((shimmer - 0.45) / 0.55));
+  const organicJitter = clamp01((jitter - 0.0005) / 0.004) * (1 - 0.5 * clamp01((jitter - 0.08) / 0.12));
+  const microVarScore = Math.max(organicShimmer, organicJitter);
+  const gatePenalty = tailDecaySec < 0.015 ? 0.65 : 1;
+  const breathArc = clamp01(
+    (0.25 * onsetSmooth + 0.35 * tailScore + 0.18 * swellScore + 0.22 * microVarScore) * gatePenalty
+  );
+
+  // 1c. Organic voiced-harmonic / breath coupling (distinct from pure sine beep or flat static)
+  const voicedSupport = clamp01(voicedRatio / 0.45);
+  const harmonicWarmth = 1 - clamp01((meanSpectralFlatness - 0.12) / 0.45);
+  const couplingSupport = clamp01(commonCauseCoupling / 0.45);
+  const sterileTonePenalty = clamp01((meanTop1PeakShare - 0.60) / 0.28);
+  const pitchLockedMask =
+    voicedRatio > 0.4 && f0RangeSemitones >= 0 && f0RangeSemitones < 0.25
+      ? 0.2 + 0.8 * clamp01(f0RangeSemitones / 0.25)
+      : 1;
+  const rigidElectronicMask =
+    voicedRatio > 0.4 && jitter < 0.0008 && shimmer < 0.01 ? 0.35 : 1;
+  const organicPhonation = clamp01(
+    (0.42 * voicedSupport + 0.28 * harmonicWarmth + 0.30 * couplingSupport) *
+      (1 - 0.85 * sterileTonePenalty) *
+      pitchLockedMask *
+      rigidElectronicMask
+  );
+
+  const respiratoryScore = clamp01(
+    0.28 * lungSupport + 0.36 * breathArc + 0.36 * organicPhonation
+  );
+
+  // =========================================================================
+  // Axis 2: directnessScore ("誰かに聞かせるために出した音" — Communicative Directness)
+  // =========================================================================
+  // 2a. Communicative band focus (300–3500 Hz intelligibility share vs rumble / hiss)
+  let midOnlyRatio;
+  if (Number.isFinite(feat.midOnlyRatio)) {
+    midOnlyRatio = clamp01(feat.midOnlyRatio);
+  } else {
+    const meanCentroid = meanOf(activeFrames.map((fr) => finite(fr.spectralCentroidHz, 0)));
+    midOnlyRatio =
+      meanCentroid >= 300 && meanCentroid <= 3500
+        ? 0.75
+        : meanCentroid > 0
+          ? clamp01(1 - Math.abs(Math.log2(Math.max(meanCentroid, 30) / 1100)) / 3.5)
+          : 0;
+  }
+  const subBassRatio = Number.isFinite(feat.subBassRatio) ? clamp01(feat.subBassRatio) : 0;
+  const rumblePenalty = 1 - 0.55 * clamp01((subBassRatio - 0.20) / 0.50);
+  const bandFocus = clamp01(clamp01(midOnlyRatio / 0.50) * rumblePenalty);
+
+  // 2b. Syllabic / call modulation clarity (4–16 Hz speech/call band vs 30–150 Hz harshness & diffuse noise)
+  const mpsSpeech = Math.max(0, finite(feat.mpsSpeech4_16, 0));
+  const mpsRough = Math.max(0, finite(feat.mpsRoughness30_150, 0));
+  const mpsRatio =
+    mpsSpeech + mpsRough > 1e-6
+      ? mpsSpeech / (mpsSpeech + mpsRough * 1.5 + 0.015)
+      : clamp01(activeRmsCv / 0.35) * 0.6;
+  const nonDiffuse = 1 - clamp01((meanSpectralFlatness - 0.15) / 0.55);
+  const modClarity = clamp01(clamp01(mpsRatio / 0.75) * nonDiffuse);
+
+  // 2c. Figure-ground clarity (audibility + active-vs-floor dynamic contrast + tonal SNR)
+  let peak = Number.isFinite(feat.peak) ? Math.max(0, feat.peak) : 0;
+  if (!Number.isFinite(feat.peak)) {
+    for (const fr of fList) {
+      const p = Math.max(Math.abs(finite(fr.peakPos, 0)), Math.abs(finite(fr.peakNeg, 0)));
+      if (p > peak) peak = p;
+    }
+    if (peak <= 0) peak = maxRms;
+  }
+  const audibility = clamp01(peak / 0.12);
+  const allRms = fList.map((fr) => finite(fr.rms, 0));
+  const p90Rms = allRms.length > 0 ? percentile(allRms, 0.9) : maxRms;
+  const p10Rms = allRms.length > 0 ? percentile(allRms, 0.1) : 0;
+  const envContrast = p90Rms > 1e-6 ? clamp01((p90Rms - p10Rms) / p90Rms) : 0;
+  const meanHnrDb = Number.isFinite(feat.meanVoicedHnrDb)
+    ? feat.meanVoicedHnrDb
+    : voicedFrames.length > 0
+      ? meanOf(voicedFrames.map((fr) => finite(fr.hnrDb, 0)))
+      : 0;
+  const hnrClarity = voicedRatio > 0.1 ? clamp01((meanHnrDb + 5) / 25) : 0;
+  const tonalClarity = Math.max(hnrClarity, 1 - meanSpectralFlatness);
+  const figureGround = clamp01(audibility * (0.45 * envContrast + 0.55 * tonalClarity));
+
+  const directnessScore = clamp01(
+    0.42 * bandFocus + 0.28 * modClarity + 0.30 * figureGround
+  );
+
+  let label;
+  if (respiratoryScore >= 0.5 && directnessScore >= 0.5) {
+    label = "addressed_breath";
+  } else if (respiratoryScore >= 0.5 && directnessScore < 0.5) {
+    label = "distant_or_private_breath";
+  } else if (respiratoryScore < 0.5 && directnessScore >= 0.5) {
+    label = "non_breath_signal";
+  } else {
+    label = "ambient_or_hollow";
+  }
+
+  return {
+    respiratoryScore: roundTo(respiratoryScore, 4),
+    directnessScore: roundTo(directnessScore, 4),
+    label,
+  };
+}
+
 /**
  * Time-Segmented Mirror: divides audio into compact windows (default 0.5s) and tracks
  * per-window Presence (voiced/HNR/coupling) vs MPS 30–150Hz Roughness vs median F0 so LLMs
@@ -1522,12 +1803,14 @@ export function extractSegmentTimeline(profile, samples, sampleRate, opts = { wi
 
   const segments = [];
   if (durationSec <= 0 || n === 0) {
+    const voiceCompass = computeVoiceCompass(frames, { durationSec: 0, peak: 0 }, breath);
     return {
       schema: "unkawaii_timeline/v0.5",
       windowSec: roundTo(windowSec, 3),
       durationSec: 0,
       sampleRate: sr,
       breath,
+      voiceCompass,
       segments,
     };
   }
@@ -1581,12 +1864,51 @@ export function extractSegmentTimeline(profile, samples, sampleRate, opts = { wi
     });
   }
 
+  // Lightweight full-clip summary for consistent Voice Compass on timeline
+  const fullMps = computeMpsRoughness(sig, sr);
+  let sigPeak = 0;
+  for (let i = 0; i < n; i++) {
+    const a = Math.abs(finite(sig[i], 0));
+    if (a > sigPeak) sigPeak = a;
+  }
+  let midOnlyRatio;
+  let subBassRatio;
+  const sFreqs = prof?.spectralSlice?.freqsHz;
+  const sDb = prof?.spectralSlice?.meanDb;
+  if (Array.isArray(sFreqs) && Array.isArray(sDb) && sFreqs.length === sDb.length && sFreqs.length > 0) {
+    let totalP = 0;
+    let midP = 0;
+    let subP = 0;
+    for (let i = 0; i < sFreqs.length; i++) {
+      const p = Math.pow(10, Math.max(-100, finite(sDb[i], -100)) / 10);
+      totalP += p;
+      if (sFreqs[i] >= 300 && sFreqs[i] <= 3400) midP += p;
+      if (sFreqs[i] >= 20 && sFreqs[i] <= 90) subP += p;
+    }
+    if (totalP > 1e-12) {
+      midOnlyRatio = midP / totalP;
+      subBassRatio = subP / totalP;
+    }
+  }
+  const voiceCompass = computeVoiceCompass(
+    frames,
+    {
+      durationSec,
+      peak: sigPeak,
+      mpsSpeech4_16: fullMps.mpsSpeech4_16,
+      mpsRoughness30_150: fullMps.mpsRoughness30_150,
+      ...(midOnlyRatio !== undefined ? { midOnlyRatio, subBassRatio } : {}),
+    },
+    breath
+  );
+
   return {
     schema: "unkawaii_timeline/v0.5",
     windowSec: roundTo(windowSec, 3),
     durationSec: roundTo(durationSec, 3),
     sampleRate: sr,
     breath,
+    voiceCompass,
     segments,
   };
 }

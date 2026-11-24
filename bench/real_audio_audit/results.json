@@ -1,6 +1,6 @@
 {
-  "schema": "yata_real_audio_audit/v0.5",
-  "generatedAt": "2026-11-24T06:03:55.570Z",
+  "schema": "yata_real_audio_audit/v0.6",
+  "generatedAt": "2026-11-24T06:48:40.327Z",
   "axisCounts": {
     "core": 6,
     "toolbox": 25,
@@ -2795,6 +2795,328 @@
       }
     ]
   },
+  "voiceCompass": {
+    "groups": {
+      "tokiko": {
+        "count": 9,
+        "respiratoryScore": {
+          "count": 9,
+          "mean": 0.9969,
+          "min": 0.9895,
+          "max": 1
+        },
+        "directnessScore": {
+          "count": 9,
+          "mean": 0.9983,
+          "min": 0.9967,
+          "max": 0.9996
+        },
+        "quadrants": {
+          "addressed_breath": 9,
+          "distant_or_private_breath": 0,
+          "non_breath_signal": 0,
+          "ambient_or_hollow": 0
+        }
+      },
+      "benignReal": {
+        "count": 10,
+        "respiratoryScore": {
+          "count": 10,
+          "mean": 0.8119,
+          "min": 0.5962,
+          "max": 1
+        },
+        "directnessScore": {
+          "count": 10,
+          "mean": 0.7187,
+          "min": 0.3736,
+          "max": 0.9989
+        },
+        "quadrants": {
+          "addressed_breath": 7,
+          "distant_or_private_breath": 3,
+          "non_breath_signal": 0,
+          "ambient_or_hollow": 0
+        }
+      },
+      "historical": {
+        "count": 2,
+        "respiratoryScore": {
+          "count": 2,
+          "mean": 0.7296,
+          "min": 0.474,
+          "max": 0.9853
+        },
+        "directnessScore": {
+          "count": 2,
+          "mean": 0.8216,
+          "min": 0.751,
+          "max": 0.8922
+        },
+        "quadrants": {
+          "addressed_breath": 1,
+          "distant_or_private_breath": 0,
+          "non_breath_signal": 1,
+          "ambient_or_hollow": 0
+        }
+      },
+      "expectedUnkawaii": {
+        "count": 5,
+        "respiratoryScore": {
+          "count": 5,
+          "mean": 0.7734,
+          "min": 0.3382,
+          "max": 0.9719
+        },
+        "directnessScore": {
+          "count": 5,
+          "mean": 0.6452,
+          "min": 0.3371,
+          "max": 0.8607
+        },
+        "quadrants": {
+          "addressed_breath": 3,
+          "distant_or_private_breath": 1,
+          "non_breath_signal": 1,
+          "ambient_or_hollow": 0
+        }
+      }
+    },
+    "perClip": [
+      {
+        "id": "tokiko_naru_kawaii",
+        "group": "tokiko",
+        "title": "kawaii:なる",
+        "respiratoryScore": 1,
+        "directnessScore": 0.9996,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "tokiko_naru_amae",
+        "group": "tokiko",
+        "title": "amae:なる",
+        "respiratoryScore": 1,
+        "directnessScore": 0.9979,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "tokiko_naru_genki",
+        "group": "tokiko",
+        "title": "genki:なる",
+        "respiratoryScore": 1,
+        "directnessScore": 0.9995,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "tokiko_watashi_kawaii",
+        "group": "tokiko",
+        "title": "kawaii:わたし、にほんご、ちょっとしゃべれます",
+        "respiratoryScore": 1,
+        "directnessScore": 0.9967,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "tokiko_watashi_amae",
+        "group": "tokiko",
+        "title": "amae:わたし、にほんご、ちょっとしゃべれます",
+        "respiratoryScore": 0.9899,
+        "directnessScore": 0.9967,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "tokiko_watashi_genki",
+        "group": "tokiko",
+        "title": "genki:わたし、にほんご、ちょっとしゃべれます",
+        "respiratoryScore": 0.9895,
+        "directnessScore": 0.9972,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "tokiko_ohayo_kawaii",
+        "group": "tokiko",
+        "title": "kawaii:おはよう、きょうは、いいてんきだね",
+        "respiratoryScore": 0.9927,
+        "directnessScore": 0.9991,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "tokiko_ohayo_amae",
+        "group": "tokiko",
+        "title": "amae:おはよう、きょうは、いいてんきだね",
+        "respiratoryScore": 0.9998,
+        "directnessScore": 0.999,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "tokiko_ohayo_genki",
+        "group": "tokiko",
+        "title": "genki:おはよう、きょうは、いいてんきだね",
+        "respiratoryScore": 1,
+        "directnessScore": 0.9992,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "clip_01",
+        "group": "benign_real_audio",
+        "title": "Georgian polyphonic folk song 'Chakrulo' (1957)",
+        "respiratoryScore": 0.7921,
+        "directnessScore": 0.9683,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "clip_02",
+        "group": "benign_real_audio",
+        "title": "Mozart 'Die Zauberflote' vocal ensemble (Ferenc Fricsay, 1953)",
+        "respiratoryScore": 0.9791,
+        "directnessScore": 0.7749,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "clip_03",
+        "group": "historical_recording",
+        "title": "Metropolitan Quartet 'Darling Nellie Gray' (1909 78rpm)",
+        "respiratoryScore": 0.9853,
+        "directnessScore": 0.751,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "clip_04",
+        "group": "historical_recording",
+        "title": "Au Clair de la Lune (1860 phonautogram, oldest human voice)",
+        "respiratoryScore": 0.474,
+        "directnessScore": 0.8922,
+        "voiceCompassLabel": "non_breath_signal"
+      },
+      {
+        "id": "clip_05",
+        "group": "benign_real_audio",
+        "title": "Catalan folk lullaby 'El Noi de la Mare' (acoustic guitar)",
+        "respiratoryScore": 0.7747,
+        "directnessScore": 0.528,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "clip_06",
+        "group": "benign_real_audio",
+        "title": "Real baby laughing",
+        "respiratoryScore": 0.8793,
+        "directnessScore": 0.9989,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "clip_07",
+        "group": "expected_unkawaii",
+        "title": "Cat hissing aggressively",
+        "respiratoryScore": 0.9719,
+        "directnessScore": 0.5378,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "clip_08",
+        "group": "expected_unkawaii",
+        "title": "Periodic alarm / siren beep",
+        "respiratoryScore": 0.3382,
+        "directnessScore": 0.7399,
+        "voiceCompassLabel": "non_breath_signal"
+      },
+      {
+        "id": "clip_09",
+        "group": "benign_real_audio",
+        "title": "Red-winged Blackbird song",
+        "respiratoryScore": 0.6509,
+        "directnessScore": 0.3893,
+        "voiceCompassLabel": "distant_or_private_breath"
+      },
+      {
+        "id": "clip_10",
+        "group": "expected_unkawaii",
+        "title": "Synthetic perturbation of clip_05 (+60Hz/120Hz hum + 2-sample click @ 1.20s)",
+        "respiratoryScore": 0.8288,
+        "directnessScore": 0.3371,
+        "voiceCompassLabel": "distant_or_private_breath"
+      },
+      {
+        "id": "p1_baby",
+        "group": "benign_real_audio",
+        "title": "Mudchute farm lamb bleat",
+        "respiratoryScore": 0.5962,
+        "directnessScore": 0.754,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "p1_adult",
+        "group": "neutral_adult_animal",
+        "title": "Mudchute farm adult sheep bleat",
+        "respiratoryScore": 0.9274,
+        "directnessScore": 0.7206,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "p2_baby",
+        "group": "benign_real_audio",
+        "title": "Young female cat meow",
+        "respiratoryScore": 0.7207,
+        "directnessScore": 0.3736,
+        "voiceCompassLabel": "distant_or_private_breath"
+      },
+      {
+        "id": "p2_adult",
+        "group": "expected_unkawaii",
+        "title": "Cat hissing aggressively",
+        "respiratoryScore": 0.9719,
+        "directnessScore": 0.5378,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "p3_baby",
+        "group": "benign_real_audio",
+        "title": "Real baby laughing",
+        "respiratoryScore": 0.8793,
+        "directnessScore": 0.9989,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "p3_adult",
+        "group": "benign_real_audio",
+        "title": "Adult male Georgian folk singing ('Chakrulo', 1957)",
+        "respiratoryScore": 1,
+        "directnessScore": 0.9845,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "p4_baby",
+        "group": "benign_real_audio",
+        "title": "Three-striped palm squirrel chirping",
+        "respiratoryScore": 0.7255,
+        "directnessScore": 0.4734,
+        "voiceCompassLabel": "distant_or_private_breath"
+      },
+      {
+        "id": "p4_adult",
+        "group": "expected_unkawaii",
+        "title": "Wild boar growling",
+        "respiratoryScore": 0.7582,
+        "directnessScore": 0.8607,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "p5_baby",
+        "group": "benign_real_audio",
+        "title": "Small dog bark",
+        "respiratoryScore": 1,
+        "directnessScore": 0.9424,
+        "voiceCompassLabel": "addressed_breath"
+      },
+      {
+        "id": "p5_adult",
+        "group": "expected_unkawaii",
+        "title": "Giant canine deep growl",
+        "respiratoryScore": 0.9699,
+        "directnessScore": 0.7507,
+        "voiceCompassLabel": "addressed_breath"
+      }
+    ]
+  },
   "perClipTokiko": [
     {
       "id": "tokiko_naru_kawaii",
@@ -2815,7 +3137,10 @@
       "mpsSpeech4_16": 0.1166,
       "mpsRoughness30_150": 0.015,
       "mpsRoughToSpeechRatio": 0.128,
-      "subharmonicRatio": 0.0266
+      "subharmonicRatio": 0.0266,
+      "respiratoryScore": 1,
+      "directnessScore": 0.9996,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "tokiko_naru_amae",
@@ -2836,7 +3161,10 @@
       "mpsSpeech4_16": 0.1089,
       "mpsRoughness30_150": 0.0148,
       "mpsRoughToSpeechRatio": 0.136,
-      "subharmonicRatio": 0.0645
+      "subharmonicRatio": 0.0645,
+      "respiratoryScore": 1,
+      "directnessScore": 0.9979,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "tokiko_naru_genki",
@@ -2857,7 +3185,10 @@
       "mpsSpeech4_16": 0.144,
       "mpsRoughness30_150": 0.0146,
       "mpsRoughToSpeechRatio": 0.102,
-      "subharmonicRatio": 0.0047
+      "subharmonicRatio": 0.0047,
+      "respiratoryScore": 1,
+      "directnessScore": 0.9995,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "tokiko_watashi_kawaii",
@@ -2878,7 +3209,10 @@
       "mpsSpeech4_16": 0.172,
       "mpsRoughness30_150": 0.0109,
       "mpsRoughToSpeechRatio": 0.064,
-      "subharmonicRatio": 0.0957
+      "subharmonicRatio": 0.0957,
+      "respiratoryScore": 1,
+      "directnessScore": 0.9967,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "tokiko_watashi_amae",
@@ -2904,7 +3238,10 @@
       "mpsSpeech4_16": 0.1437,
       "mpsRoughness30_150": 0.0193,
       "mpsRoughToSpeechRatio": 0.134,
-      "subharmonicRatio": 0.057
+      "subharmonicRatio": 0.057,
+      "respiratoryScore": 0.9899,
+      "directnessScore": 0.9967,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "tokiko_watashi_genki",
@@ -2926,7 +3263,10 @@
       "mpsSpeech4_16": 0.1926,
       "mpsRoughness30_150": 0.0115,
       "mpsRoughToSpeechRatio": 0.06,
-      "subharmonicRatio": 0.0629
+      "subharmonicRatio": 0.0629,
+      "respiratoryScore": 0.9895,
+      "directnessScore": 0.9972,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "tokiko_ohayo_kawaii",
@@ -2947,7 +3287,10 @@
       "mpsSpeech4_16": 0.1075,
       "mpsRoughness30_150": 0.0076,
       "mpsRoughToSpeechRatio": 0.071,
-      "subharmonicRatio": 0.0687
+      "subharmonicRatio": 0.0687,
+      "respiratoryScore": 0.9927,
+      "directnessScore": 0.9991,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "tokiko_ohayo_amae",
@@ -2969,7 +3312,10 @@
       "mpsSpeech4_16": 0.1168,
       "mpsRoughness30_150": 0.0107,
       "mpsRoughToSpeechRatio": 0.091,
-      "subharmonicRatio": 0.0277
+      "subharmonicRatio": 0.0277,
+      "respiratoryScore": 0.9998,
+      "directnessScore": 0.999,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "tokiko_ohayo_genki",
@@ -2991,7 +3337,10 @@
       "mpsSpeech4_16": 0.1205,
       "mpsRoughness30_150": 0.0063,
       "mpsRoughToSpeechRatio": 0.052,
-      "subharmonicRatio": 0.07
+      "subharmonicRatio": 0.07,
+      "respiratoryScore": 1,
+      "directnessScore": 0.9992,
+      "voiceCompassLabel": "addressed_breath"
     }
   ],
   "perClipReal": [
@@ -3024,7 +3373,10 @@
       "mpsSpeech4_16": 0.0631,
       "mpsRoughness30_150": 0.0093,
       "mpsRoughToSpeechRatio": 0.147,
-      "subharmonicRatio": 0.1663
+      "subharmonicRatio": 0.1663,
+      "respiratoryScore": 0.7921,
+      "directnessScore": 0.9683,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "clip_02",
@@ -3053,7 +3405,10 @@
       "mpsSpeech4_16": 0.0443,
       "mpsRoughness30_150": 0.0282,
       "mpsRoughToSpeechRatio": 0.637,
-      "subharmonicRatio": 0.0531
+      "subharmonicRatio": 0.0531,
+      "respiratoryScore": 0.9791,
+      "directnessScore": 0.7749,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "clip_03",
@@ -3085,7 +3440,10 @@
       "mpsSpeech4_16": 0.008,
       "mpsRoughness30_150": 0.0481,
       "mpsRoughToSpeechRatio": 5.981,
-      "subharmonicRatio": 0.124
+      "subharmonicRatio": 0.124,
+      "respiratoryScore": 0.9853,
+      "directnessScore": 0.751,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "clip_04",
@@ -3118,7 +3476,10 @@
       "mpsSpeech4_16": 0.0299,
       "mpsRoughness30_150": 0.0106,
       "mpsRoughToSpeechRatio": 0.356,
-      "subharmonicRatio": 0.014
+      "subharmonicRatio": 0.014,
+      "respiratoryScore": 0.474,
+      "directnessScore": 0.8922,
+      "voiceCompassLabel": "non_breath_signal"
     },
     {
       "id": "clip_05",
@@ -3148,7 +3509,10 @@
       "mpsSpeech4_16": 0.0135,
       "mpsRoughness30_150": 0.0767,
       "mpsRoughToSpeechRatio": 5.668,
-      "subharmonicRatio": 0.1215
+      "subharmonicRatio": 0.1215,
+      "respiratoryScore": 0.7747,
+      "directnessScore": 0.528,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "clip_06",
@@ -3177,7 +3541,10 @@
       "mpsSpeech4_16": 0.0813,
       "mpsRoughness30_150": 0.0064,
       "mpsRoughToSpeechRatio": 0.078,
-      "subharmonicRatio": 0.1288
+      "subharmonicRatio": 0.1288,
+      "respiratoryScore": 0.8793,
+      "directnessScore": 0.9989,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "clip_07",
@@ -3207,7 +3574,10 @@
       "mpsSpeech4_16": 0.0468,
       "mpsRoughness30_150": 0.0301,
       "mpsRoughToSpeechRatio": 0.644,
-      "subharmonicRatio": 0.1165
+      "subharmonicRatio": 0.1165,
+      "respiratoryScore": 0.9719,
+      "directnessScore": 0.5378,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "clip_08",
@@ -3254,7 +3624,10 @@
       "mpsSpeech4_16": 0.0304,
       "mpsRoughness30_150": 0.2459,
       "mpsRoughToSpeechRatio": 8.099,
-      "subharmonicRatio": 0.0007
+      "subharmonicRatio": 0.0007,
+      "respiratoryScore": 0.3382,
+      "directnessScore": 0.7399,
+      "voiceCompassLabel": "non_breath_signal"
     },
     {
       "id": "clip_09",
@@ -3290,7 +3663,10 @@
       "mpsSpeech4_16": 0.0063,
       "mpsRoughness30_150": 0.02,
       "mpsRoughToSpeechRatio": 3.148,
-      "subharmonicRatio": 0.0179
+      "subharmonicRatio": 0.0179,
+      "respiratoryScore": 0.6509,
+      "directnessScore": 0.3893,
+      "voiceCompassLabel": "distant_or_private_breath"
     },
     {
       "id": "clip_10",
@@ -3331,7 +3707,10 @@
       "mpsSpeech4_16": 0.0058,
       "mpsRoughness30_150": 0.0772,
       "mpsRoughToSpeechRatio": 13.26,
-      "subharmonicRatio": 0.1285
+      "subharmonicRatio": 0.1285,
+      "respiratoryScore": 0.8288,
+      "directnessScore": 0.3371,
+      "voiceCompassLabel": "distant_or_private_breath"
     },
     {
       "id": "p1_baby",
@@ -3364,7 +3743,10 @@
       "mpsSpeech4_16": 0.0099,
       "mpsRoughness30_150": 0.0195,
       "mpsRoughToSpeechRatio": 1.967,
-      "subharmonicRatio": 0
+      "subharmonicRatio": 0,
+      "respiratoryScore": 0.5962,
+      "directnessScore": 0.754,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "p1_adult",
@@ -3401,7 +3783,10 @@
       "mpsSpeech4_16": 0.0034,
       "mpsRoughness30_150": 0.0161,
       "mpsRoughToSpeechRatio": 4.718,
-      "subharmonicRatio": 0.0499
+      "subharmonicRatio": 0.0499,
+      "respiratoryScore": 0.9274,
+      "directnessScore": 0.7206,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "p2_baby",
@@ -3434,7 +3819,10 @@
       "mpsSpeech4_16": 0.02,
       "mpsRoughness30_150": 0.0722,
       "mpsRoughToSpeechRatio": 3.619,
-      "subharmonicRatio": 0.0575
+      "subharmonicRatio": 0.0575,
+      "respiratoryScore": 0.7207,
+      "directnessScore": 0.3736,
+      "voiceCompassLabel": "distant_or_private_breath"
     },
     {
       "id": "p2_adult",
@@ -3464,7 +3852,10 @@
       "mpsSpeech4_16": 0.0468,
       "mpsRoughness30_150": 0.0301,
       "mpsRoughToSpeechRatio": 0.644,
-      "subharmonicRatio": 0.1165
+      "subharmonicRatio": 0.1165,
+      "respiratoryScore": 0.9719,
+      "directnessScore": 0.5378,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "p3_baby",
@@ -3493,7 +3884,10 @@
       "mpsSpeech4_16": 0.0813,
       "mpsRoughness30_150": 0.0064,
       "mpsRoughToSpeechRatio": 0.078,
-      "subharmonicRatio": 0.1288
+      "subharmonicRatio": 0.1288,
+      "respiratoryScore": 0.8793,
+      "directnessScore": 0.9989,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "p3_adult",
@@ -3519,7 +3913,10 @@
       "mpsSpeech4_16": 0.0742,
       "mpsRoughness30_150": 0.0076,
       "mpsRoughToSpeechRatio": 0.102,
-      "subharmonicRatio": 0.1106
+      "subharmonicRatio": 0.1106,
+      "respiratoryScore": 1,
+      "directnessScore": 0.9845,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "p4_baby",
@@ -3553,7 +3950,10 @@
       "mpsSpeech4_16": 0.2585,
       "mpsRoughness30_150": 0.0157,
       "mpsRoughToSpeechRatio": 0.061,
-      "subharmonicRatio": 0.0669
+      "subharmonicRatio": 0.0669,
+      "respiratoryScore": 0.7255,
+      "directnessScore": 0.4734,
+      "voiceCompassLabel": "distant_or_private_breath"
     },
     {
       "id": "p4_adult",
@@ -3590,7 +3990,10 @@
       "mpsSpeech4_16": 0.0336,
       "mpsRoughness30_150": 0.0192,
       "mpsRoughToSpeechRatio": 0.572,
-      "subharmonicRatio": 0.1132
+      "subharmonicRatio": 0.1132,
+      "respiratoryScore": 0.7582,
+      "directnessScore": 0.8607,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "p5_baby",
@@ -3621,7 +4024,10 @@
       "mpsSpeech4_16": 0.0859,
       "mpsRoughness30_150": 0.028,
       "mpsRoughToSpeechRatio": 0.326,
-      "subharmonicRatio": 0.0867
+      "subharmonicRatio": 0.0867,
+      "respiratoryScore": 1,
+      "directnessScore": 0.9424,
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "p5_adult",
@@ -3650,7 +4056,10 @@
       "mpsSpeech4_16": 0.0079,
       "mpsRoughness30_150": 0.0341,
       "mpsRoughToSpeechRatio": 4.336,
-      "subharmonicRatio": 0.0254
+      "subharmonicRatio": 0.0254,
+      "respiratoryScore": 0.9699,
+      "directnessScore": 0.7507,
+      "voiceCompassLabel": "addressed_breath"
     }
   ]
 }

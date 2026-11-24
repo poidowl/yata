@@ -29,6 +29,7 @@ import {
   extractAudioProfile,
   extractSegmentTimeline,
   computeBreathPauseProfile,
+  computeVoiceCompass,
 } from "./src/features.mjs";
 import {
   ORIGINAL_6_FALSIFIERS,
@@ -96,6 +97,7 @@ export {
   applyEarPrecedents,
   // v0.6 extensions
   computeBreathPauseProfile,
+  computeVoiceCompass,
   renderTimelineDiff,
   findTimelineHotspot,
   generateCounterfactualSlice,

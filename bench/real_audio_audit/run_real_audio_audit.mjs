@@ -236,6 +236,17 @@ function analyzePolicies(samples, sampleRate, label, contestedIds = []) {
     );
   }
 
+  const respScore = repAll.features?.respiratoryScore ?? 0;
+  const dirScore = repAll.features?.directnessScore ?? 0;
+  const compassLabel =
+    respScore >= 0.5 && dirScore >= 0.5
+      ? "addressed_breath"
+      : respScore >= 0.5
+        ? "distant_or_private_breath"
+        : dirScore >= 0.5
+          ? "non_breath_signal"
+          : "ambient_or_hollow";
+
   return {
     verdictCoreVeto: repCore.verdict,
     verdictShelfVeto,
@@ -250,6 +261,9 @@ function analyzePolicies(samples, sampleRate, label, contestedIds = []) {
     mpsRoughness30_150: repAll.features?.mpsRoughness30_150 ?? 0,
     mpsRoughToSpeechRatio: repAll.features?.mpsRoughToSpeechRatio ?? 0,
     subharmonicRatio: repAll.features?.subharmonicRatio ?? 0,
+    respiratoryScore: respScore,
+    directnessScore: dirScore,
+    voiceCompassLabel: compassLabel,
   };
 }
 
@@ -470,7 +484,7 @@ function buildMarkdownReport(summary) {
   } = summary;
 
   const lines = [];
-  lines.push("# yata v0.5 — Reproducible Real-Audio & Protected Shelf Audit (`RESULTS.md`)");
+  lines.push("# yata v0.6 — Reproducible Real-Audio & Protected Shelf Audit (`RESULTS.md`)");
   lines.push("");
   lines.push(`Generated: \`${generatedAt}\` by \`node bench/real_audio_audit/run_real_audio_audit.mjs\``);
   lines.push(`Manifest: [\`manifest.json\`](./manifest.json) (${realClipCount} trimmed 24kHz mono clips from 16 Wikimedia Commons sources with verified licenses + ${tokikoCount} \`tokiko-axis\` clips).`);
@@ -634,6 +648,38 @@ function buildMarkdownReport(summary) {
     lines.push("| :--- | :--- | ---: | ---: | ---: | ---: |");
     for (const c of neuroscienceLenses.perClipExpectedUnkawaii) {
       lines.push(`| \`${c.id}\` | ${c.title} | ${c.mpsSpeech4_16} | ${c.mpsRoughness30_150} | ${c.mpsRoughToSpeechRatio} | ${c.subharmonicRatio} |`);
+    }
+    lines.push("");
+  }
+
+  // Section E: v0.6 Voice Compass
+  if (summary.voiceCompass) {
+    const vc = summary.voiceCompass;
+    const fmtStats = (s) => `mean **${s.mean}** (min ${s.min}, max ${s.max})`;
+    lines.push("## E. Voice Compass (`respiratoryScore` × `directnessScore`, v0.6)");
+    lines.push("");
+    lines.push("> *「声って、誰かに聞かせるために出した音で、呼吸器を使ったもの かな」* — Diagnostic 2D lens (never a hard veto) decomposing **finite-lung respiratory signature (`RESP`)** × **listener-addressed communicative directness (`DIR`)** across all 20 Wikimedia Commons clips + 9 `tokiko-axis` clips.");
+    lines.push("");
+    lines.push("| Group | Clips | `respiratoryScore` | `directnessScore` | Quadrant Counts |");
+    lines.push("| :--- | ---: | :--- | :--- | :--- |");
+    const fmtQuads = (q) =>
+      Object.entries(q)
+        .filter(([, n]) => n > 0)
+        .map(([k, n]) => `\`${k}\`: ${n}`)
+        .join(", ");
+    for (const [name, g] of [
+      ["`tokiko-axis` Speech", vc.groups.tokiko],
+      ["Benign Real Wikimedia", vc.groups.benignReal],
+      ["Historical Recordings", vc.groups.historical],
+      ["Expected-Unkawaii Real", vc.groups.expectedUnkawaii],
+    ]) {
+      lines.push(`| **${name}** | ${g.count} | ${fmtStats(g.respiratoryScore)} | ${fmtStats(g.directnessScore)} | ${fmtQuads(g.quadrants)} |`);
+    }
+    lines.push("");
+    lines.push("| Clip ID | Group | Title / Utterance | `RESP` | `DIR` | Quadrant (`voiceCompassLabel`) |");
+    lines.push("| :--- | :--- | :--- | ---: | ---: | :--- |");
+    for (const c of vc.perClip) {
+      lines.push(`| \`${c.id}\` | \`${c.group}\` | ${c.title} | ${c.respiratoryScore.toFixed(2)} | ${c.directnessScore.toFixed(2)} | \`${c.voiceCompassLabel}\` |`);
     }
     lines.push("");
   }
@@ -812,9 +858,55 @@ async function main() {
     expectedUnkawaiiEntries
   );
 
+  const countQuads = (items) => {
+    const q = {
+      addressed_breath: 0,
+      distant_or_private_breath: 0,
+      non_breath_signal: 0,
+      ambient_or_hollow: 0,
+    };
+    for (const it of items) {
+      if (it.voiceCompassLabel in q) q[it.voiceCompassLabel]++;
+    }
+    return q;
+  };
+  const summarizeCompassGroup = (items) => ({
+    count: items.length,
+    respiratoryScore: summarizeMetric(items, "respiratoryScore"),
+    directnessScore: summarizeMetric(items, "directnessScore"),
+    quadrants: countQuads(items),
+  });
+  const historicalRealEntries = perClipReal.filter((c) => c.auditGroup === "historical_recording");
+  const voiceCompass = {
+    groups: {
+      tokiko: summarizeCompassGroup(perClipTokiko),
+      benignReal: summarizeCompassGroup(benignRealEntries),
+      historical: summarizeCompassGroup(historicalRealEntries),
+      expectedUnkawaii: summarizeCompassGroup(expectedUnkawaiiEntries),
+    },
+    perClip: [
+      ...perClipTokiko.map((c) => ({
+        id: c.id,
+        group: "tokiko",
+        title: `${c.preset}:${c.utterance}`,
+        respiratoryScore: c.respiratoryScore,
+        directnessScore: c.directnessScore,
+        voiceCompassLabel: c.voiceCompassLabel,
+      })),
+      ...perClipReal.map((c) => ({
+        id: c.id,
+        group: c.auditGroup,
+        title: c.title,
+        respiratoryScore: c.respiratoryScore,
+        directnessScore: c.directnessScore,
+        voiceCompassLabel: c.voiceCompassLabel,
+      })),
+    ],
+  };
+
   const generatedAt = new Date().toISOString();
   const resultsObj = {
-    schema: "yata_real_audio_audit/v0.5",
+    schema: "yata_real_audio_audit/v0.6",
     generatedAt,
     axisCounts: {
       core: ORIGINAL_6_FALSIFIERS.length,
@@ -833,6 +925,7 @@ async function main() {
     generalization,
     expectedUnkawaiiSummary,
     neuroscienceLenses,
+    voiceCompass,
     perClipTokiko,
     perClipReal,
   };
