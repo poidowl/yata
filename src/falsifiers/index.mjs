@@ -1,11 +1,11 @@
 /**
- * src/falsifiers/index.mjs — 40-Axis "Unkawaii" Falsifier Registry
+ * src/falsifiers/index.mjs — 64-Axis "Unkawaii" Falsifier Registry
  *
  * Exports:
  *   - ORIGINAL_6_FALSIFIERS: F1–F6 (v0.1 backward-compatible core)
- *   - DEFAULT_FALSIFIERS:    F1–F40 in exact numerical order
+ *   - DEFAULT_FALSIFIERS:    F1–F64 in exact numerical order
  *   - ORTHOGONAL_AXES:       Axes confirmed neither kawaii nor unkawaii (freedom-of-expression map)
- *   - TOOLBOX_FALSIFIERS:    F7–F40 excluding ORTHOGONAL_AXES (diagnostic/toolbox axes)
+ *   - TOOLBOX_FALSIFIERS:    F7–F64 excluding ORTHOGONAL_AXES (diagnostic/toolbox axes)
  *   - createFalsifiers(thresholdOverrides = {}, baseFalsifiers = DEFAULT_FALSIFIERS)
  *
  * Zero external dependencies. Pure ES Module.
@@ -16,6 +16,9 @@ import { WAVEFORM_FALSIFIERS } from "./waveform.mjs";
 import { SPECTRAL_CORE_FALSIFIERS, SPECTRAL_EXTRA_FALSIFIERS } from "./spectral.mjs";
 import { PROSODY_FALSIFIERS } from "./prosody.mjs";
 import { SPATIAL_FALSIFIERS } from "./spatial.mjs";
+import { DYNAMICS_FALSIFIERS } from "./dynamics.mjs";
+import { ACOUSTICS_FALSIFIERS } from "./acoustics.mjs";
+import { FATIGUE_FALSIFIERS } from "./fatigue.mjs";
 
 export { ORIGINAL_6_FALSIFIERS };
 
@@ -26,6 +29,9 @@ export const DEFAULT_FALSIFIERS = Object.freeze([
   ...PROSODY_FALSIFIERS,          // F21–F27
   ...SPATIAL_FALSIFIERS,          // F28–F30
   ...SPECTRAL_EXTRA_FALSIFIERS,   // F31–F40
+  ...DYNAMICS_FALSIFIERS,         // F41–F48
+  ...ACOUSTICS_FALSIFIERS,        // F49–F56
+  ...FATIGUE_FALSIFIERS,          // F57–F64
 ]);
 
 /**

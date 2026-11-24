@@ -297,13 +297,16 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
   const b60 = Math.max(1, binOf(60));
   const b80 = Math.max(1, binOf(80));
   const b90 = binOf(90);
+  const b150 = binOf(150);
   const b200 = binOf(200);
   const b250 = binOf(250);
   const b300 = binOf(300);
+  const b450 = binOf(450);
   const b600 = binOf(600);
   const b650 = binOf(650);
   const b1000 = binOf(1000);
   const b2000 = binOf(2000);
+  const b2200 = binOf(2200);
   const b2500 = binOf(2500);
   const b2800 = binOf(2800);
   const b3400 = binOf(3400);
@@ -339,11 +342,13 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
   const invFftSq = invFft * invFft;
   const numAcBins = Math.max(1, halfBins - 1);
   const mhCount = Math.max(1, b4000 - b1000 + 1);
+  const coreCount = Math.max(1, b2200 - b300 + 1);
 
   for (let start = 0; start + frameSize <= n; start += hopSize) {
     let sumSq = 0;
     let rawSumSq = 0;
     let rawSumCube = 0;
+    let rawSumQuad = 0;
     let zcr = 0;
     let diffSq = 0;
     let peakPos = -Infinity;
@@ -354,9 +359,11 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
       const idx = start + j;
       const x = norm[idx];
       const raw = samples[idx];
+      const raw2 = raw * raw;
       sumSq += x * x;
-      rawSumSq += raw * raw;
-      rawSumCube += raw * raw * raw;
+      rawSumSq += raw2;
+      rawSumCube += raw2 * raw;
+      rawSumQuad += raw2 * raw2;
       if (raw > peakPos) peakPos = raw;
       if (raw < peakNeg) peakNeg = raw;
       if (raw >= 0.995 || raw <= -0.995) clipped = true;
@@ -373,6 +380,8 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
     const rawAbsPeak = Math.max(Math.abs(peakPos), Math.abs(peakNeg));
     const frameCrest = rawRms > 1e-6 ? rawAbsPeak / rawRms : 0;
     const frameSkew = rawRms > 1e-6 ? Math.abs(rawSumCube / frameSize / (rawRms * rawRms * rawRms)) : 0;
+    const rawRms4 = rawRms * rawRms * rawRms * rawRms;
+    const frameKurt = rawRms4 > 1e-12 ? Math.min(100, rawSumQuad / frameSize / rawRms4) : 0;
     const rmsDb = 20 * Math.log10(Math.max(rms, 1e-6));
     const zcrRate = zcr / frameSize;
     const hfRatio = sumSq > 1e-8 ? Math.min(1, diffSq / (sumSq * 2.0)) : 0;
@@ -413,6 +422,7 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
     let weightedFreqSum = 0;
     let logPowSum = 0;
     let mhLogSum = 0;
+    let coreLogSum = 0;
     let domBin = 1;
     let domMag = 0;
     const accumulateSpec = rms > 0.02;
@@ -435,6 +445,7 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
         logP = Math.log(p + 1e-18);
         logPowSum += logP;
         if (b >= b1000 && b <= b4000) mhLogSum += logP;
+        if (b >= b300 && b <= b2200) coreLogSum += logP;
         if (b >= minDomBin && m > domMag) {
           domMag = m;
           domBin = b;
@@ -451,13 +462,18 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
     const domHz = domMag > 1e-9 ? domBin * binHz : 0;
     const spectralCentroidHz = magSum > 1e-12 ? weightedFreqSum / magSum : 0;
 
-    // 85% spectral rolloff
+    // 85% and 99% spectral rolloff
     let spectralRolloffHz = 0;
+    let rolloff99Hz = 0;
     if (totalPow > 1e-18) {
       const target = powPrefix[1] + totalPow * 0.85;
+      const target99 = powPrefix[1] + totalPow * 0.99;
       for (let b = 1; b < halfBins; b++) {
-        if (powPrefix[b + 1] >= target) {
+        if (spectralRolloffHz === 0 && powPrefix[b + 1] >= target) {
           spectralRolloffHz = b * binHz;
+        }
+        if (powPrefix[b + 1] >= target99) {
+          rolloff99Hz = b * binHz;
           break;
         }
       }
@@ -470,11 +486,17 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
         ? Math.max(0, Math.min(1, Math.exp(logPowSum / numAcBins) / (arithMeanPow + 1e-18)))
         : 0;
 
-    // Mid-high flatness (1000-4000 Hz) for F31 whisper guard
+    // Mid-high flatness (1000-4000 Hz) for F31 whisper guard & voiced core flatness (300-2200 Hz) for F55
     const mhPowSum = powPrefix[b4000 + 1] - powPrefix[b1000];
     const mhArith = mhPowSum / mhCount;
     const midHighFlatness =
       mhArith > 1e-18 ? Math.max(0, Math.min(1, Math.exp(mhLogSum / mhCount) / (mhArith + 1e-18))) : 0;
+    const corePowSum = powPrefix[b2200 + 1] - powPrefix[b300];
+    const coreArith = corePowSum / coreCount;
+    const voicedCoreFlatness =
+      coreArith > 1e-18
+        ? Math.max(0, Math.min(1, Math.exp(coreLogSum / coreCount) / (coreArith + 1e-18)))
+        : 0;
 
     // O(1) prefix-sum band energies
     const invTotalPow = totalPow > 1e-18 ? 1 / totalPow : 0;
@@ -483,6 +505,7 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
     const subBassRatio = (powPrefix[b90 + 1] - powPrefix[b20]) * invTotalPow;
     const sibilanceRatio = (powPrefix[b10000 + 1] - powPrefix[b4500]) * invTotalPow;
     const boxyRatio = (powPrefix[b650 + 1] - powPrefix[b250]) * invTotalPow;
+    const proximityBoomRatio = (powPrefix[b450 + 1] - powPrefix[b150]) * invTotalPow;
     const presenceRatio = (powPrefix[b5000 + 1] - powPrefix[b2000]) * invTotalPow;
     const midOnlyRatio = (powPrefix[b3400 + 1] - powPrefix[b300]) * invTotalPow;
     const lowWarmthRatio = (powPrefix[b300 + 1] - powPrefix[b80]) * invTotalPow;
@@ -641,7 +664,11 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
       hiBand2800_11000Db,
       frameCrest,
       frameSkew,
+      frameKurt,
       specKurtosis,
+      voicedCoreFlatness,
+      rolloff99Hz,
+      proximityBoomRatio,
     });
   }
 
@@ -1190,6 +1217,379 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
   const meanSyllIoi = meanOf(syllIois);
   const syllIoiCv = syllIois.length >= 2 && meanSyllIoi > 1e-4 ? stdOf(syllIois, meanSyllIoi) / meanSyllIoi : 0;
 
+  // --- F41–F48 (v0.10): Prosodic & Articulatory Dynamics (zero extra FFT) ---
+  const syllPeakAmps = [];
+  const syllOnsetRises = [];
+  for (let i = 2; i + 2 < frames.length; i++) {
+    const r = frames[i].rms;
+    if (
+      r >= maxRms * 0.18 &&
+      r > frames[i - 1].rms &&
+      r >= frames[i + 1].rms &&
+      r > frames[i - 2].rms &&
+      r >= frames[i + 2].rms
+    ) {
+      syllPeakAmps.push(r);
+      syllOnsetRises.push(Math.max(0, r - frames[i - 2].rms));
+    }
+  }
+  const meanSyllAmp = meanOf(syllPeakAmps);
+  const syllPeakAmpCv =
+    syllPeakAmps.length >= 3 && meanSyllAmp > 1e-6 ? stdOf(syllPeakAmps, meanSyllAmp) / meanSyllAmp : 1;
+  const meanOnsetRise = meanOf(syllOnsetRises);
+  const onsetAttackCv =
+    syllOnsetRises.length >= 3 && meanOnsetRise > 1e-6
+      ? stdOf(syllOnsetRises, meanOnsetRise) / meanOnsetRise
+      : 1;
+
+  // F41 & F46: Pitch declination slope & 90th-percentile curvature
+  const dynVoicedSemi = [];
+  const voicedHnrVals = [];
+  const dynThr = Math.max(0.03, maxRms * 0.1);
+  for (let i = 0; i < frames.length; i++) {
+    if (frames[i].rms >= dynThr && frames[i].voiced && frames[i].f0 > 50) {
+      dynVoicedSemi.push(12 * Math.log2(frames[i].f0 / 100));
+      voicedHnrVals.push(frames[i].hnrDb);
+    }
+  }
+  let f0SlopeSemi = 0;
+  let f0CurvP90Semi = 0;
+  if (dynVoicedSemi.length >= 10) {
+    const xs = new Float64Array(dynVoicedSemi.length);
+    const invLen = 1 / dynVoicedSemi.length;
+    for (let i = 0; i < dynVoicedSemi.length; i++) xs[i] = i * invLen;
+    f0SlopeSemi = pearson(xs, dynVoicedSemi) * stdOf(dynVoicedSemi, meanOf(dynVoicedSemi));
+    const curvVals = [];
+    for (let i = 1; i + 1 < dynVoicedSemi.length; i++) {
+      const d2 = Math.abs(dynVoicedSemi[i + 1] - 2 * dynVoicedSemi[i] + dynVoicedSemi[i - 1]);
+      if (d2 < 6) curvVals.push(d2);
+    }
+    if (curvVals.length >= 4) f0CurvP90Semi = percentile(curvVals, 0.9);
+  }
+  const hnrStdDb = voicedHnrVals.length >= 4 ? stdOf(voicedHnrVals, meanOf(voicedHnrVals)) : 0;
+
+  // F43: Internal unvoiced consonant release ratio inside active span
+  let internalUnvoicedRatio = 0;
+  if (activeCount >= 4) {
+    const firstActIdx = activeIndices[0];
+    const lastActIdx = activeIndices[activeCount - 1];
+    const spanLen = Math.max(1, lastActIdx - firstActIdx + 1);
+    let unvCnt = 0;
+    for (let i = firstActIdx; i <= lastActIdx; i++) {
+      if (frames[i].rms >= maxRms * 0.1 && !frames[i].voiced) unvCnt++;
+    }
+    internalUnvoicedRatio = unvCnt / spanLen;
+  }
+
+  // F45: MFCC 1–8 frame-to-frame articulatory velocity from dbMatrix (precomputed DCT cosines, zero per-frame alloc)
+  let mfccVelMean = 0;
+  if (Array.isArray(dbMat) && dbMat.length === frames.length && frames.length > 0 && dbMat[0].length >= 48) {
+    const M = dbMat[0].length;
+    const invM = 1 / M;
+    const dctCos = new Float64Array(8 * M);
+    for (let k = 0; k < 8; k++) {
+      const factor = (Math.PI * (k + 1)) / M;
+      for (let m = 0; m < M; m++) dctCos[k * M + m] = Math.cos(factor * (m + 0.5));
+    }
+    let prevC = new Float64Array(8);
+    let currC = new Float64Array(8);
+    let hasPrevC = false;
+    let velSum = 0;
+    let velCnt = 0;
+    for (let i = 0; i < frames.length; i++) {
+      if (frames[i].rms < dynThr) {
+        hasPrevC = false;
+        continue;
+      }
+      const col = dbMat[i];
+      for (let k = 0; k < 8; k++) {
+        let s = 0;
+        const baseOff = k * M;
+        for (let m = 0; m < M; m++) s += col[m] * dctCos[baseOff + m];
+        currC[k] = s * invM;
+      }
+      if (hasPrevC) {
+        let ds = 0;
+        for (let k = 0; k < 8; k++) {
+          const d = currC[k] - prevC[k];
+          ds += d * d;
+        }
+        velSum += Math.sqrt(ds);
+        velCnt++;
+      }
+      const tmp = prevC;
+      prevC = currC;
+      currC = tmp;
+      hasPrevC = true;
+    }
+    if (velCnt > 0) mfccVelMean = velSum / velCnt;
+  }
+
+  // F47: Internal pause duration CV
+  let pauseDurCv = 1;
+  if (frames.length >= 10) {
+    const pauseLens = [];
+    let inGap = false;
+    let gapStart = 0;
+    let seenAct = false;
+    for (let i = 0; i < frames.length; i++) {
+      const act = frames[i].rms >= 0.03;
+      if (act) {
+        if (inGap && seenAct) {
+          const dur = (i - gapStart) * hopSec;
+          if (dur >= 0.06) pauseLens.push(dur);
+        }
+        seenAct = true;
+        inGap = false;
+      } else if (seenAct && !inGap) {
+        inGap = true;
+        gapStart = i;
+      }
+    }
+    if (pauseLens.length >= 3) {
+      const mp = meanOf(pauseLens);
+      if (mp > 1e-4) pauseDurCv = stdOf(pauseLens, mp) / mp;
+    }
+  }
+
+  // --- F49–F64 (v0.10): Acoustics, Codec, Micro-Expression & Listener Fatigue (zero extra FFT) ---
+  // F49: Late room reverb tail ratio (sustained low-level -35..-18 dB decay frames relative to active span)
+  let lateReverbRatio = 0;
+  if (activeCount >= 10 && maxRms > 1e-5) {
+    const revLo = maxRms * 0.018;
+    const revHi = maxRms * 0.125;
+    let tailCnt = 0;
+    for (let i = 1; i < frames.length; i++) {
+      const r = frames[i].rms;
+      if (r >= revLo && r <= revHi && frames[i - 1].rms >= r) tailCnt++;
+    }
+    lateReverbRatio = tailCnt / Math.max(1, frames.length);
+  }
+
+  // F50: Pre-echo smear before sharp onset jumps
+  let preEchoRatio = 0;
+  if (frames.length >= 8 && maxRms > 1e-5) {
+    const preVals = [];
+    for (let i = 4; i < frames.length; i++) {
+      const jump = frames[i].rms - frames[i - 1].rms;
+      if (jump >= maxRms * 0.28 && frames[i - 3].rms < maxRms * 0.06) {
+        preVals.push(frames[i - 1].rms / Math.max(frames[i].rms, 1e-6));
+      }
+    }
+    if (preVals.length >= 2) preEchoRatio = meanOf(preVals);
+  }
+
+  // F51: Deepest spectral band hole in mean active Mel spectrum (bands 10..34)
+  // F52: Mid-band flux jitter (rapid 500-2500 Hz micro-beating)
+  // F58: Upper formant MFCC 5-8 temporal std
+  let spectralHoleDepthDb = 0;
+  let midBandFluxJitter = 0;
+  let upperMfccStd = 0;
+  if (Array.isArray(dbMat) && dbMat.length === frames.length && frames.length > 0 && dbMat[0].length >= 48) {
+    const M = dbMat[0].length;
+    const meanMel = new Float64Array(M);
+    let actMelCnt = 0;
+    const midDeltas = [];
+    let prevMid = 0;
+    let hasPrevMid = false;
+
+    const invM = 1 / M;
+    const dctHi = new Float64Array(4 * M);
+    for (let k = 0; k < 4; k++) {
+      const factor = (Math.PI * (k + 5)) / M;
+      for (let m = 0; m < M; m++) dctHi[k * M + m] = Math.cos(factor * (m + 0.5));
+    }
+    const hiSums = new Float64Array(4);
+    const hiSqSums = new Float64Array(4);
+
+    for (let i = 0; i < frames.length; i++) {
+      if (frames[i].rms < dynThr) {
+        hasPrevMid = false;
+        continue;
+      }
+      const col = dbMat[i];
+      for (let m = 0; m < M; m++) meanMel[m] += col[m];
+      actMelCnt++;
+
+      let midMean = 0;
+      for (let m = 14; m <= 27; m++) midMean += col[m];
+      midMean /= 14;
+      if (hasPrevMid) midDeltas.push(Math.abs(midMean - prevMid));
+      prevMid = midMean;
+      hasPrevMid = true;
+
+      for (let k = 0; k < 4; k++) {
+        let s = 0;
+        const off = k * M;
+        for (let m = 0; m < M; m++) s += col[m] * dctHi[off + m];
+        const v = s * invM;
+        hiSums[k] += v;
+        hiSqSums[k] += v * v;
+      }
+    }
+
+    if (actMelCnt >= 5) {
+      for (let m = 0; m < M; m++) meanMel[m] /= actMelCnt;
+      for (let m = 10; m <= 34; m++) {
+        const neigh = 0.5 * (meanMel[m - 2] + meanMel[m + 2]);
+        const dip = neigh - meanMel[m];
+        if (dip > spectralHoleDepthDb) spectralHoleDepthDb = dip;
+      }
+      let hiStdSum = 0;
+      for (let k = 0; k < 4; k++) {
+        const mu = hiSums[k] / actMelCnt;
+        hiStdSum += Math.sqrt(Math.max(0, hiSqSums[k] / actMelCnt - mu * mu));
+      }
+      upperMfccStd = hiStdSum / 4;
+    }
+    if (midDeltas.length >= 6) {
+      const mm = meanOf(midDeltas);
+      midBandFluxJitter = stdOf(midDeltas, mm);
+    }
+  }
+
+  // F53, F55, F56, F59: Active-frame aggregates
+  const effectiveCutoffHz = activeCount
+    ? percentile(
+        activeIndices.map((i) => frameExtras[i].rolloff99Hz),
+        0.9
+      )
+    : 0;
+  const voicedCoreFlatness = voicedFrameCount
+    ? meanOf(
+        frames
+          .map((fr, idx) => (fr.voiced ? frameExtras[idx].voicedCoreFlatness : -1))
+          .filter((v) => v >= 0)
+      )
+    : 0;
+  const waveKurtMean = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].frameKurt)) : 0;
+  const proximityBoomRatio = activeCount
+    ? meanOf(activeIndices.map((i) => frameExtras[i].proximityBoomRatio))
+    : 0;
+
+  // F54: Compressor / AGC noise-floor pumping (floor level surging during gaps)
+  let noiseFloorPumping = 0;
+  if (frames.length >= 20 && maxRms > 1e-5) {
+    const gapFloors = [];
+    let inGap = false;
+    let gapMin = Infinity;
+    let seenAct = false;
+    for (let i = 0; i < frames.length; i++) {
+      const r = frames[i].rms;
+      if (r >= 0.04) {
+        if (inGap && seenAct && Number.isFinite(gapMin)) gapFloors.push(gapMin);
+        seenAct = true;
+        inGap = false;
+        gapMin = Infinity;
+      } else if (seenAct) {
+        inGap = true;
+        if (r < gapMin) gapMin = r;
+      }
+    }
+    if (gapFloors.length >= 2) {
+      const gfMean = meanOf(gapFloors);
+      const gfStd = stdOf(gapFloors, gfMean);
+      const floorRel = gfMean / Math.max(maxRms, 1e-5);
+      // Only flag audible elevated noise floors (>= 4% of peak) surging during pauses
+      noiseFloorPumping =
+        floorRel >= 0.04 ? Math.min(1, floorRel * 8 + (gfStd / Math.max(gfMean, 1e-5)) * 0.35) : 0;
+    }
+  }
+
+  // F57: Tail decay monotony across multiple phrase ends
+  const phraseTailDurs = [];
+  if (frames.length >= 15) {
+    let inAct = false;
+    let peakIdx = 0;
+    let peakVal = 0;
+    for (let i = 0; i < frames.length; i++) {
+      const r = frames[i].rms;
+      if (r >= 0.03) {
+        if (!inAct) {
+          inAct = true;
+          peakIdx = i;
+          peakVal = r;
+        } else if (r >= peakVal * 0.7) {
+          peakIdx = i;
+          if (r > peakVal) peakVal = r;
+        }
+      } else if (inAct) {
+        phraseTailDurs.push(Math.max(hopSec, (i - peakIdx) * hopSec));
+        inAct = false;
+      }
+    }
+    if (inAct) phraseTailDurs.push(Math.max(hopSec, (frames.length - peakIdx) * hopSec));
+  }
+  const phraseEndCount = phraseTailDurs.length;
+  const meanTailDur = meanOf(phraseTailDurs);
+  const tailDecayCv =
+    phraseEndCount >= 3 && meanTailDur > 1e-4 ? stdOf(phraseTailDurs, meanTailDur) / meanTailDur : 1;
+
+  // F60: Longest continuous high-sibilance run
+  let maxSibilantRunSec = 0;
+  {
+    let curRun = 0;
+    for (let i = 0; i < frames.length; i++) {
+      if (frames[i].rms >= dynThr && frameExtras[i].sibilanceRatio >= 0.35) {
+        curRun++;
+        if (curRun * hopSec > maxSibilantRunSec) maxSibilantRunSec = curRun * hopSec;
+      } else {
+        curRun = 0;
+      }
+    }
+  }
+
+  // F61: Creaky vocal fry drag ratio (voiced frames < 115 Hz) & F62: Max sustained intra-run F0 register break jump
+  let vocalFryRatio = 0;
+  let maxIntraRunF0JumpSemi = 0;
+  if (voicedFrameCount >= 5) {
+    let fryCnt = 0;
+    for (let i = 0; i < frames.length; i++) {
+      if (frames[i].voiced && frames[i].f0 > 50 && frames[i].f0 < 115) fryCnt++;
+    }
+    vocalFryRatio = fryCnt / voicedFrameCount;
+
+    // Require 2 stable pre-frames and 2 stable post-frames to ignore 1-frame pitch-tracker octave glitches
+    for (let i = 2; i + 1 < frames.length; i++) {
+      const a0 = frames[i - 2];
+      const a1 = frames[i - 1];
+      const b0 = frames[i];
+      const b1 = frames[i + 1];
+      if (
+        a0.voiced &&
+        a1.voiced &&
+        b0.voiced &&
+        b1.voiced &&
+        a0.f0 > 50 &&
+        a1.f0 > 50 &&
+        b0.f0 > 50 &&
+        b1.f0 > 50
+      ) {
+        const preStable = Math.abs(12 * Math.log2(a1.f0 / a0.f0)) < 1.5;
+        const postStable = Math.abs(12 * Math.log2(b1.f0 / b0.f0)) < 1.5;
+        if (preStable && postStable) {
+          const jump = Math.abs(12 * Math.log2(b0.f0 / a1.f0));
+          if (jump > maxIntraRunF0JumpSemi) maxIntraRunF0JumpSemi = jump;
+        }
+      }
+    }
+  }
+
+  // F63: Stress micro-tremor depth (8–13 Hz amplitude modulation in active span)
+  let stressTremorDepth = 0;
+  if (activeCount >= 25 && meanActiveRms > 1e-6) {
+    const firstAct = activeIndices[0];
+    const lastAct = activeIndices[activeCount - 1];
+    const envSpan = [];
+    for (let i = firstAct; i <= lastAct; i++) envSpan.push(frames[i].rms / meanActiveRms);
+    const trem = computeModulationDft(envSpan, hopSec, 8, 13);
+    stressTremorDepth = trem.depth * trem.sinusoidality;
+  }
+
+  // F64: Ear-canal resonance fatigue density (mean harshnessRatio 2.5-5.5 kHz weighted by active duty)
+  const meanHarshBand = activeCount ? meanOf(activeIndices.map((i) => frames[i].harshnessRatio)) : 0;
+  const earFatigueDensity = meanHarshBand * (activeCount / Math.max(1, frames.length));
+
   const lowBandRatio = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].lowBandRatio)) : 0;
   const subBassRatio = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].subBassRatio)) : 0;
   const meanRoughness = activeCount ? meanOf(activeIndices.map((i) => frameExtras[i].roughness)) : 0;
@@ -1539,6 +1939,35 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     syllIoiCv: roundTo(syllIoiCv, 3),
     frameCrestMean: roundTo(frameCrestMean, 3),
     waveSkewMean: roundTo(waveSkewMean, 3),
+
+    // === v0.10 Prosodic & Articulatory Dynamics (F41–F48) ===
+    f0SlopeSemi: roundTo(f0SlopeSemi, 3),
+    syllPeakAmpCv: roundTo(syllPeakAmpCv, 3),
+    internalUnvoicedRatio: roundTo(internalUnvoicedRatio, 4),
+    hnrStdDb: roundTo(hnrStdDb, 2),
+    mfccVelMean: roundTo(mfccVelMean, 3),
+    f0CurvP90Semi: roundTo(f0CurvP90Semi, 3),
+    pauseDurCv: roundTo(pauseDurCv, 3),
+    onsetAttackCv: roundTo(onsetAttackCv, 3),
+
+    // === v0.10 Acoustics, Codec, Micro-Expression & Listener Fatigue (F49–F64) ===
+    lateReverbRatio: roundTo(lateReverbRatio, 4),
+    preEchoRatio: roundTo(preEchoRatio, 4),
+    spectralHoleDepthDb: roundTo(spectralHoleDepthDb, 2),
+    midBandFluxJitter: roundTo(midBandFluxJitter, 3),
+    effectiveCutoffHz: roundTo(effectiveCutoffHz, 1),
+    noiseFloorPumping: roundTo(noiseFloorPumping, 4),
+    voicedCoreFlatness: roundTo(voicedCoreFlatness, 4),
+    waveKurtMean: roundTo(waveKurtMean, 2),
+    tailDecayCv: roundTo(tailDecayCv, 3),
+    phraseEndCount,
+    upperMfccStd: roundTo(upperMfccStd, 3),
+    proximityBoomRatio: roundTo(proximityBoomRatio, 4),
+    maxSibilantRunSec: roundTo(maxSibilantRunSec, 3),
+    vocalFryRatio: roundTo(vocalFryRatio, 4),
+    maxIntraRunF0JumpSemi: roundTo(maxIntraRunF0JumpSemi, 2),
+    stressTremorDepth: roundTo(stressTremorDepth, 4),
+    earFatigueDensity: roundTo(earFatigueDensity, 4),
   };
 
   // --- v0.6 Voice Compass ("sound produced to be heard by someone, using a respiratory organ") ---

@@ -130,10 +130,10 @@ function getFalsifierResult(report, id) {
   return found;
 }
 
-describe("M2: 40-Axis Falsifier Registry & Report Engine", () => {
-  it("exports ORIGINAL_6_FALSIFIERS (6) and DEFAULT_FALSIFIERS (40) in exact F1..F40 order with unique IDs", () => {
+describe("M2: 64-Axis Falsifier Registry & Report Engine", () => {
+  it("exports ORIGINAL_6_FALSIFIERS (6) and DEFAULT_FALSIFIERS (64) in exact F1..F64 order with unique IDs", () => {
     assert.equal(ORIGINAL_6_FALSIFIERS.length, 6);
-    assert.equal(DEFAULT_FALSIFIERS.length, 40);
+    assert.equal(DEFAULT_FALSIFIERS.length, 64);
 
     const expectedCoreIds = [
       "F1_HARSH_EDGE",
@@ -149,7 +149,7 @@ describe("M2: 40-Axis Falsifier Registry & Report Engine", () => {
     );
 
     const seen = new Set();
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 64; i++) {
       const f = DEFAULT_FALSIFIERS[i];
       assert.ok(f.id.startsWith(`F${i + 1}_`), `Index ${i} expected F${i + 1}_*, got ${f.id}`);
       assert.equal(typeof f.domain, "string");
@@ -160,7 +160,7 @@ describe("M2: 40-Axis Falsifier Registry & Report Engine", () => {
     }
   });
 
-  it("clean pleasant positive controls survive 0/40 (warm voice, sasayaki whisper, warm chime, clean stereo)", () => {
+  it("clean pleasant positive controls survive 0/64 (warm voice, sasayaki whisper, warm chime, clean stereo)", () => {
     const positives = [
       { label: "warm_voice", samples: genWarmVoice(0.65, 101) },
       { label: "sasayaki_whisper", samples: genSasayakiWhisper(0.65, 202) },
@@ -173,12 +173,12 @@ describe("M2: 40-Axis Falsifier Registry & Report Engine", () => {
       assert.equal(
         rep.verdict,
         "SURVIVED_KAWAII_CANDIDATE",
-        `${item.label} should survive 0/40, but triggered: ${triggered
+        `${item.label} should survive 0/64, but triggered: ${triggered
           .map((t) => `${t.id}(score=${t.score}, ${t.evidence})`)
           .join("; ")}`
       );
       assert.equal(rep.triggeredCount, 0);
-      assert.equal(rep.totalFalsifiers, 40);
+      assert.equal(rep.totalFalsifiers, 64);
       for (const f of rep.falsifiers) {
         assert.ok(Number.isFinite(f.score) && f.score >= 0 && f.score <= 1, `${f.id} score invalid`);
       }
@@ -739,7 +739,7 @@ describe("M2: 40-Axis Falsifier Registry & Report Engine", () => {
       ["short15ms", shortClip],
     ]) {
       const rep = analyzeSamples(buf, SR, { label });
-      assert.equal(rep.totalFalsifiers, 40);
+      assert.equal(rep.totalFalsifiers, 64);
       for (const f of rep.falsifiers) {
         assert.ok(
           Number.isFinite(f.score) && f.score >= 0 && f.score <= 1,
@@ -785,12 +785,12 @@ describe("M2: 40-Axis Falsifier Registry & Report Engine", () => {
 
     const repCore = analyzeSamples(warm, SR, { label: "core6", falsifiers: ORIGINAL_6_FALSIFIERS });
     const repAll = analyzeSamples(dc, SR, {
-      label: "all40_reversed",
+      label: "all64_reversed",
       falsifiers: [...DEFAULT_FALSIFIERS].reverse(),
     });
 
     const cmp = compareReports(repCore, repAll);
-    assert.equal(cmp.deltas.length, 40);
+    assert.equal(cmp.deltas.length, 64);
 
     const d1 = cmp.deltas.find((d) => d.id === "F1_HARSH_EDGE");
     assert.ok(d1 && d1.aScore !== null && d1.bScore !== null && d1.deltaBMinusA !== null);
@@ -813,7 +813,7 @@ describe("M2: 40-Axis Falsifier Registry & Report Engine", () => {
     const compactClean = formatForLLM(repClean);
     const verboseClean = formatForLLM(repClean, { verbose: true });
     assert.ok(compactClean.split("\n").length <= 10, `Compact clean too long: ${compactClean.split("\n").length}`);
-    assert.ok(verboseClean.split("\n").length > 40, "Verbose dump should include all 40 falsifiers");
+    assert.ok(verboseClean.split("\n").length > 64, "Verbose dump should include all 64 falsifiers");
 
     const repBad = analyzeSamples(dc, SR, { label: "dc_bad" });
     const compactBad = formatForLLM(repBad);
@@ -1206,5 +1206,83 @@ describe("M2: 40-Axis Falsifier Registry & Report Engine", () => {
       f40.detect({ activeFrameCount: 200, voicedRatio: 0.8, durationSec: 3.0, frameCrestMean: 2.55, waveSkewMean: 0.39, activeMpsSpeech4_16: 0.14 }).triggered,
       false
     );
+  });
+
+  it("v0.10 64-Axis Mirror: F41-F48 (dynamics), F49-F56 (acoustics/codec), F57-F64 (register/fatigue) detect targeted failures and stay silent on clean live speech", () => {
+    const byId = (id) => DEFAULT_FALSIFIERS.find((x) => x.id === id);
+    const cleanSpeech = {
+      activeFrameCount: 220,
+      voicedFrameCount: 180,
+      voicedRatio: 0.8,
+      durationSec: 3.0,
+      activeMpsSpeech4_16: 0.15,
+      meanSpectralFlatness: 0.04,
+      meanTop1PeakShare: 0.2,
+      presenceRatio: 0.25,
+      onsetCount: 8,
+      pauseCount: 3,
+      syllPeakCount: 10,
+      phraseEndCount: 4,
+      breathlessWallRatio: 0.1,
+      f0SlopeSemi: -0.1,
+      syllPeakAmpCv: 0.42,
+      internalUnvoicedRatio: 0.11,
+      hnrStdDb: 5.8,
+      mfccVelMean: 1.65,
+      f0CurvP90Semi: 0.65,
+      pauseDurCv: 0.45,
+      onsetAttackCv: 0.55,
+      lateReverbRatio: 0.08,
+      preEchoRatio: 0.12,
+      spectralHoleDepthDb: 6.0,
+      midBandFluxJitter: 2.1,
+      effectiveCutoffHz: 9200,
+      noiseFloorPumping: 0.12,
+      voicedCoreFlatness: 0.05,
+      waveKurtMean: 4.5,
+      tailDecayCv: 0.42,
+      upperMfccStd: 1.15,
+      proximityBoomRatio: 0.25,
+      maxSibilantRunSec: 0.11,
+      vocalFryRatio: 0.04,
+      maxIntraRunF0JumpSemi: 2.1,
+      stressTremorDepth: 0.06,
+      earFatigueDensity: 0.12,
+    };
+
+    // Clean live speech must pass ALL F41..F64 with zero false positives
+    for (let i = 40; i < 64; i++) {
+      const fn = DEFAULT_FALSIFIERS[i];
+      const res = fn.detect(cleanSpeech);
+      assert.equal(res.triggered, false, `Clean live speech should pass ${fn.id}, got score=${res.score}`);
+    }
+
+    // Targeted failure triggers across all 3 new modules
+    assert.equal(byId("F41_MONOTONE_DECLINATION").detect({ ...cleanSpeech, f0SlopeSemi: -1.45 }).triggered, true);
+    assert.equal(byId("F42_FLAT_SYLLABLE_DYNAMICS").detect({ ...cleanSpeech, syllPeakAmpCv: 0.18 }).triggered, true);
+    assert.equal(byId("F43_UNVOICED_CONSONANT_STARVATION").detect({ ...cleanSpeech, internalUnvoicedRatio: 0.01 }).triggered, true);
+    assert.equal(byId("F44_FLAT_HNR_CONTRAST").detect({ ...cleanSpeech, hnrStdDb: 3.5 }).triggered, true);
+    assert.equal(byId("F45_SLUGGISH_ARTICULATION").detect({ ...cleanSpeech, mfccVelMean: 1.05 }).triggered, true);
+    assert.equal(byId("F46_PITCH_ACCENT_STIFFNESS").detect({ ...cleanSpeech, f0CurvP90Semi: 0.10 }).triggered, true);
+    assert.equal(byId("F47_MECHANICAL_PAUSE_PACKING").detect({ ...cleanSpeech, pauseDurCv: 0.04 }).triggered, true);
+    assert.equal(byId("F48_UNIFORM_ONSET_LOCK").detect({ ...cleanSpeech, onsetAttackCv: 0.15 }).triggered, true);
+
+    assert.equal(byId("F49_EXCESSIVE_ROOM_REVERB_TAIL").detect({ ...cleanSpeech, lateReverbRatio: 0.55 }).triggered, true);
+    assert.equal(byId("F50_PRE_ECHO_SMEAR").detect({ ...cleanSpeech, preEchoRatio: 0.60 }).triggered, true);
+    assert.equal(byId("F51_SPECTRAL_BAND_HOLE").detect({ ...cleanSpeech, spectralHoleDepthDb: 28 }).triggered, true);
+    assert.equal(byId("F52_HARMONIC_PHASE_CHORUS").detect({ ...cleanSpeech, midBandFluxJitter: 7.8 }).triggered, true);
+    assert.equal(byId("F53_HIGH_FREQ_BANDWIDTH_CUTOFF").detect({ ...cleanSpeech, effectiveCutoffHz: 2800 }).triggered, true);
+    assert.equal(byId("F54_COMPRESSOR_PUMPING").detect({ ...cleanSpeech, noiseFloorPumping: 0.80 }).triggered, true);
+    assert.equal(byId("F55_INTERHARMONIC_BUZZ_FLOOR").detect({ ...cleanSpeech, voicedCoreFlatness: 0.36 }).triggered, true);
+    assert.equal(byId("F56_PHASE_LOCKED_IMPULSE_BUZZ").detect({ ...cleanSpeech, waveKurtMean: 14.5 }).triggered, true);
+
+    assert.equal(byId("F57_TAIL_DECAY_MONOTONY").detect({ ...cleanSpeech, tailDecayCv: 0.03 }).triggered, true);
+    assert.equal(byId("F58_UPPER_FORMANT_FREEZE").detect({ ...cleanSpeech, upperMfccStd: 0.25 }).triggered, true);
+    assert.equal(byId("F59_LOW_MID_PROXIMITY_BOOM").detect({ ...cleanSpeech, proximityBoomRatio: 0.78, presenceRatio: 0.04 }).triggered, true);
+    assert.equal(byId("F60_SIBILANT_DURATION_STRETCH").detect({ ...cleanSpeech, maxSibilantRunSec: 0.36 }).triggered, true);
+    assert.equal(byId("F61_CREAKY_VOCAL_FRY_DRAG").detect({ ...cleanSpeech, vocalFryRatio: 0.45 }).triggered, true);
+    assert.equal(byId("F62_REGISTER_BREAK_JUMP").detect({ ...cleanSpeech, maxIntraRunF0JumpSemi: 11.0 }).triggered, true);
+    assert.equal(byId("F63_MICRO_TREMOR_STRESS").detect({ ...cleanSpeech, stressTremorDepth: 0.42 }).triggered, true);
+    assert.equal(byId("F64_EAR_CANAL_FATIGUE_INDEX").detect({ ...cleanSpeech, earFatigueDensity: 0.55 }).triggered, true);
   });
 });
