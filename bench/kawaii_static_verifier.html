@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>鳴る・ナル・鳴った・ナッタ — かわいさの静的観測＆検証ベンチ</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <style>
+    :root {
+      --bg: #faf8f5;
+      --card: #ffffff;
+      --ink: #1e242b;
+      --muted: #5c6672;
+      --kawaii: #e05677;
+      --symbolic: #3b6ea5;
+      --pass: #0d9488;
+      --warn: #d97706;
+      --fail: #dc2626;
+      --border: #e7e2da;
+    }
+    body {
+      font-family: "Inter", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      background-color: var(--bg);
+      color: var(--ink);
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    input[type="range"] {
+      accent-color: var(--kawaii);
+    }
+    .tab-active {
+      background-color: var(--ink);
+      color: #ffffff;
+    }
+    .preset-active {
+      border-color: var(--kawaii);
+      background-color: #fff1f4;
+      color: #9f1239;
+    }
+    .svg-grid line {
+      stroke: #ede8e0;
+      stroke-width: 1;
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#e7e2da] pb-4">
+      <div>
+        <div class="inline-flex items-center gap-2 text-xs font-semibold tracking-wider uppercase text-[#e05677] mb-1">
+          <span>Static Acoustic Geometry</span>
+          <span>•</span>
+          <span>Formal Verifier v0.1</span>
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-[#1e242b]">
+          鳴る・ナル・鳴った・ナッタ
+          <span class="block sm:inline text-base sm:text-lg font-medium text-[#5c6672] sm:ml-2">
+            かわいさの静的観測＆検証ベンチ
+          </span>
+        </h1>
+        <p class="text-sm text-[#5c6672] mt-1 max-w-2xl">
+          音を「鳴るプロセス」ではなく「時間ごと凍らせた1つの静的構造物」として三面図に射影し、公理の不等式で検証・反例探索するための設計プロトタイプです。
+        </p>
+      </div>
+      <div class="flex flex-col items-start md:items-end gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="btnPlay" type="button" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#e05677] hover:bg-[#c84665] text-white text-sm font-semibold shadow-sm transition">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <span>簡易シンセで試聴</span>
+          </button>
+          <a id="btnDownloadWav" href="#" download="kawaii_sample.wav" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-[#f4efe8] border border-[#d8d1c5] text-[#1e242b] text-xs font-medium transition">
+            <span>WAV保存</span>
+          </a>
+          <button id="btnExplore" type="button" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-[#f4efe8] border border-[#d8d1c5] text-[#1e242b] text-sm font-medium transition">
+            <span>ランダム探索（境界候補）</span>
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <audio id="nativeAudio" controls preload="auto" class="h-8 w-56"></audio>
+          <span id="audioStatus" class="mono text-[11px] text-[#5c6672]">WAV準備OK</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Preset Bar & Phase Banner -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+      <div class="lg:col-span-7 bg-white rounded-2xl border border-[#e7e2da] p-4 shadow-sm">
+        <div class="flex items-center justify-between mb-2.5">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[#5c6672]">基準リトマス試験紙（4語プリセット）</span>
+          <span class="text-xs text-[#5c6672]">同じ音素列でも静的形状が分岐する</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5" id="presetButtons">
+          <button type="button" data-preset="naru" class="preset-btn px-3 py-2.5 rounded-xl border border-[#e7e2da] text-left transition hover:border-[#e05677]">
+            <div class="text-lg font-bold leading-tight">鳴る</div>
+            <div class="text-[11px] text-[#5c6672] mt-0.5">進行・開いて溶ける</div>
+          </button>
+          <button type="button" data-preset="naru_kata" class="preset-btn px-3 py-2.5 rounded-xl border border-[#e7e2da] text-left transition hover:border-[#3b6ea5]">
+            <div class="text-lg font-bold leading-tight">ナル</div>
+            <div class="text-[11px] text-[#5c6672] mt-0.5">記号・硬いぶつ切り</div>
+          </button>
+          <button type="button" data-preset="natta" class="preset-btn px-3 py-2.5 rounded-xl border border-[#e7e2da] text-left transition hover:border-[#e05677]">
+            <div class="text-lg font-bold leading-tight">鳴った</div>
+            <div class="text-[11px] text-[#5c6672] mt-0.5">完了・丸い促音着地</div>
+          </button>
+          <button type="button" data-preset="natta_kata" class="preset-btn px-3 py-2.5 rounded-xl border border-[#e7e2da] text-left transition hover:border-[#3b6ea5]">
+            <div class="text-lg font-bold leading-tight">ナッタ</div>
+            <div class="text-[11px] text-[#5c6672] mt-0.5">硬い促音・鋭い破裂</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Current Verdict Card -->
+      <div class="lg:col-span-5 bg-white rounded-2xl border border-[#e7e2da] p-4 shadow-sm flex flex-col justify-between">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-wider text-[#5c6672]">機械検証カーネル判定</div>
+            <div class="flex items-center gap-2.5 mt-1">
+              <span id="phaseBadge" class="inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-bold bg-[#ccfbf1] text-[#0f766e]">Kawaii（かわいい相）</span>
+              <span id="verdictScore" class="mono text-xs text-[#5c6672]">4 / 4 公理 PASS</span>
+            </div>
+          </div>
+          <span id="formTag" class="mono text-xs px-2 py-1 rounded-md bg-[#f5f2ec] text-[#5c6672]">/n a Q t a/</span>
+        </div>
+        <p id="phaseDesc" class="text-xs text-[#5c6672] mt-2 leading-relaxed">
+          促音の溜めが丸く復帰し、語尾が息と溶けて着地しています。記号化（ナッタ）にも破綻にも落ちていません。
+        </p>
+      </div>
+    </section>
+
+    <!-- Main Workspace: 3 Orthographic Views + Controls & Verifier -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <!-- Left: Static Three-View Projection (8 cols) -->
+      <div class="lg:col-span-8 space-y-4">
+        <!-- View 1: Contour & Curvature -->
+        <div class="bg-white rounded-2xl border border-[#e7e2da] p-4 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div>
+              <h2 class="text-sm font-bold text-[#1e242b]">第1面図：輪郭の曲率マップ（Contour &amp; Curvature）</h2>
+              <p class="text-xs text-[#5c6672]">時間軸を凍らせた強度・高域輪郭。鋭い角（赤）が出ると「ナッタ／攻撃的」へ相転移します。</p>
+            </div>
+            <div class="flex items-center gap-3 text-[11px] text-[#5c6672]">
+              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-[#e05677]"></span>柔らかい輪郭</span>
+              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-[#dc2626]"></span>角張り（高曲率）</span>
+              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-[#94a3b8]"></span>理想軌道（意図）</span>
+            </div>
+          </div>
+          <div class="w-full overflow-hidden rounded-xl bg-[#fcfbf9] border border-[#efeae2]">
+            <svg id="svgContour" viewBox="0 0 640 200" class="w-full h-auto block" role="img" aria-label="輪郭の曲率マップ"></svg>
+          </div>
+        </div>
+
+        <!-- View 2 & View 3 side-by-side -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- View 2: Phase Space Topology -->
+          <div class="bg-white rounded-2xl border border-[#e7e2da] p-4 shadow-sm">
+            <div class="mb-2">
+              <h2 class="text-sm font-bold text-[#1e242b]">第2面図：緊張×脱力の相空間ループ</h2>
+              <p class="text-xs text-[#5c6672]">時間を消し「呼気緊張(X)」と「息漏れ・余白(Y)」の閉曲線で見る。緑枠がかわいい許容帯。</p>
+            </div>
+            <div class="w-full overflow-hidden rounded-xl bg-[#fcfbf9] border border-[#efeae2]">
+              <svg id="svgPhase" viewBox="0 0 320 230" class="w-full h-auto block" role="img" aria-label="緊張と脱力の相空間ループ"></svg>
+            </div>
+          </div>
+
+          <!-- View 3: Tail & Margin Landing -->
+          <div class="bg-white rounded-2xl border border-[#e7e2da] p-4 shadow-sm">
+            <div class="mb-2">
+              <h2 class="text-sm font-bold text-[#1e242b]">第3面図：着地のシルエット（語尾と余白）</h2>
+              <p class="text-xs text-[#5c6672]">語尾の減衰カーブ（実線）と息漏れ比（破線）。ぶつ切りか、溶けて着地するか。</p>
+            </div>
+            <div class="w-full overflow-hidden rounded-xl bg-[#fcfbf9] border border-[#efeae2]">
+              <svg id="svgTail" viewBox="0 0 320 230" class="w-full h-auto block" role="img" aria-label="語尾の着地シルエット"></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Parameters + Axiom Kernel + Counterexample Lab (4 cols) -->
+      <div class="lg:col-span-4 space-y-4">
+        <!-- Sliders -->
+        <div class="bg-white rounded-2xl border border-[#e7e2da] p-4 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-bold text-[#1e242b]">静的構造パラメータ（6軸）</h2>
+            <button id="btnResetPreset" type="button" class="text-xs text-[#5c6672] hover:text-[#1e242b] underline">プリセットに戻す</button>
+          </div>
+          <div class="space-y-3" id="slidersContainer"></div>
+        </div>
+
+        <!-- Formal Axioms Checklist -->
+        <div class="bg-white rounded-2xl border border-[#e7e2da] p-4 shadow-sm">
+          <div class="flex items-center justify-between mb-2.5">
+            <h2 class="text-sm font-bold text-[#1e242b]">公理の不等式チェック</h2>
+            <span class="mono text-[11px] text-[#5c6672]">Hard Verifier</span>
+          </div>
+          <div id="axiomList" class="space-y-2"></div>
+        </div>
+
+        <!-- Human Oracle / Counterexample Tagging -->
+        <div class="bg-white rounded-2xl border border-[#e7e2da] p-4 shadow-sm">
+          <h2 class="text-sm font-bold text-[#1e242b] mb-1">人間オラクル：反例を記録する</h2>
+          <p class="text-xs text-[#5c6672] mb-3">機械判定と耳の感覚がズレたら反例として記録。公理の穴を見つけるループ用。</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" data-oracle="kawaii_confirmed" class="oracle-btn px-2.5 py-2 rounded-xl border border-[#d1fae5] bg-[#ecfdf5] hover:bg-[#d1fae5] text-[#065f46] text-xs font-semibold transition">
+              かわいい確認
+            </button>
+            <button type="button" data-oracle="counter_azatoi" class="oracle-btn px-2.5 py-2 rounded-xl border border-[#fde68a] bg-[#fffbeb] hover:bg-[#fef3c7] text-[#92400e] text-xs font-semibold transition">
+              反例：あざとい
+            </button>
+            <button type="button" data-oracle="counter_uncanny" class="oracle-btn px-2.5 py-2 rounded-xl border border-[#fecaca] bg-[#fef2f2] hover:bg-[#fee2e2] text-[#991b1b] text-xs font-semibold transition">
+              反例：不気味・硬い
+            </button>
+            <button type="button" data-oracle="counter_hidden_kawaii" class="oracle-btn px-2.5 py-2 rounded-xl border border-[#fbcfe8] bg-[#fdf2f8] hover:bg-[#fce7f3] text-[#9d174d] text-xs font-semibold transition">
+              反例：REJECTだが可愛い
+            </button>
+          </div>
+          <div id="oracleToast" class="hidden mt-2 text-xs font-medium text-[#0d9488]"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom Spec Tabs: Data Schema / Kernel Code / Counterexample Log -->
+    <section class="bg-white rounded-2xl border border-[#e7e2da] p-4 sm:p-5 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#efeae2] pb-3 mb-4">
+        <div class="flex flex-wrap gap-2" role="tablist">
+          <button type="button" data-tab="schema" class="tab-btn tab-active px-3.5 py-1.5 rounded-lg text-xs font-semibold transition">
+            静的データ構造 (JSON)
+          </button>
+          <button type="button" data-tab="kernel" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#f5f2ec] text-[#5c6672] hover:text-[#1e242b] transition">
+            検証カーネル仕様 (JS)
+          </button>
+          <button type="button" data-tab="log" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#f5f2ec] text-[#5c6672] hover:text-[#1e242b] transition">
+            反例ログ (<span id="logCount">0</span>)
+          </button>
+        </div>
+        <button id="btnCopySpec" type="button" class="px-3 py-1.5 rounded-lg border border-[#d8d1c5] hover:bg-[#f4efe8] text-xs font-medium text-[#1e242b] transition">
+          表示中のコードをコピー
+        </button>
+      </div>
+
+      <div id="tabSchema" class="tab-panel">
+        <p class="text-xs text-[#5c6672] mb-2">
+          1発話（波形 $p(t)$）を静的な幾何オブジェクトへ畳み込んだ正規化データ表現。現在のスライダー状態と検証結果がリアルタイムに反映されます。
+        </p>
+        <pre id="jsonPreview" class="mono text-xs bg-[#1e242b] text-[#e6edf3] p-4 rounded-xl overflow-x-auto leading-relaxed"></pre>
+      </div>
+
+      <div id="tabKernel" class="tab-panel hidden">
+        <p class="text-xs text-[#5c6672] mb-2">
+          物理声道合成器（例：KUDA等）の出力波形から抽出した静的特徴量を受け取り、4公理の不等式と相ラベルを返す検証カーネルの純粋関数仕様です。
+        </p>
+        <pre id="kernelCode" class="mono text-xs bg-[#1e242b] text-[#e6edf3] p-4 rounded-xl overflow-x-auto leading-relaxed"></pre>
+      </div>
+
+      <div id="tabLog" class="tab-panel hidden">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-xs text-[#5c6672]">探索中に記録した反例や確認済みサンプル。クリックでそのパラメータを復元できます。</p>
+          <button id="btnClearLog" type="button" class="text-xs text-[#dc2626] hover:underline">ログをクリア</button>
+        </div>
+        <div id="logList" class="space-y-2 text-xs text-[#5c6672]">
+          まだ記録がありません。「ランダム探索」やスライダーを動かして、右側の「人間オラクル」ボタンから反例を記録してみてください。
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      const PRESETS = {
+        naru: {
+          id: "naru",
+          label: "鳴る",
+          phonemes: "/n a r u/",
+          mode: "ongoing",
+          params: {
+            scale: 0.72,
+            softness: 0.78,
+            lag: 0.42,
+            sokuonDepth: 0.08,
+            breathCoupling: 0.68,
+            tailMelt: 0.84
+          }
+        },
+        naru_kata: {
+          id: "naru_kata",
+          label: "ナル",
+          phonemes: "/n a r u/",
+          mode: "ongoing",
+          params: {
+            scale: 0.56,
+            softness: 0.24,
+            lag: 0.08,
+            sokuonDepth: 0.05,
+            breathCoupling: 0.14,
+            tailMelt: 0.12
+          }
+        },
+        natta: {
+          id: "natta",
+          label: "鳴った",
+          phonemes: "/n a Q t a/",
+          mode: "completed",
+          params: {
+            scale: 0.76,
+            softness: 0.74,
+            lag: 0.46,
+            sokuonDepth: 0.78,
+            breathCoupling: 0.64,
+            tailMelt: 0.72
+          }
+        },
+        natta_kata: {
+          id: "natta_kata",
+          label: "ナッタ",
+          phonemes: "/n a Q t a/",
+          mode: "completed",
+          params: {
+            scale: 0.52,
+            softness: 0.18,
+            lag: 0.09,
+            sokuonDepth: 0.88,
+            breathCoupling: 0.12,
+            tailMelt: 0.10
+          }
+        }
+      };
+
+      const SLIDER_META = [
+        { key: "scale", name: "身体スケール (声道短縮・高F0)", low: "大きい", high: "小さい" },
+        { key: "softness", name: "輪郭の丸み (非攻撃性・傾斜)", low: "鋭い・硬い", high: "丸い・柔和" },
+        { key: "lag", name: "意図と身体のズレ (臨界追従)", low: "完全追従(機械)", high: "追いつかない" },
+        { key: "sokuonDepth", name: "促音「ッ」の溜め・余白深さ", low: "連続(鳴る)", high: "深い溜め(鳴った)" },
+        { key: "breathCoupling", name: "息漏れ×脱力の因果結合", low: "乾いた無相関", high: "因果的に滲む" },
+        { key: "tailMelt", name: "語尾の着地カーブ (溶け方)", low: "ぶつ切り", high: "ふわりと着地" }
+      ];
+
+      let state = {
+        activePreset: "natta",
+        activeTab: "schema",
+        params: { ...PRESETS.natta.params },
+        logs: []
+      };
+
+      try {
+        const saved = localStorage.getItem("kawaii_static_verifier_logs_v1");
+        if (saved) state.logs = JSON.parse(saved);
+      } catch (e) {}
+
+      // Compute derived static geometric observables & run formal verification kernel
+      function evaluateStaticObject(p) {
+        const hasSokuon = p.sokuonDepth >= 0.35;
+        // Derived geometric invariants
+        const edgeSharpness = +(Math.max(0, Math.min(1, (1 - p.softness) * 0.78 + (1 - p.lag) * 0.22))).toFixed(3);
+        const reboundShock = +(hasSokuon
+          ? Math.max(0, Math.min(1, p.sokuonDepth * (1 - p.softness) * 1.05 + (1 - p.lag) * 0.15))
+          : 0.12).toFixed(3);
+        const loopRoundness = +(Math.max(0, Math.min(1, p.softness * 0.45 + p.breathCoupling * 0.35 + (1 - Math.abs(p.lag - 0.45) * 1.4) * 0.2))).toFixed(3);
+        const landingSoftness = +(p.tailMelt * 0.65 + p.breathCoupling * 0.35).toFixed(3);
+
+        const axioms = [
+          {
+            id: "A1",
+            title: "公理1：スケール×非攻撃性",
+            formula: "scale ≥ 0.45 ∧ softness ≥ 0.45 ∧ edgeSharpness ≤ 0.48",
+            valueText: `scale=${p.scale.toFixed(2)}, edge=${edgeSharpness.toFixed(2)}`,
+            pass: p.scale >= 0.45 && p.softness >= 0.45 && edgeSharpness <= 0.48,
+            failMode: p.softness < 0.45 ? "Harsh（硬い・記号的）" : "Heavy（サイズ過大）"
+          },
+          {
+            id: "A2",
+            title: "公理2：意図と身体の臨界帯",
+            formula: "0.18 ≤ lag ≤ 0.72",
+            valueText: `lag=${p.lag.toFixed(2)}`,
+            pass: p.lag >= 0.18 && p.lag <= 0.72,
+            failMode: p.lag < 0.18 ? "Robotic（完全追従・無機質）" : "Broken（制御破綻）"
+          },
+          {
+            id: "A3",
+            title: "公理3：因果ゆらぎ×着地の余白",
+            formula: "breathCoupling ≥ 0.35 ∧ landingSoftness ≥ 0.42",
+            valueText: `breath=${p.breathCoupling.toFixed(2)}, land=${landingSoftness.toFixed(2)}`,
+            pass: p.breathCoupling >= 0.35 && landingSoftness >= 0.42,
+            failMode: "Dry / Cut-off（乾いたぶつ切り）"
+          },
+          {
+            id: "A4",
+            title: hasSokuon ? "公理4：促音「ッ」の丸い復帰" : "公理4：連続流れの滑らかさ",
+            formula: hasSokuon ? "reboundShock ≤ 0.45" : "loopRoundness ≥ 0.50",
+            valueText: hasSokuon ? `shock=${reboundShock.toFixed(2)}` : `round=${loopRoundness.toFixed(2)}`,
+            pass: hasSokuon ? reboundShock <= 0.45 : loopRoundness >= 0.50,
+            failMode: hasSokuon ? "Symbolic（ナッタ化・鋭い破裂）" : "Flat（平坦な記号）"
+          }
+        ];
+
+        const passCount = axioms.filter(a => a.pass).length;
+        let phase = "Kawaii（かわいい相）";
+        let badgeClass = "bg-[#ccfbf1] text-[#0f766e]";
+        let desc = hasSokuon
+          ? "促音「ッ」の溜めから丸く復帰し、語尾が息と溶けて着地しています。『鳴った』の静的構造を満たしています。"
+          : "連続的な流れに微小な追いつかなさと余白が同居し、柔らかく開いて溶ける『鳴る』の静的構造です。";
+
+        if (passCount < 4) {
+          if (p.lag > 0.72) {
+            phase = "Uncanny / Broken（破綻相）";
+            badgeClass = "bg-[#fee2e2] text-[#991b1b]";
+            desc = "意図と身体のズレが臨界帯を超え、発話の輪郭が崩れています。制約を少し緩める必要があります。";
+          } else if (p.softness < 0.45 && p.lag < 0.18) {
+            phase = hasSokuon ? "Symbolic（ナッタ相）" : "Symbolic（ナル相）";
+            badgeClass = "bg-[#dbeafe] text-[#1e40af]";
+            desc = "立ち上がりが鋭く、追従も機械的に完璧なため、乾いたカタカナ記号の音像になっています。";
+          } else if (p.softness < 0.45 || edgeSharpness > 0.48 || (hasSokuon && reboundShock > 0.45)) {
+            phase = "Harsh（攻撃的・硬い相）";
+            badgeClass = "bg-[#ffedd5] text-[#9a3412]";
+            desc = "輪郭の曲率が尖りすぎています。小さくても高域や破裂のエッジが立つと「かわいい」から外れます。";
+          } else if (p.lag < 0.18) {
+            phase = "Robotic（無機質・人形相）";
+            badgeClass = "bg-[#e2e8f0] text-[#334155]";
+            desc = "音色は柔らかいのに、身体の遅れや揺らぎがゼロに近く、記号・人形のように聴こえる領域です。";
+          } else {
+            phase = "Boundary（境界・未確定相）";
+            badgeClass = "bg-[#fef3c7] text-[#92400e]";
+            desc = "一部はかわいい領域に入っていますが、語尾の着地や息の因果結合が不足しています。反例候補として注目です。";
+          }
+        }
+
+        return {
+          hasSokuon,
+          observables: { edgeSharpness, reboundShock, loopRoundness, landingSoftness },
+          axioms,
+          passCount,
+          phase,
+          badgeClass,
+          desc
+        };
+      }
+
+      // Draw View 1: Contour & Curvature Map
+      function renderContourSVG(p, evalRes) {
+        const svg = document.getElementById("svgContour");
+        const W = 640, H = 200;
+        const padL = 42, padR = 20, padT = 22, padB = 28;
+        const plotW = W - padL - padR;
+        const plotH = H - padT - padB;
+        const N = 120;
+
+        const idealPts = [];
+        const realPts = [];
+        const spikes = [];
+
+        for (let i = 0; i <= N; i++) {
+          const u = i / N; // normalized static position 0..1
+          // Ideal target envelope (phoneme intention)
+          let ideal = 0;
+          if (evalRes.hasSokuon) {
+            // /n a/ (0.08..0.40) -> /Q/ (0.40..0.58) -> /t a/ (0.58..0.88)
+            if (u >= 0.08 && u < 0.40) ideal = 0.76;
+            else if (u >= 0.40 && u < 0.58) ideal = 0.04;
+            else if (u >= 0.58 && u < 0.86) ideal = 0.82;
+            else ideal = 0.0;
+          } else {
+            // /n a r u/ continuous
+            if (u >= 0.08 && u < 0.45) ideal = 0.74;
+            else if (u >= 0.45 && u < 0.54) ideal = 0.48; // flap /r/
+            else if (u >= 0.54 && u < 0.86) ideal = 0.72;
+            else ideal = 0.0;
+          }
+
+          // Real physical contour shaped by softness, lag, sokuonDepth, tailMelt
+          let real = 0;
+          const riseSharp = 14 + (1 - p.softness) * 34;
+          const lagShift = p.lag * 0.045;
+          const uLag = Math.max(0, u - lagShift);
+
+          if (evalRes.hasSokuon) {
+            const seg1 = 1 / (1 + Math.exp(-riseSharp * (uLag - 0.10))) - 1 / (1 + Math.exp(-riseSharp * (uLag - 0.40)));
+            const valley = 1 - p.sokuonDepth * 0.94 * Math.exp(-Math.pow((uLag - 0.49) / 0.075, 2));
+            const burstSharp = 16 + (1 - p.softness) * 42;
+            const seg2Rise = 1 / (1 + Math.exp(-burstSharp * (uLag - 0.58)));
+            const overshoot = (1 - p.softness) * 0.24 * Math.exp(-Math.pow((uLag - 0.60) / 0.028, 2));
+            const tailRate = 6 + (1 - p.tailMelt) * 36;
+            const seg2Fall = 1 / (1 + Math.exp(tailRate * (uLag - (0.83 + p.tailMelt * 0.05))));
+            const base = Math.max(seg1 * 0.74 * valley, (seg2Rise * 0.76 + overshoot) * seg2Fall);
+            const microWobble = p.breathCoupling * 0.025 * Math.sin(u * 48) * (u > 0.68 ? 1.4 : 0.4);
+            real = Math.max(0, Math.min(1.0, base + microWobble));
+          } else {
+            const onset = 1 / (1 + Math.exp(-riseSharp * (uLag - 0.10)));
+            const flapDip = 1 - (0.28 + (1 - p.softness) * 0.22) * Math.exp(-Math.pow((uLag - 0.49) / 0.048, 2));
+            const tailRate = 5 + (1 - p.tailMelt) * 36;
+            const tail = 1 / (1 + Math.exp(tailRate * (uLag - (0.82 + p.tailMelt * 0.07))));
+            const overshoot = (1 - p.softness) * 0.16 * Math.exp(-Math.pow((uLag - 0.12) / 0.025, 2));
+            const microWobble = p.breathCoupling * 0.022 * Math.sin(u * 44) * (u > 0.65 ? 1.5 : 0.35);
+            real = Math.max(0, Math.min(1.0, (onset * 0.74 * flapDip + overshoot) * tail + microWobble));
+          }
+
+          const x = padL + u * plotW;
+          const yIdeal = padT + (1 - ideal) * plotH;
+          const yReal = padT + (1 - real) * plotH;
+          idealPts.push([x, yIdeal]);
+          realPts.push([x, yReal, real]);
+        }
+
+        // Detect sharp curvature points
+        for (let i = 2; i < realPts.length - 2; i++) {
+          const prev = realPts[i - 2][2];
+          const curr = realPts[i][2];
+          const next = realPts[i + 2][2];
+          const curv = Math.abs(next - 2 * curr + prev);
+          if (curv > 0.11) {
+            spikes.push({ x: realPts[i][0], y: realPts[i][1], curv });
+          }
+        }
+
+        const toPath = pts => pts.map((pt, idx) => `${idx === 0 ? "M" : "L"}${pt[0].toFixed(1)},${pt[1].toFixed(1)}`).join(" ");
+        const areaPath = `${toPath(realPts)} L${(padL + plotW).toFixed(1)},${(padT + plotH).toFixed(1)} L${padL},${(padT + plotH).toFixed(1)} Z`;
+        const strokeColor = evalRes.passCount === 4 ? "#e05677" : "#3b6ea5";
+        const fillColor = evalRes.passCount === 4 ? "rgba(224,86,119,0.14)" : "rgba(59,110,165,0.12)";
+
+        let gridLines = "";
+        for (let g = 0; g <= 4; g++) {
+          const y = padT + (g / 4) * plotH;
+          gridLines += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" />`;
+        }
+
+        const sokuonHighlight = evalRes.hasSokuon
+          ? `<rect x="${(padL + 0.40 * plotW).toFixed(1)}" y="${padT}" width="${(0.18 * plotW).toFixed(1)}" height="${plotH}" fill="rgba(217,119,6,0.07)" />
+             <text x="${(padL + 0.49 * plotW).toFixed(1)}" y="${padT + 14}" text-anchor="middle" font-size="10" fill="#b45309" font-weight="600">促音「ッ」の溜め</text>`
+          : `<text x="${(padL + 0.49 * plotW).toFixed(1)}" y="${padT + 14}" text-anchor="middle" font-size="10" fill="#64748b">連続流音 /r/</text>`;
+
+        const spikeDots = spikes
+          .filter((_, idx) => idx % 2 === 0)
+          .map(s => `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="4" fill="#dc2626" fill-opacity="0.85" stroke="#fff" stroke-width="1" />`)
+          .join("");
+
+        svg.innerHTML = `
+          <g class="svg-grid">${gridLines}</g>
+          ${sokuonHighlight}
+          <path d="${areaPath}" fill="${fillColor}" />
+          <path d="${toPath(idealPts)}" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 4" />
+          <path d="${toPath(realPts)}" fill="none" stroke="${strokeColor}" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" />
+          ${spikeDots}
+          <text x="${padL - 8}" y="${padT + 4}" text-anchor="end" font-size="10" fill="#64748b">高</text>
+          <text x="${padL - 8}" y="${padT + plotH}" text-anchor="end" font-size="10" fill="#64748b">0</text>
+          <text x="${padL + 4}" y="${H - 8}" font-size="10" fill="#64748b">開始 /n a/</text>
+          <text x="${padL + plotW * 0.5}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#64748b">${evalRes.hasSokuon ? "溜め → 破裂 /Q t/" : "移行 /r/"}</text>
+          <text x="${padL + plotW - 4}" y="${H - 8}" text-anchor="end" font-size="10" fill="#64748b">着地・余韻</text>
+        `;
+      }
+
+      // Draw View 2: Phase Space Topology (Tension X vs Release/Margin Y)
+      function renderPhaseSVG(p, evalRes) {
+        const svg = document.getElementById("svgPhase");
+        const W = 320, H = 230;
+        const padL = 38, padR = 16, padT = 18, padB = 30;
+        const plotW = W - padL - padR;
+        const plotH = H - padT - padB;
+
+        const pts = [];
+        const steps = 96;
+        // Superellipse exponent: lower = round/organic, higher = square/sharp
+        const sharpnessExp = 1.6 + (1 - p.softness) * 5.2;
+        const cx = 0.48 + (1 - p.softness) * 0.14;
+        const cy = 0.30 + p.breathCoupling * 0.42;
+        const rx = 0.24 + (1 - p.softness) * 0.12;
+        const ry = 0.14 + p.breathCoupling * 0.18 + p.tailMelt * 0.08;
+
+        for (let i = 0; i <= steps; i++) {
+          const theta = (i / steps) * Math.PI * 2;
+          const cosT = Math.cos(theta);
+          const sinT = Math.sin(theta);
+          const sx = Math.sign(cosT) * Math.pow(Math.abs(cosT), 2 / sharpnessExp);
+          const sy = Math.sign(sinT) * Math.pow(Math.abs(sinT), 2 / sharpnessExp);
+          // Sokuon creates an inward pinch loop
+          const pinch = evalRes.hasSokuon ? (p.sokuonDepth * 0.12 * Math.exp(-Math.pow(theta - Math.PI * 1.1, 2) / 0.18)) : 0;
+          // Organic slight asymmetry from lag
+          const asym = p.lag * 0.05 * Math.sin(theta * 2);
+          const vx = Math.max(0.05, Math.min(0.95, cx + (rx - pinch) * sx + asym));
+          const vy = Math.max(0.05, Math.min(0.95, cy + ry * sy - pinch * 0.4));
+          pts.push([padL + vx * plotW, padT + (1 - vy) * plotH]);
+        }
+
+        const pathD = pts.map((pt, idx) => `${idx === 0 ? "M" : "L"}${pt[0].toFixed(1)},${pt[1].toFixed(1)}`).join(" ") + " Z";
+        const strokeColor = evalRes.passCount === 4 ? "#e05677" : "#3b6ea5";
+
+        // Kawaii safe island region (X: 0.22..0.72, Y: 0.38..0.88)
+        const safeX = padL + 0.20 * plotW;
+        const safeY = padT + (1 - 0.88) * plotH;
+        const safeW = 0.56 * plotW;
+        const safeH = 0.50 * plotH;
+
+        svg.innerHTML = `
+          <g class="svg-grid">
+            <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" />
+            <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" />
+            <line x1="${padL + plotW * 0.5}" y1="${padT}" x2="${padL + plotW * 0.5}" y2="${padT + plotH}" />
+            <line x1="${padL}" y1="${padT + plotH * 0.5}" x2="${W - padR}" y2="${padT + plotH * 0.5}" />
+          </g>
+          <rect x="${safeX.toFixed(1)}" y="${safeY.toFixed(1)}" width="${safeW.toFixed(1)}" height="${safeH.toFixed(1)}" rx="12" fill="rgba(13,148,136,0.09)" stroke="#0d9488" stroke-dasharray="4 3" stroke-width="1.2" />
+          <text x="${(safeX + 6).toFixed(1)}" y="${(safeY + 13).toFixed(1)}" font-size="9.5" fill="#0f766e" font-weight="600">かわいい許容帯</text>
+          <path d="${pathD}" fill="${evalRes.passCount === 4 ? "rgba(224,86,119,0.14)" : "rgba(59,110,165,0.12)"}" stroke="${strokeColor}" stroke-width="2.5" />
+          <circle cx="${pts[0][0].toFixed(1)}" cy="${pts[0][1].toFixed(1)}" r="4" fill="${strokeColor}" />
+          <text x="${padL + plotW * 0.5}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#64748b">呼気圧・緊張 (Tension) →</text>
+          <text x="12" y="${padT + plotH * 0.5}" text-anchor="middle" font-size="10" fill="#64748b" transform="rotate(-90 12 ${padT + plotH * 0.5})">息漏れ・脱力 (Release) →</text>
+        `;
+      }
+
+      // Draw View 3: Tail & Margin Landing Silhouette
+      function renderTailSVG(p, evalRes) {
+        const svg = document.getElementById("svgTail");
+        const W = 320, H = 230;
+        const padL = 38, padR = 16, padT = 18, padB = 30;
+        const plotW = W - padL - padR;
+        const plotH = H - padT - padB;
+
+        const ampPts = [];
+        const breathPts = [];
+        const N = 60;
+        for (let i = 0; i <= N; i++) {
+          const u = i / N; // tail window 0..1
+          const steep = 4 + (1 - p.tailMelt) * 24;
+          const mid = 0.25 + p.tailMelt * 0.35;
+          const amp = 1 / (1 + Math.exp(steep * (u - mid)));
+          // Breath rises gently as periodic energy falls when breathCoupling is high
+          const breath = p.breathCoupling * 0.85 * Math.exp(-Math.pow((u - (mid + 0.14)) / (0.18 + p.tailMelt * 0.16), 2));
+          ampPts.push([padL + u * plotW, padT + (1 - amp * 0.88) * plotH]);
+          breathPts.push([padL + u * plotW, padT + (1 - Math.min(0.95, breath)) * plotH]);
+        }
+
+        const toPath = pts => pts.map((pt, idx) => `${idx === 0 ? "M" : "L"}${pt[0].toFixed(1)},${pt[1].toFixed(1)}`).join(" ");
+        const breathArea = `${toPath(breathPts)} L${(padL + plotW).toFixed(1)},${(padT + plotH).toFixed(1)} L${padL},${(padT + plotH).toFixed(1)} Z`;
+
+        svg.innerHTML = `
+          <g class="svg-grid">
+            <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" />
+            <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" />
+            <line x1="${padL}" y1="${padT + plotH * 0.5}" x2="${W - padR}" y2="${padT + plotH * 0.5}" />
+          </g>
+          <path d="${breathArea}" fill="rgba(13,148,136,0.12)" />
+          <path d="${toPath(breathPts)}" fill="none" stroke="#0d9488" stroke-width="2" stroke-dasharray="4 3" />
+          <path d="${toPath(ampPts)}" fill="none" stroke="${evalRes.passCount === 4 ? "#e05677" : "#3b6ea5"}" stroke-width="2.6" stroke-linecap="round" />
+          <text x="${W - padR - 4}" y="${padT + 14}" text-anchor="end" font-size="10" fill="#0f766e">破線：語尾の息漏れ</text>
+          <text x="${W - padR - 4}" y="${padT + 28}" text-anchor="end" font-size="10" fill="${evalRes.passCount === 4 ? "#e05677" : "#3b6ea5"}">実線：声帯エネルギー</text>
+          <text x="${padL + plotW * 0.5}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#64748b">語尾ウィンドウ（消え際） →</text>
+          <text x="12" y="${padT + plotH * 0.5}" text-anchor="middle" font-size="10" fill="#64748b" transform="rotate(-90 12 ${padT + plotH * 0.5})">強度 / 気息比</text>
+        `;
+      }
+
+      function buildSliders() {
+        const container = document.getElementById("slidersContainer");
+        container.innerHTML = SLIDER_META.map(m => `
+          <div>
+            <div class="flex items-center justify-between text-xs mb-1">
+              <label for="slider_${m.key}" class="font-medium text-[#1e242b]">${m.name}</label>
+              <span id="val_${m.key}" class="mono font-semibold text-[#e05677]">${state.params[m.key].toFixed(2)}</span>
+            </div>
+            <input id="slider_${m.key}" data-key="${m.key}" type="range" min="0" max="1" step="0.01" value="${state.params[m.key]}" class="w-full h-1.5 bg-[#e7e2da] rounded-lg cursor-pointer" />
+            <div class="flex justify-between text-[10px] text-[#78828e] mt-0.5">
+              <span>${m.low}</span>
+              <span>${m.high}</span>
+            </div>
+          </div>
+        `).join("");
+
+        container.querySelectorAll('input[type="range"]').forEach(input => {
+          input.addEventListener("input", e => {
+            const key = e.target.dataset.key;
+            state.params[key] = parseFloat(e.target.value);
+            renderAll();
+          });
+        });
+      }
+
+      function renderAll() {
+        const p = state.params;
+        const evalRes = evaluateStaticObject(p);
+
+        // Update preset button active state
+        document.querySelectorAll(".preset-btn").forEach(btn => {
+          const isAct = btn.dataset.preset === state.activePreset;
+          btn.classList.toggle("preset-active", isAct);
+        });
+
+        // Update slider values
+        SLIDER_META.forEach(m => {
+          const el = document.getElementById(`slider_${m.key}`);
+          const lbl = document.getElementById(`val_${m.key}`);
+          if (el) el.value = p[m.key];
+          if (lbl) lbl.textContent = p[m.key].toFixed(2);
+        });
+
+        // Update verdict banner
+        const badge = document.getElementById("phaseBadge");
+        badge.className = `inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-bold ${evalRes.badgeClass}`;
+        badge.textContent = evalRes.phase;
+        document.getElementById("verdictScore").textContent = `${evalRes.passCount} / 4 公理 PASS`;
+        document.getElementById("formTag").textContent = evalRes.hasSokuon ? "/n a Q t a/" : "/n a r u/";
+        document.getElementById("phaseDesc").textContent = evalRes.desc;
+
+        // Render 3 views
+        renderContourSVG(p, evalRes);
+        renderPhaseSVG(p, evalRes);
+        renderTailSVG(p, evalRes);
+
+        // Render axiom list
+        const axiomList = document.getElementById("axiomList");
+        axiomList.innerHTML = evalRes.axioms.map(a => `
+          <div class="p-2.5 rounded-xl border ${a.pass ? "border-[#ccfbf1] bg-[#f0fdfa]" : "border-[#fecaca] bg-[#fef2f2]"}">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-bold ${a.pass ? "text-[#0f766e]" : "text-[#991b1b]"}">${a.title}</span>
+              <span class="mono text-[10px] font-bold px-1.5 py-0.5 rounded ${a.pass ? "bg-[#0d9488] text-white" : "bg-[#dc2626] text-white"}">${a.pass ? "PASS" : "REJECT"}</span>
+            </div>
+            <div class="mono text-[10px] text-[#5c6672] mt-1">${a.formula}</div>
+            <div class="flex items-center justify-between text-[11px] mt-1">
+              <span class="mono text-[#1e242b]">${a.valueText}</span>
+              ${a.pass ? "" : `<span class="text-[#b91c1c] font-medium">→ ${a.failMode}</span>`}
+            </div>
+          </div>
+        `).join("");
+
+        // Update JSON schema preview
+        const staticObject = {
+          utteranceClass: evalRes.hasSokuon ? "completed_sokuon (/n a Q t a/)" : "ongoing_liquid (/n a r u/)",
+          staticParams: p,
+          geometricObservables: evalRes.observables,
+          verification: {
+            passedAxioms: evalRes.passCount,
+            totalAxioms: 4,
+            phase: evalRes.phase,
+            axioms: evalRes.axioms.map(a => ({ id: a.id, pass: a.pass, rule: a.formula }))
+          }
+        };
+        document.getElementById("jsonPreview").textContent = JSON.stringify(staticObject, null, 2);
+
+        // Update Kernel code snippet
+        document.getElementById("kernelCode").textContent = `// Static Acoustic Verification Kernel (engine-agnostic)
+export function verifyKawaiiStatic(obs) {
+  // obs: extracted from frozen utterance contour, phase-space loop, and tail window
+  const hasSokuon = obs.sokuonDepth >= 0.35;
+  const edgeSharpness = (1 - obs.softness) * 0.78 + (1 - obs.lag) * 0.22;
+  const reboundShock = hasSokuon
+    ? obs.sokuonDepth * (1 - obs.softness) * 1.05 + (1 - obs.lag) * 0.15
+    : 0.12;
+  const landingSoftness = obs.tailMelt * 0.65 + obs.breathCoupling * 0.35;
+
+  const checks = {
+    A1_scaleNonAggression: obs.scale >= 0.45 && obs.softness >= 0.45 && edgeSharpness <= 0.48,
+    A2_criticalLagBand:    obs.lag >= 0.18 && obs.lag <= 0.72,
+    A3_causalMarginTail:   obs.breathCoupling >= 0.35 && landingSoftness >= 0.42,
+    A4_sokuonOrFlowShape:  hasSokuon ? reboundShock <= 0.45 : obs.loopRoundness >= 0.50
+  };
+
+  const pass = Object.values(checks).every(Boolean);
+  return { pass, checks, metrics: { edgeSharpness, reboundShock, landingSoftness } };
+}`;
+
+        renderLogs();
+        refreshAudioElement();
+      }
+
+      function renderLogs() {
+        document.getElementById("logCount").textContent = String(state.logs.length);
+        const list = document.getElementById("logList");
+        if (state.logs.length === 0) {
+          list.innerHTML = "まだ記録がありません。「ランダム探索」やスライダーを動かして、右側の「人間オラクル」ボタンから反例を記録してみてください。";
+          return;
+        }
+        list.innerHTML = state.logs.map((item, idx) => `
+          <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl border border-[#e7e2da] bg-[#fcfbf9]">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="font-bold text-[#1e242b]">#${state.logs.length - idx}</span>
+              <span class="px-2 py-0.5 rounded-md bg-[#fff1f4] text-[#9f1239] font-semibold">${item.oracleLabel}</span>
+              <span class="mono text-[11px] text-[#5c6672]">機械判定: ${item.machinePhase} (${item.passCount}/4)</span>
+            </div>
+            <button type="button" data-restore="${idx}" class="restore-log-btn px-2.5 py-1 rounded-lg bg-white border border-[#d8d1c5] hover:bg-[#f4efe8] text-[#1e242b] font-medium">
+              この形を復元
+            </button>
+          </div>
+        `).join("");
+
+        list.querySelectorAll(".restore-log-btn").forEach(btn => {
+          btn.addEventListener("click", e => {
+            const idx = parseInt(e.target.dataset.restore, 10);
+            const entry = state.logs[idx];
+            if (entry) {
+              state.params = { ...entry.params };
+              state.activePreset = "";
+              renderAll();
+            }
+          });
+        });
+      }
+
+      // Direct PCM additive-formant synth with peak normalization + WAV fallback
+      let audioCtx = null;
+      let activeSource = null;
+
+      function synthesizeSamples(p, sr) {
+        const hasSokuon = p.sokuonDepth >= 0.35;
+        const voiceDur = hasSokuon ? 0.85 : 0.80;
+        const dur = 1.25; // >= 1s so native <audio> displays 0:01 clearly
+        const voiceLen = Math.floor(sr * voiceDur);
+        const len = Math.floor(sr * dur);
+        const out = new Float32Array(len);
+
+        const baseF0 = 210 + p.scale * 210; // 210Hz .. 420Hz
+        const fScale = 0.86 + p.scale * 0.40;
+        const tiltExp = 0.75 + p.softness * 1.45; // higher = softer high harmonics
+        const riseSharp = 14 + (1 - p.softness) * 34;
+        const tailRate = 5 + (1 - p.tailMelt) * 36;
+        const lagShift = p.lag * 0.045;
+
+        let phase = 0;
+        let lpNoise = 0;
+
+        const startOffset = Math.floor(sr * 0.08);
+        for (let i = 0; i < voiceLen; i++) {
+          const u = i / voiceLen;
+          const uLag = Math.max(0, u - lagShift);
+
+          // Pitch contour (Hz)
+          let f0 = baseF0;
+          if (hasSokuon) {
+            if (u < 0.45) f0 = baseF0 * (0.95 + 0.11 * Math.sin((u / 0.45) * Math.PI * 0.8));
+            else f0 = baseF0 * (1.07 - 0.14 * ((u - 0.45) / 0.55) + p.tailMelt * 0.08 * Math.pow(u, 3));
+          } else {
+            f0 = baseF0 * (0.96 + 0.10 * Math.sin(u * Math.PI) + p.tailMelt * 0.06 * Math.pow(u, 2));
+          }
+          // Subtle organic pitch drift coupled to lag & breath
+          f0 *= 1 + (0.004 + p.breathCoupling * 0.012) * Math.sin(u * 28);
+          phase += (2 * Math.PI * f0) / sr;
+
+          // Envelope matching View 1 static contour
+          let env = 0;
+          let burstNoise = 0;
+          if (hasSokuon) {
+            const seg1 = 1 / (1 + Math.exp(-riseSharp * (uLag - 0.08))) - 1 / (1 + Math.exp(-riseSharp * (uLag - 0.38)));
+            const valley = 1 - p.sokuonDepth * 0.96 * Math.exp(-Math.pow((uLag - 0.48) / 0.075, 2));
+            const burstSharp = 16 + (1 - p.softness) * 42;
+            const seg2Rise = 1 / (1 + Math.exp(-burstSharp * (uLag - 0.57)));
+            const overshoot = (1 - p.softness) * 0.25 * Math.exp(-Math.pow((uLag - 0.59) / 0.025, 2));
+            const seg2Fall = 1 / (1 + Math.exp(tailRate * (uLag - (0.82 + p.tailMelt * 0.06))));
+            env = Math.max(seg1 * 0.78 * valley, (seg2Rise * 0.80 + overshoot) * seg2Fall);
+            // Plosive /t/ burst right after sokuon
+            burstNoise = (0.12 + (1 - p.softness) * 0.45) * Math.exp(-Math.pow((uLag - 0.565) / 0.014, 2));
+          } else {
+            const onset = 1 / (1 + Math.exp(-riseSharp * (uLag - 0.08)));
+            const flapDip = 1 - (0.28 + (1 - p.softness) * 0.22) * Math.exp(-Math.pow((uLag - 0.48) / 0.048, 2));
+            const tail = 1 / (1 + Math.exp(tailRate * (uLag - (0.80 + p.tailMelt * 0.08))));
+            env = onset * 0.80 * flapDip * tail;
+          }
+
+          // Smooth fade edges to prevent clicks
+          const edgeFade = Math.min(1, i / (sr * 0.008)) * Math.min(1, (voiceLen - 1 - i) / (sr * 0.015));
+          env = Math.max(0, env) * edgeFade;
+
+          // Vowel formants (/a/ -> /a/ for natta, /a/ -> /u/ for naru)
+          const f1 = (hasSokuon ? 760 : (760 * (1 - u * 0.45) + 340 * (u * 0.45))) * fScale;
+          const f2 = (hasSokuon ? 1280 : (1280 * (1 - u * 0.30) + 1150 * (u * 0.30))) * fScale;
+          const f3 = 2750 * fScale;
+
+          // Additive harmonic synthesis with formant weighting
+          let voice = 0;
+          for (let k = 1; k <= 14; k++) {
+            const fk = f0 * k;
+            if (fk > sr * 0.45) break;
+            const g1 = Math.exp(-Math.pow((fk - f1) / (150 + p.softness * 70), 2));
+            const g2 = 0.72 * Math.exp(-Math.pow((fk - f2) / (230 + p.softness * 90), 2));
+            const g3 = 0.25 * Math.exp(-Math.pow((fk - f3) / 360, 2));
+            const tilt = 1 / Math.pow(k, tiltExp);
+            voice += Math.sin(phase * k) * tilt * (0.18 + g1 + g2 + g3);
+          }
+
+          // Breath & burst noise (one-pole shaped)
+          const rawN = Math.random() * 2 - 1;
+          lpNoise = lpNoise * 0.55 + rawN * 0.45;
+          const hpNoise = rawN - lpNoise;
+          const tailBreath = p.breathCoupling * 0.34 * Math.exp(-Math.pow((u - (0.72 + p.tailMelt * 0.10)) / (0.18 + p.tailMelt * 0.12), 2));
+          const steadyBreath = p.breathCoupling * 0.06 * env;
+
+          if (startOffset + i < len) {
+            out[startOffset + i] = voice * env + hpNoise * (burstNoise + tailBreath + steadyBreath) * edgeFade;
+          }
+        }
+
+        // Peak normalize to 0.72 so it is always clearly audible
+        let peak = 0;
+        for (let i = 0; i < len; i++) {
+          const a = Math.abs(out[i]);
+          if (a > peak) peak = a;
+        }
+        if (peak > 1e-5) {
+          const gain = 0.72 / peak;
+          for (let i = 0; i < len; i++) out[i] *= gain;
+        }
+        return { samples: out, sampleRate: sr, dur };
+      }
+
+      function encodeWavBlob(samples, sr) {
+        const buffer = new ArrayBuffer(44 + samples.length * 2);
+        const view = new DataView(buffer);
+        const writeStr = (off, str) => {
+          for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
+        };
+        writeStr(0, "RIFF");
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeStr(8, "WAVE");
+        writeStr(12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sr, true);
+        view.setUint32(28, sr * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeStr(36, "data");
+        view.setUint32(40, samples.length * 2, true);
+        let offset = 44;
+        for (let i = 0; i < samples.length; i++) {
+          const s = Math.max(-1, Math.min(1, samples[i]));
+          view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+          offset += 2;
+        }
+        return new Blob([buffer], { type: "audio/wav" });
+      }
+
+      function encodeWavDataUri(samples, sr) {
+        const buffer = new ArrayBuffer(44 + samples.length * 2);
+        const view = new DataView(buffer);
+        const writeStr = (off, str) => {
+          for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
+        };
+        writeStr(0, "RIFF");
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeStr(8, "WAVE");
+        writeStr(12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sr, true);
+        view.setUint32(28, sr * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeStr(36, "data");
+        view.setUint32(40, samples.length * 2, true);
+        let offset = 44;
+        for (let i = 0; i < samples.length; i++) {
+          const s = Math.max(-1, Math.min(1, samples[i]));
+          view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+          offset += 2;
+        }
+        const bytes = new Uint8Array(buffer);
+        let bin = "";
+        const chunk = 8192;
+        for (let i = 0; i < bytes.length; i += chunk) {
+          bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        }
+        return "data:audio/wav;base64," + btoa(bin);
+      }
+
+      function refreshAudioElement() {
+        const audioEl = document.getElementById("nativeAudio");
+        const dlBtn = document.getElementById("btnDownloadWav");
+        const statusEl = document.getElementById("audioStatus");
+        const { samples, sampleRate, dur } = synthesizeSamples(state.params, 22050);
+        const dataUri = encodeWavDataUri(samples, sampleRate);
+        if (audioEl) {
+          audioEl.onloadedmetadata = () => {
+            const d = Number.isFinite(audioEl.duration) ? audioEl.duration.toFixed(2) : dur.toFixed(2);
+            if (statusEl) statusEl.textContent = `WAV ${d}s OK`;
+          };
+          audioEl.onerror = () => {
+            const code = audioEl.error ? audioEl.error.code : "?";
+            if (statusEl) statusEl.textContent = `読込エラー(${code})`;
+          };
+          audioEl.src = dataUri;
+          audioEl.load();
+        }
+        if (dlBtn) {
+          const label = state.activePreset || "custom";
+          dlBtn.href = dataUri;
+          dlBtn.setAttribute("download", `kawaii_${label}.wav`);
+        }
+        if (statusEl) statusEl.textContent = `WAV ${dur.toFixed(2)}s`;
+      }
+
+      async function playPreviewSynth() {
+        const btn = document.getElementById("btnPlay");
+        const labelSpan = btn ? btn.querySelector("span") : null;
+        const statusEl = document.getElementById("audioStatus");
+        const audioEl = document.getElementById("nativeAudio");
+        if (labelSpan) labelSpan.textContent = "再生中...";
+        if (statusEl) statusEl.textContent = "再生中...";
+
+        const restoreBtn = (msg) => {
+          if (labelSpan) labelSpan.textContent = "簡易シンセで試聴";
+          if (statusEl && msg) statusEl.textContent = msg;
+        };
+
+        // 1. Primary: Native HTML <audio> with embedded WAV data URI
+        try {
+          refreshAudioElement();
+          if (audioEl) {
+            audioEl.currentTime = 0;
+            audioEl.volume = 1.0;
+            audioEl.muted = false;
+            audioEl.onended = () => restoreBtn("再生完了");
+            await audioEl.play();
+            setTimeout(() => restoreBtn("再生完了"), 1350);
+            return;
+          }
+        } catch (err) {
+          // Fall through to Web Audio API
+        }
+
+        // 2. Fallback: Web Audio API
+        try {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            if (!audioCtx) audioCtx = new AudioContextClass();
+            if (audioCtx.state === "suspended") {
+              await Promise.race([
+                audioCtx.resume(),
+                new Promise((_, rej) => setTimeout(() => rej(new Error("resume timeout")), 500))
+              ]);
+            }
+            if (activeSource) {
+              try { activeSource.stop(); } catch (e) {}
+            }
+            const sr = audioCtx.sampleRate || 44100;
+            const { samples, dur } = synthesizeSamples(state.params, sr);
+            const buf = audioCtx.createBuffer(1, samples.length, sr);
+            buf.getChannelData(0).set(samples);
+            const src = audioCtx.createBufferSource();
+            src.buffer = buf;
+            src.connect(audioCtx.destination);
+            src.onended = () => restoreBtn("再生完了");
+            activeSource = src;
+            src.start(0);
+            setTimeout(() => restoreBtn("再生完了"), Math.ceil(dur * 1000) + 150);
+            return;
+          }
+        } catch (err2) {
+          restoreBtn("直接再生制限あり（下のプレイヤーかWAV保存を利用）");
+        }
+      }
+
+      // Bindings
+      document.querySelectorAll(".preset-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.preset;
+          state.activePreset = id;
+          state.params = { ...PRESETS[id].params };
+          renderAll();
+        });
+      });
+
+      document.getElementById("btnResetPreset").addEventListener("click", () => {
+        const id = state.activePreset || "natta";
+        state.activePreset = id;
+        state.params = { ...PRESETS[id].params };
+        renderAll();
+      });
+
+      document.getElementById("btnPlay").addEventListener("click", playPreviewSynth);
+
+      document.getElementById("btnExplore").addEventListener("click", () => {
+        // Sample interesting boundary or island points
+        const r = (min, max) => +(min + Math.random() * (max - min)).toFixed(2);
+        state.activePreset = "";
+        state.params = {
+          scale: r(0.35, 0.95),
+          softness: r(0.25, 0.92),
+          lag: r(0.08, 0.80),
+          sokuonDepth: Math.random() > 0.5 ? r(0.55, 0.92) : r(0.05, 0.25),
+          breathCoupling: r(0.15, 0.90),
+          tailMelt: r(0.12, 0.92)
+        };
+        renderAll();
+      });
+
+      const ORACLE_LABELS = {
+        kawaii_confirmed: "かわいい確認",
+        counter_azatoi: "反例：あざとい",
+        counter_uncanny: "反例：不気味・硬い",
+        counter_hidden_kawaii: "反例：REJECTだが可愛い"
+      };
+
+      document.querySelectorAll(".oracle-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const type = btn.dataset.oracle;
+          const evalRes = evaluateStaticObject(state.params);
+          state.logs.unshift({
+            oracleType: type,
+            oracleLabel: ORACLE_LABELS[type],
+            machinePhase: evalRes.phase,
+            passCount: evalRes.passCount,
+            params: { ...state.params }
+          });
+          if (state.logs.length > 30) state.logs.pop();
+          try {
+            localStorage.setItem("kawaii_static_verifier_logs_v1", JSON.stringify(state.logs));
+          } catch (e) {}
+          const toast = document.getElementById("oracleToast");
+          toast.textContent = `記録しました：「${ORACLE_LABELS[type]}」（反例ログタブで確認できます）`;
+          toast.classList.remove("hidden");
+          setTimeout(() => toast.classList.add("hidden"), 2500);
+          renderLogs();
+        });
+      });
+
+      document.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const tab = btn.dataset.tab;
+          state.activeTab = tab;
+          document.querySelectorAll(".tab-btn").forEach(b => {
+            const act = b.dataset.tab === tab;
+            b.classList.toggle("tab-active", act);
+            b.classList.toggle("bg-[#f5f2ec]", !act);
+            b.classList.toggle("text-[#5c6672]", !act);
+          });
+          document.getElementById("tabSchema").classList.toggle("hidden", tab !== "schema");
+          document.getElementById("tabKernel").classList.toggle("hidden", tab !== "kernel");
+          document.getElementById("tabLog").classList.toggle("hidden", tab !== "log");
+        });
+      });
+
+      document.getElementById("btnCopySpec").addEventListener("click", () => {
+        const text = state.activeTab === "kernel"
+          ? document.getElementById("kernelCode").textContent
+          : document.getElementById("jsonPreview").textContent;
+        const btn = document.getElementById("btnCopySpec");
+        const done = () => {
+          const orig = btn.textContent;
+          btn.textContent = "コピーしました";
+          setTimeout(() => { btn.textContent = orig; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+        } else {
+          fallbackCopy(text, done);
+        }
+      });
+
+      function fallbackCopy(text, cb) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta);
+        if (cb) cb();
+      }
+
+      document.getElementById("btnClearLog").addEventListener("click", () => {
+        state.logs = [];
+        try { localStorage.removeItem("kawaii_static_verifier_logs_v1"); } catch (e) {}
+        renderLogs();
+      });
+
+      buildSliders();
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
