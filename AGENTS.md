@@ -37,6 +37,14 @@
 
 ---
 
+## yata で tokiko を磨くときの Goodhart よけ（3つのルール）
+
+yata は「明らかにアカン音」を見つける道具です。**点数そのものを目標にしない**でください。tokiko で鳴ったフィルタを足し、tokiko をそれに合わせ、また足す、を回すと、yata は「本物の声との距離」ではなく「前の tokiko との差」を測るようになります（v0.10 の `F35` で痰がらみノイズ、v0.11 の `F37`/`F38`/`F65` が実例）。
+
+1. **新しいフィルタは本物の声で先に試す。** `node bench/real_voice_gate.mjs --cache-dir <wavs> --tokiko-dir <tokiko>` で PD/CC0 実音（BY・BY-SA・VOICEVOX 除外）の誤爆率を出し、20% を超えるものは `quarantined`（JSON には残すが既定/compact 表示から隠す）。実音で 0 回なのに tokiko の 2/3 以上で鳴るものは `tokiko_derived` タグ（その軸に合わせて tokiko を調整しない）。`--write` で `src/falsifiers/gate.mjs` を再生成。
+2. **調整用と確認用の音を分ける。** 閾値・ガード・表示選びに使ってよいのは `manifest.json` と `tuning_pd_cc0_manifest.json` だけ。`heldout_pd_cc0_manifest.json` は `bench/real_audio_audit/run_heldout.mjs` で確かめるだけ。見て何かを直したら、そのクリップは tuning へ移す（`ho_whisper` → `tu_whisper` が前例）。`test/gate.test.mjs` が src/test 内の held-out ID 混入を検出します。
+3. **最後は耳か ASR で決める。** 合否は core-6（F1–F6）だけ。診断軸の増減で「良くなった」とは言わない。方向が変わるときだけ 10 秒の A/B を 1 本。
+
 ## 現在の見張りメモ（オブザーバー引き継ぎ用・2026-11-24）
 
 - **現行安定版**: `main`（`v0.11.0` — 65軸直交ミラー `F1`–`F65`）
@@ -83,7 +91,8 @@
     - v0.4 ブラインド鏡審査（`245ed15`、[MIRROR_AUDIT_VERDICT.md](bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md)）: `原音派 5–0`（単純確率 `1/108`、真ん中テイクに話速変更 `1.30–1.45×` を含む旧版での結果）＋ `#4 わたし` tie → `F24` の単独拒否権を否定し、スコープ付き耳判例メモリへ記録
   - **重要：LLM 視覚の読解力と、検出器の誤爆率（FPR）を明確に区別すること**:
     - **LLM 視覚の読解力（目隠し視力検査・ラベル全隠し）**: 一般実音10本で **v0.1（数値のみ）25/100 → v0.2（コンパクト視覚）80/100**、動物・子ども vs 大人5ペアで **v0.1 3/5 → v0.2 4/5**。
-    - **検出器の誤爆率（実音＋`tokiko` 保護棚19本の再現監査: [RESULTS.md](bench/real_audio_audit/RESULTS.md)）**:
+    - **v0.11.1 再測（オブザーバー, ffmpeg 7.1.5 で再取得, core-6 は不変）**: 問題なし実音 **8/10** 通過・期待かわいくない **4/5** 検出・`tokiko` 9/9 生存・`veto_all` 0/19。held-out（`ho_whisper` を tuning へ移した 8 本）: 人の声 4/4・子犬 0/1・期待かわいくない 2/3。テスト 85/85 + e2e 27/27。
+    - **（旧 v0.4 の数値・参考）検出器の誤爆率（実音＋`tokiko` 保護棚19本の再現監査: [RESULTS.md](bench/real_audio_audit/RESULTS.md)）**:
       - `core_veto`（F1–F6・既定）: 保護棚生存率 **68.4%（13/19）**（`tokiko` 単体 **88.9% = 8/9**）／期待かわいくない実音再現率 **60.0%（3/5）**
       - `shelf_veto`（棚クリア19軸）: インサンプル **100.0%（19/19）**／**アウトオブサンプル汎化: LOO 78.9%（15/19）、Real→`tokiko` 66.7%（6/9）、`tokiko`→Real 30.0%（3/10）**／期待かわいくない実音再現率 **60.0%（3/5、LOO 3–4/5）**
       - `veto_all`（F1–F32）: 保護棚生存率 **5.3%（1/19）**（`tokiko` 単体 **0.0% = 0/9**）／期待かわいくない実音再現率 **100.0%（5/5）** — 計 **13軸が `CONTESTED`**。

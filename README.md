@@ -74,6 +74,14 @@
 
 ---
 
+## yata で tokiko を磨くときの Goodhart よけ（3つのルール）
+
+yata は「明らかにアカン音」を見つける道具です。**点数そのものを目標にしない**でください。tokiko で鳴ったフィルタを足し、tokiko をそれに合わせ、また足す、を回すと、yata は「本物の声との距離」ではなく「前の tokiko との差」を測るようになります（v0.10 の `F35` で痰がらみノイズ、v0.11 の `F37`/`F38`/`F65` が実例）。
+
+1. **新しいフィルタは本物の声で先に試す。** `node bench/real_voice_gate.mjs --cache-dir <wavs> --tokiko-dir <tokiko>` で PD/CC0 実音（BY・BY-SA・VOICEVOX 除外）の誤爆率を出し、20% を超えるものは `quarantined`（JSON には残すが既定/compact 表示から隠す）。実音で 0 回なのに tokiko の 2/3 以上で鳴るものは `tokiko_derived` タグ（その軸に合わせて tokiko を調整しない）。`--write` で `src/falsifiers/gate.mjs` を再生成。
+2. **調整用と確認用の音を分ける。** 閾値・ガード・表示選びに使ってよいのは `manifest.json` と `tuning_pd_cc0_manifest.json` だけ。`heldout_pd_cc0_manifest.json` は `bench/real_audio_audit/run_heldout.mjs` で確かめるだけ。見て何かを直したら、そのクリップは tuning へ移す（`ho_whisper` → `tu_whisper` が前例）。`test/gate.test.mjs` が src/test 内の held-out ID 混入を検出します。
+3. **最後は耳か ASR で決める。** 合否は core-6（F1–F6）だけ。診断軸の増減で「良くなった」とは言わない。方向が変わるときだけ 10 秒の A/B を 1 本。
+
 ## 使い方（CLI）
 
 Node.js v18+ があれば外部パッケージなしでそのまま動きます。
@@ -204,8 +212,10 @@ const customFalsifiers = [
 ## テスト & ベンチマーク
 
 ```bash
-npm test          # 単体・統合テスト (test/*.test.mjs)
-npm run test:e2e  # 独立 E2E テストスイート (e2e/*.test.mjs)
+npm test          # 単体・統合テスト (test/*.test.mjs) — v0.11.1: 85/85
+npm run test:e2e  # 独立 E2E テストスイート (e2e/*.test.mjs) — v0.11.1: 27/27（軸数はレジストリから導出）
+node bench/real_voice_gate.mjs --cache-dir /tmp/yata_real_wavs --cache-dir /tmp/yata_heldout  # 診断軸の実音誤爆率
+node bench/real_audio_audit/run_heldout.mjs --fetch --cache-dir /tmp/yata_heldout              # held-out 確認（調整に使わない）
 npm run bench     # 検出マトリクス & レイテンシベンチマーク
 npm run discover  # 反例発見ループ
 ```
