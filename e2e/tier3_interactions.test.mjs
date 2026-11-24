@@ -18,6 +18,8 @@ import {
   withTempDir,
   writeWavFile,
 } from "./_helpers.mjs";
+import { DEFAULT_FALSIFIERS as REGISTRY } from "../src/falsifiers/index.mjs";
+const N_AXES = REGISTRY.length;
 
 const SR = 24000;
 
@@ -115,7 +117,7 @@ describe("Tier 3: Cross-Feature Pairwise Interactions E2E", () => {
 
   it("--falsifiers core vs --falsifiers all shows slip-through delta on targeted counterexample", async () => {
     await withTempDir((dir) => {
-      // Stereo phase inversion (R = -L) on warm audio: invisible to core 6, caught by all 32 (F30)
+      // Stereo phase inversion (R = -L) on warm audio: invisible to core 6, caught by all registry axes (F30)
       const phasePath = path.join(dir, "phase_inv.wav");
       writeWavFile(phasePath, genStereoPhaseInverted(SR, 0.6), SR);
 
@@ -128,7 +130,7 @@ describe("Tier 3: Cross-Feature Pairwise Interactions E2E", () => {
       const allReport = JSON.parse(allRes.stdout);
 
       assert.equal(coreReport.totalFalsifiers, 6);
-      assert.equal(allReport.totalFalsifiers, 32);
+      assert.equal(allReport.totalFalsifiers, N_AXES);
       assert.equal(allReport.verdict, "REJECTED_UNKAWAII");
       assert.ok(
         allReport.triggeredCount > coreReport.triggeredCount,
@@ -156,7 +158,7 @@ describe("Tier 3: Cross-Feature Pairwise Interactions E2E", () => {
     // Relax F8 threshold far above observed DC offset / dcToRmsRatio so it no longer triggers
     const highThreshold = Math.max(100, (f8Before.threshold || 1) * 1000);
     const relaxedFalsifiers = createFalsifiers({ [f8Before.id]: highThreshold });
-    assert.equal(relaxedFalsifiers.length, 32);
+    assert.equal(relaxedFalsifiers.length, N_AXES);
     assert.notEqual(relaxedFalsifiers, DEFAULT_FALSIFIERS);
 
     const relaxedReport1 = analyzeSamples(dcAudio, SR, {
@@ -192,7 +194,7 @@ describe("Tier 3: Cross-Feature Pairwise Interactions E2E", () => {
     assert.equal(f8After.score, f8Before.score);
   });
 
-  it("processes non-vocal UI chime / electronic pluck cleanly through 32 falsifiers and all vision renderers", async () => {
+  it("processes non-vocal UI chime / electronic pluck cleanly through all registry falsifiers and all vision renderers", async () => {
     const api = await loadPublicApi();
     const extractAudioProfile = requireExport(api, "extractAudioProfile");
     const analyzeSamples = requireExport(api, "analyzeSamples");

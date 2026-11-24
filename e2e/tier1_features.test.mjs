@@ -17,6 +17,9 @@ import {
   withTempDir,
   writeWavFile,
 } from "./_helpers.mjs";
+import { DEFAULT_FALSIFIERS as REGISTRY } from "../src/falsifiers/index.mjs";
+// Axis count is derived from the registry, never hardcoded (v0.11 shipped with 5 stale "32" asserts).
+const N_AXES = REGISTRY.length;
 
 const SR = 24000;
 
@@ -79,9 +82,9 @@ describe("Tier 1: Feature Coverage (Happy-Path E2E)", () => {
           report.verdict === "REJECTED_UNKAWAII"
       );
       assert.equal(typeof report.triggeredCount, "number");
-      assert.equal(report.totalFalsifiers, 32);
+      assert.equal(report.totalFalsifiers, N_AXES);
       assert.ok(report.features && typeof report.features === "object");
-      assert.ok(Array.isArray(report.falsifiers) && report.falsifiers.length === 32);
+      assert.ok(Array.isArray(report.falsifiers) && report.falsifiers.length === N_AXES);
       assertAllNumericFinite(report.features, "cli.json.features");
     });
   });
@@ -231,10 +234,10 @@ describe("Tier 1: Feature Coverage (Happy-Path E2E)", () => {
     }
   });
 
-  it("CLI --list-falsifiers lists all 32 falsifier IDs F1_..F32_ in llm and json", () => {
+  it("CLI --list-falsifiers lists all registry falsifier IDs F1_..FN_ in llm and json", () => {
     const llmRes = runCli(["--list-falsifiers", "--format", "llm"]);
     assert.equal(llmRes.status, 0, `stderr: ${llmRes.stderr}`);
-    for (let i = 1; i <= 32; i++) {
+    for (let i = 1; i <= N_AXES; i++) {
       assert.match(
         llmRes.stdout,
         new RegExp(`\\bF${i}_[A-Z0-9_]+\\b`),
@@ -247,9 +250,9 @@ describe("Tier 1: Feature Coverage (Happy-Path E2E)", () => {
     const parsed = JSON.parse(jsonRes.stdout);
     const list = Array.isArray(parsed) ? parsed : parsed.falsifiers;
     assert.ok(Array.isArray(list), "JSON --list-falsifiers must contain an array");
-    assert.equal(list.length, 32);
+    assert.equal(list.length, N_AXES);
     const ids = list.map((item) => (typeof item === "string" ? item : item.id));
-    for (let i = 1; i <= 32; i++) {
+    for (let i = 1; i <= N_AXES; i++) {
       assert.ok(
         ids.some((id) => typeof id === "string" && id.startsWith(`F${i}_`)),
         `Missing F${i}_* in --list-falsifiers --format json`
@@ -257,16 +260,16 @@ describe("Tier 1: Feature Coverage (Happy-Path E2E)", () => {
     }
   });
 
-  it("32 falsifiers public API smoke: registry sizes, v0.1+ features, bounded scores, verdicts", async () => {
+  it("registry falsifiers public API smoke: registry sizes, v0.1+ features, bounded scores, verdicts", async () => {
     const api = await loadPublicApi();
     const DEFAULT_FALSIFIERS = requireExport(api, "DEFAULT_FALSIFIERS");
     const ORIGINAL_6_FALSIFIERS = requireExport(api, "ORIGINAL_6_FALSIFIERS");
     const extractFeatures = requireExport(api, "extractFeatures");
     const analyzeSamples = requireExport(api, "analyzeSamples");
 
-    assert.equal(DEFAULT_FALSIFIERS.length, 32);
+    assert.equal(DEFAULT_FALSIFIERS.length, N_AXES);
     assert.equal(ORIGINAL_6_FALSIFIERS.length, 6);
-    for (let i = 1; i <= 32; i++) {
+    for (let i = 1; i <= N_AXES; i++) {
       assert.ok(
         DEFAULT_FALSIFIERS.some((f) => f.id.startsWith(`F${i}_`)),
         `DEFAULT_FALSIFIERS missing F${i}_*`
@@ -292,7 +295,7 @@ describe("Tier 1: Feature Coverage (Happy-Path E2E)", () => {
       cleanReport.verdict === "SURVIVED_KAWAII_CANDIDATE" ||
         cleanReport.verdict === "REJECTED_UNKAWAII"
     );
-    assert.equal(cleanReport.totalFalsifiers, 32);
+    assert.equal(cleanReport.totalFalsifiers, N_AXES);
     for (const f of cleanReport.falsifiers) {
       assert.ok(
         Number.isFinite(f.score) && f.score >= 0 && f.score <= 1,

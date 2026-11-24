@@ -11,7 +11,7 @@ import {
 } from "./_helpers.mjs";
 
 describe("Tier 4: Real-World End-to-End Scenarios", () => {
-  it("full discovery workflow: ORIGINAL_6 misses counterexamples caught by DEFAULT_32 and renders vision artifacts", async () => {
+  it("full discovery workflow: ORIGINAL_6 misses counterexamples caught by DEFAULT (all registry axes) and renders vision artifacts", async () => {
     const api = await loadPublicApi();
     const buildCorpus = requireExport(api, "buildCorpus");
     const runDiscoveryLoop = requireExport(api, "runDiscoveryLoop");
@@ -32,7 +32,7 @@ describe("Tier 4: Real-World End-to-End Scenarios", () => {
     const discovery = runDiscoveryLoop({ sampleRate: 24000, seed: 2026 });
     assert.ok(discovery && typeof discovery === "object");
 
-    // Verify slip-throughs: items missed by ORIGINAL_6 but caught by DEFAULT_32
+    // Verify slip-throughs: items missed by ORIGINAL_6 but caught by DEFAULT (all registry axes)
     let caughtByCore = 0;
     let caughtByAll = 0;
     let slipThroughItem = null;
@@ -67,11 +67,11 @@ describe("Tier 4: Real-World End-to-End Scenarios", () => {
 
     assert.ok(
       caughtByAll > caughtByCore,
-      `Expected DEFAULT_32 (${caughtByAll}) to catch strictly more counterexamples than ORIGINAL_6 (${caughtByCore})`
+      `Expected DEFAULT (all registry axes) (${caughtByAll}) to catch strictly more counterexamples than ORIGINAL_6 (${caughtByCore})`
     );
     assert.ok(
       slipThroughItem,
-      "Expected at least one counterexample that slips through ORIGINAL_6 and is caught by DEFAULT_32"
+      "Expected at least one counterexample that slips through ORIGINAL_6 and is caught by DEFAULT (all registry axes)"
     );
 
     // Inspect caught slip-through counterexample via text, SVG, and PNG vision
@@ -90,7 +90,7 @@ describe("Tier 4: Real-World End-to-End Scenarios", () => {
     assertValidPng(pngVision);
   });
 
-  it("positive controls survival: all >= 8 diverse pleasant/kawaii controls survive 0/32", async () => {
+  it("positive controls survival: all >= 8 diverse pleasant/kawaii controls survive with 0 veto", async () => {
     const api = await loadPublicApi();
     const buildCorpus = requireExport(api, "buildCorpus");
     const analyzeSamples = requireExport(api, "analyzeSamples");
@@ -125,7 +125,7 @@ describe("Tier 4: Real-World End-to-End Scenarios", () => {
     assert.equal(
       failures.length,
       0,
-      `Positive controls should survive 0/32 falsifiers, but failed: ${failures.join("; ")}`
+      `Positive controls should survive with 0 veto falsifiers, but failed: ${failures.join("; ")}`
     );
   });
 
