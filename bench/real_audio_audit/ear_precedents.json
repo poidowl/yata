@@ -1,0 +1,61 @@
+{
+  "schema": "unkawaii_ear_precedents/v0.5",
+  "updatedAt": "2026-11-24",
+  "source": "Owner blind ear-judge & Mirror Audit sessions (poidowl)",
+  "precedents": {
+    "F30_STEREO_PHASE_DISCOMFORT": {
+      "status": "orthogonal",
+      "judge": "poidowl",
+      "votes": {
+        "orthogonal": 1
+      },
+      "scope": "general_audio",
+      "testedCommit": "fefbc73",
+      "condition": "v0.2 A/B audition demo (bench/yata_audition_demo.html)",
+      "recordedAt": "2026-11-24",
+      "note": "Owner ear-judge 2026-11-24: neither kawaii nor unkawaii"
+    },
+    "F24_CALCULATED_PITCH_LFO": {
+      "status": "ear_overruled",
+      "judge": "poidowl",
+      "votes": {
+        "original": 5,
+        "damped": 0,
+        "flat": 0
+      },
+      "exactAllOriginalProb": "1/108 (~0.00926 under independent uniform random choice across 3x3-choice + 2x2-choice; single-outcome probability, not a two-sided binomial test)",
+      "scope": "tokiko_japanese_speech",
+      "testedCommit": "245ed15",
+      "condition": "v0.4 mirror_audit_demo.html (middle take of naru also varied rate 1.30-1.45x alongside hopf; speed-matched ebd8ffb not yet re-voted)",
+      "recordedAt": "2026-11-24",
+      "evidenceDoc": "bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md",
+      "note": "Owner blind 3-choice & 2-choice Mirror Audit (commit 245ed15): preferred original 5-0 (Tests #1-#3 naru kawaii/amae/genki, #5 ohayo kawaii, #6 ohayo genki)"
+    },
+    "F14_HELMHOLTZ_ROUGHNESS": {
+      "status": "ear_tie_observed",
+      "judge": "poidowl",
+      "votes": {
+        "tie": 1
+      },
+      "scope": "tokiko_japanese_speech",
+      "testedCommit": "245ed15",
+      "condition": "v0.4 mirror_audit_demo.html Test #4 watashi/amae (2-choice: original vs 2.2kHz low-pass)",
+      "recordedAt": "2026-11-24",
+      "evidenceDoc": "bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md",
+      "note": "Mirror saw a difference on #4 watashi/amae, ear saw no reason to fix"
+    },
+    "F23_ERRATIC_PITCH_WARBLE": {
+      "status": "ear_tie_observed",
+      "judge": "poidowl",
+      "votes": {
+        "tie": 1
+      },
+      "scope": "tokiko_japanese_speech",
+      "testedCommit": "245ed15",
+      "condition": "v0.4 mirror_audit_demo.html Test #4 watashi/amae (2-choice: original vs 2.2kHz low-pass)",
+      "recordedAt": "2026-11-24",
+      "evidenceDoc": "bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md",
+      "note": "Mirror saw a difference on #4 watashi/amae, ear saw no reason to fix"
+    }
+  }
+}

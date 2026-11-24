@@ -1,11 +1,18 @@
 {
   "name": "yata",
-  "version": "0.1.0",
-  "description": "LLM-friendly multidimensional 'unkawaii' falsifier for audio (zero-dependency pure JS)",
+  "version": "0.5.0",
+  "description": "LLM-friendly multidimensional 'unkawaii' falsifier & audio-vision suite (zero-dependency pure JS)",
   "type": "module",
   "main": "./unkawaii_detector.mjs",
   "bin": {
     "yata": "./unkawaii_detector.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:e2e": "node --test e2e/*.test.mjs",
+    "bench": "node bench/benchmark.mjs",
+    "discover": "node unkawaii_detector.mjs --discover",
+    "build:demo": "node bench/build_demo.mjs"
   },
   "license": "MIT",
   "author": "poidowl"

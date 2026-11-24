@@ -1,510 +1,523 @@
 #!/usr/bin/env node
 /**
- * unkawaii_detector.mjs — LLM-Friendly Multidimensional "Unkawaii" Falsifier (v0.1)
+ * unkawaii_detector.mjs — LLM-Friendly Multidimensional "Unkawaii" Falsifier & Audio Vision (v0.2)
  *
- * Philosophy:
- *   "Kawaii" cannot be written completely; "Unkawaii" (signatures of something
- *   you do not want to be with) can be detected across multiple dimensions.
- *   Whatever survives every falsifier without triggering is a Kawaii Candidate.
+ * 0th Axiom:
+ *   "Discover 'unkawaii' across multiple dimensions. If all falsifiers fail, it survives as 'kawaii'."
  *
  * Zero dependencies. Pure JavaScript (ES Module + Node.js CLI).
+ * 100% backward-compatible with v0.1 programmatic exports and CLI usage.
  *
  * Usage:
- *   node unkawaii_detector.mjs sample.wav
- *   node unkawaii_detector.mjs sample.wav --format json
- *   node unkawaii_detector.mjs --compare natta.wav natta_kata.wav
- *
- * Programmatic API:
- *   import { analyzeSamples, compareReports, formatForLLM, DEFAULT_FALSIFIERS } from "./unkawaii_detector.mjs";
+ *   node unkawaii_detector.mjs <file.wav> [--format llm|json] [--verbose] [--falsifiers all|core]
+ *                                         [--view [micro|compact|full]] [--zoom [auto|<t0>..<t1>]]
+ *                                         [--charset ascii|unicode] [--width <N>]
+ *                                         [--svg <out.svg>] [--png <out.png>]
+ *   node unkawaii_detector.mjs --compare <a.wav> <b.wav> [--format llm|json] [--verbose] [--view [micro|compact|full]] [--svg <out.svg>] [--png <out.png>]
+ *   node unkawaii_detector.mjs --diff <a.wav> <b.wav> [--charset ascii|unicode] [--width <N>] [--svg <out.svg>] [--png <out.png>]
+ *   node unkawaii_detector.mjs --discover [--format llm|json] [--view]
+ *   node unkawaii_detector.mjs --list-falsifiers [--format llm|json]
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-// ============================================================================
-// 1. Minimal Zero-Dependency WAV Reader (PCM 16-bit / IEEE Float 32-bit)
-// ============================================================================
-export function decodeWavBuffer(buffer) {
-  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  const str = (off, len) =>
-    String.fromCharCode(...new Uint8Array(buffer.buffer, buffer.byteOffset + off, len));
+import { decodeWavBuffer, encodeWavBuffer } from "./src/wav.mjs";
+import { extractFeatures, extractAudioProfile, extractSegmentTimeline } from "./src/features.mjs";
+import {
+  ORIGINAL_6_FALSIFIERS,
+  DEFAULT_FALSIFIERS,
+  ORTHOGONAL_AXES,
+  TOOLBOX_FALSIFIERS,
+  createFalsifiers,
+} from "./src/falsifiers/index.mjs";
+import { analyzeSamples, compareReports, formatForLLM, formatCompareForLLM } from "./src/report.mjs";
+import {
+  auditFalsifiersAgainstShelf,
+  formatShelfAuditForLLM,
+  loadEarPrecedents,
+  applyEarPrecedents,
+} from "./src/shelf.mjs";
+import {
+  renderTextVision,
+  renderTextDiff,
+  renderSegmentTimeline,
+  renderSvgVision,
+  renderSvgDiff,
+  renderPngVision,
+  renderPngDiff,
+} from "./src/visualize/index.mjs";
+import { buildCorpus } from "./src/synth.mjs";
+import { runDiscoveryLoop, formatDiscoveryForLLM } from "./src/discovery.mjs";
 
-  if (str(0, 4) !== "RIFF" || str(8, 4) !== "WAVE") {
-    throw new Error("Invalid WAV header: expected RIFF/WAVE");
+// ============================================================================
+// Public Programmatic API (v0.1 backward-compatible + v0.2/v0.3/v0.5 extensions)
+// ============================================================================
+export {
+  // v0.1 core exports
+  decodeWavBuffer,
+  extractFeatures,
+  DEFAULT_FALSIFIERS,
+  analyzeSamples,
+  compareReports,
+  formatForLLM,
+  formatCompareForLLM,
+  // v0.2 extensions
+  encodeWavBuffer,
+  extractAudioProfile,
+  ORIGINAL_6_FALSIFIERS,
+  createFalsifiers,
+  renderTextVision,
+  renderTextDiff,
+  renderSvgVision,
+  renderSvgDiff,
+  renderPngVision,
+  renderPngDiff,
+  buildCorpus,
+  runDiscoveryLoop,
+  formatDiscoveryForLLM,
+  // v0.3 extensions
+  ORTHOGONAL_AXES,
+  TOOLBOX_FALSIFIERS,
+  auditFalsifiersAgainstShelf,
+  formatShelfAuditForLLM,
+  // v0.5 extensions
+  extractSegmentTimeline,
+  renderSegmentTimeline,
+  loadEarPrecedents,
+  applyEarPrecedents,
+};
+
+// ============================================================================
+// CLI Argument Parser & Runner
+// ============================================================================
+const USAGE = `Usage:
+  node unkawaii_detector.mjs <file.wav> [--format llm|json] [--verbose] [--falsifiers all|core]
+                                        [--policy core_veto|veto_all|shelf_veto] [--contested <ID1,ID2,...>]
+                                        [--precedents <path.json> | --shelf <path.json>] [--scope <scope>]
+                                        [--view [micro|compact|full]] [--zoom [auto|<t0>..<t1>]] [--timeline]
+                                        [--charset ascii|unicode] [--width <N>]
+                                        [--svg <out.svg>] [--png <out.png>]
+  node unkawaii_detector.mjs --compare <a.wav> <b.wav> [--format llm|json] [--verbose] [--falsifiers all|core]
+                                                       [--policy core_veto|veto_all|shelf_veto] [--contested <ID1,ID2,...>]
+                                                       [--precedents <path.json> | --shelf <path.json>] [--scope <scope>]
+                                                       [--view [micro|compact|full]] [--svg <out.svg>] [--png <out.png>]
+  node unkawaii_detector.mjs --diff <a.wav> <b.wav> [--falsifiers all|core] [--policy core_veto|veto_all|shelf_veto]
+                                                    [--contested <ID1,ID2,...>]
+                                                    [--charset ascii|unicode] [--width <N>]
+                                                    [--svg <out.svg>] [--png <out.png>]
+  node unkawaii_detector.mjs --discover [--format llm|json] [--view] [--charset ascii|unicode]
+  node unkawaii_detector.mjs --list-falsifiers [--format llm|json] [--falsifiers all|core]`;
+
+const VIEW_MODES = new Set(["micro", "compact", "full"]);
+
+function parseZoomArg(raw) {
+  if (!raw || raw === "auto") return "auto";
+  const m = /^(\d+(?:\.\d+)?)\.\.(\d+(?:\.\d+)?)$/.exec(raw.trim());
+  if (!m) {
+    throw new Error(`Invalid --zoom value "${raw}": expected "auto" or "<t0>..<t1>" (e.g. 0.1..0.4)`);
   }
+  const startSec = Number.parseFloat(m[1]);
+  const endSec = Number.parseFloat(m[2]);
+  if (!Number.isFinite(startSec) || !Number.isFinite(endSec) || endSec <= startSec) {
+    throw new Error(`Invalid --zoom range "${raw}": endSec must be greater than startSec`);
+  }
+  return { startSec, endSec };
+}
 
-  let offset = 12;
-  let audioFormat = 1;
-  let numChannels = 1;
-  let sampleRate = 44100;
-  let bitsPerSample = 16;
-  let dataOffset = -1;
-  let dataSize = 0;
+function parseCliArgs(argv) {
+  const opts = {
+    help: false,
+    mode: "single", // single | compare | diff | discover | list
+    files: [],
+    format: "llm",
+    verbose: false,
+    falsifiersSet: "all",
+    policy: "core_veto",
+    contestedIds: [],
+    precedentsPath: null,
+    scope: null,
+    timeline: false,
+    view: null, // null | "micro" | "compact" | "full"
+    zoom: null, // null | "auto" | { startSec, endSec }
+    charset: "ascii",
+    width: 48,
+    svgOut: null,
+    pngOut: null,
+  };
 
-  while (offset + 8 <= buffer.byteLength) {
-    const id = str(offset, 4);
-    const size = view.getUint32(offset + 4, true);
-    if (id === "fmt ") {
-      audioFormat = view.getUint16(offset + 8, true);
-      numChannels = view.getUint16(offset + 10, true);
-      sampleRate = view.getUint32(offset + 12, true);
-      bitsPerSample = view.getUint16(offset + 22, true);
-    } else if (id === "data") {
-      dataOffset = offset + 8;
-      dataSize = size;
-      break;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+
+    if (arg === "-h" || arg === "--help") {
+      opts.help = true;
+      continue;
     }
-    offset += 8 + size + (size % 2);
-  }
 
-  if (dataOffset < 0) throw new Error("WAV data chunk not found");
+    if (arg === "--compare") {
+      opts.mode = "compare";
+      const a = argv[++i];
+      const b = argv[++i];
+      if (!a || !b || a.startsWith("-") || b.startsWith("-")) {
+        throw new Error("--compare requires two WAV file paths: --compare <a.wav> <b.wav>");
+      }
+      opts.files.push(a, b);
+      continue;
+    }
 
-  const bytesPerSample = bitsPerSample / 8;
-  const frameCount = Math.floor(dataSize / (bytesPerSample * numChannels));
-  const samples = new Float32Array(frameCount);
+    if (arg === "--diff") {
+      opts.mode = "diff";
+      const a = argv[++i];
+      const b = argv[++i];
+      if (!a || !b || a.startsWith("-") || b.startsWith("-")) {
+        throw new Error("--diff requires two WAV file paths: --diff <a.wav> <b.wav>");
+      }
+      opts.files.push(a, b);
+      continue;
+    }
 
-  for (let i = 0; i < frameCount; i++) {
-    let sum = 0;
-    for (let ch = 0; ch < numChannels; ch++) {
-      const pos = dataOffset + (i * numChannels + ch) * bytesPerSample;
-      if (audioFormat === 3 && bitsPerSample === 32) {
-        sum += view.getFloat32(pos, true);
-      } else if (audioFormat === 1 && bitsPerSample === 16) {
-        sum += view.getInt16(pos, true) / 32768;
-      } else if (audioFormat === 1 && bitsPerSample === 8) {
-        sum += (view.getUint8(pos) - 128) / 128;
+    if (arg === "--discover") {
+      opts.mode = "discover";
+      continue;
+    }
+
+    if (arg === "--list-falsifiers") {
+      opts.mode = "list";
+      continue;
+    }
+
+    if (arg === "--format") {
+      const val = argv[++i];
+      if (val !== "llm" && val !== "json") {
+        throw new Error(`Invalid --format "${val ?? ""}": expected "llm" or "json"`);
+      }
+      opts.format = val;
+      continue;
+    }
+
+    if (arg === "--verbose") {
+      opts.verbose = true;
+      continue;
+    }
+
+    if (arg === "--falsifiers") {
+      const val = argv[++i];
+      if (val !== "all" && val !== "core") {
+        throw new Error(`Invalid --falsifiers "${val ?? ""}": expected "all" or "core"`);
+      }
+      opts.falsifiersSet = val;
+      continue;
+    }
+
+    if (arg === "--policy") {
+      const val = argv[++i];
+      if (val !== "core_veto" && val !== "veto_all" && val !== "shelf_veto") {
+        throw new Error(
+          `Invalid --policy "${val ?? ""}": expected "core_veto", "veto_all", or "shelf_veto"`
+        );
+      }
+      opts.policy = val;
+      continue;
+    }
+
+    if (arg === "--contested") {
+      const val = argv[++i];
+      if (!val || val.startsWith("-")) {
+        throw new Error("--contested requires a comma-separated list of falsifier IDs");
+      }
+      const parsedIds = val
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      opts.contestedIds.push(...parsedIds);
+      continue;
+    }
+
+    if (arg === "--precedents" || arg === "--shelf") {
+      const val = argv[++i];
+      if (!val || val.startsWith("-")) {
+        throw new Error(`${arg} requires a JSON file path`);
+      }
+      opts.precedentsPath = val;
+      continue;
+    }
+
+    if (arg === "--scope") {
+      const val = argv[++i];
+      if (!val || val.startsWith("-")) {
+        throw new Error("--scope requires a non-empty scope name (e.g. tokiko_japanese_speech)");
+      }
+      opts.scope = val.trim();
+      continue;
+    }
+
+    if (arg === "--timeline") {
+      opts.timeline = true;
+      continue;
+    }
+
+    if (arg === "--view") {
+      const next = argv[i + 1];
+      if (next && VIEW_MODES.has(next)) {
+        opts.view = next;
+        i++;
+      } else if (next && !next.startsWith("-") && opts.mode === "single" && opts.files.length > 0) {
+        throw new Error(`Invalid --view mode "${next}": expected micro, compact, or full`);
       } else {
-        throw new Error(`Unsupported WAV format=${audioFormat}, bits=${bitsPerSample}`);
+        opts.view = "compact";
       }
+      continue;
     }
-    samples[i] = sum / numChannels;
+
+    if (arg === "--zoom") {
+      const next = argv[i + 1];
+      if (next && !next.startsWith("-")) {
+        opts.zoom = parseZoomArg(next);
+        i++;
+      } else {
+        opts.zoom = "auto";
+      }
+      continue;
+    }
+
+    if (arg === "--charset") {
+      const val = argv[++i];
+      if (val !== "ascii" && val !== "unicode") {
+        throw new Error(`Invalid --charset "${val ?? ""}": expected "ascii" or "unicode"`);
+      }
+      opts.charset = val;
+      continue;
+    }
+
+    if (arg === "--width") {
+      const val = argv[++i];
+      const parsed = Number.parseInt(val, 10);
+      if (!Number.isFinite(parsed) || parsed < 16 || parsed > 240) {
+        throw new Error(`Invalid --width "${val ?? ""}": expected integer between 16 and 240`);
+      }
+      opts.width = parsed;
+      continue;
+    }
+
+    if (arg === "--svg") {
+      const val = argv[++i];
+      if (!val || val.startsWith("-")) {
+        throw new Error("--svg requires an output file path");
+      }
+      opts.svgOut = val;
+      continue;
+    }
+
+    if (arg === "--png") {
+      const val = argv[++i];
+      if (!val || val.startsWith("-")) {
+        throw new Error("--png requires an output file path");
+      }
+      opts.pngOut = val;
+      continue;
+    }
+
+    if (arg.startsWith("-")) {
+      throw new Error(`Unknown CLI flag: ${arg}`);
+    }
+
+    opts.files.push(arg);
   }
 
-  return { samples, sampleRate, durationSec: frameCount / sampleRate, numChannels, bitsPerSample };
+  return opts;
 }
 
-// ============================================================================
-// 2. Frame-Level Acoustic & Presence Feature Extractor
-// ============================================================================
-export function extractFeatures(samples, sampleRate) {
-  const n = samples.length;
-  const durationSec = n / sampleRate;
-  const frameSize = Math.max(256, Math.round(sampleRate * 0.025)); // 25ms
-  const hopSize = Math.max(128, Math.round(sampleRate * 0.010));   // 10ms
+function loadWavFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`WAV file not found: ${filePath}`);
+  }
+  const buf = fs.readFileSync(filePath);
+  return decodeWavBuffer(buf);
+}
 
-  let peak = 0;
-  let clipCount = 0;
-  let maxSampleJump = 0;
-  for (let i = 0; i < n; i++) {
-    const a = Math.abs(samples[i]);
-    if (a > peak) peak = a;
-    if (a >= 0.995) clipCount++;
-    if (i > 0) {
-      const jump = Math.abs(samples[i] - samples[i - 1]);
-      if (jump > maxSampleJump) maxSampleJump = jump;
-    }
+function runCli(argv) {
+  const opts = parseCliArgs(argv);
+
+  if (opts.help || argv.length === 0) {
+    console.log(USAGE);
+    return;
   }
 
-  // Normalize copy for scale-invariant envelope & spectral analysis
-  const norm = new Float32Array(n);
-  const invPeak = peak > 1e-6 ? 1 / peak : 1;
-  for (let i = 0; i < n; i++) norm[i] = samples[i] * invPeak;
+  const falsifiers = opts.falsifiersSet === "core" ? ORIGINAL_6_FALSIFIERS : DEFAULT_FALSIFIERS;
+  const precedentsOpt = opts.precedentsPath
+    ? { precedents: loadEarPrecedents(opts.precedentsPath), scope: opts.scope }
+    : {};
 
-  const frames = [];
-  const minLag = Math.max(2, Math.floor(sampleRate / 650)); // up to 650 Hz
-  const maxLag = Math.min(frameSize - 2, Math.floor(sampleRate / 75)); // down to 75 Hz
-
-  for (let start = 0; start + frameSize <= n; start += hopSize) {
-    let sumSq = 0;
-    let zcr = 0;
-    let diffSq = 0; // high-frequency proxy (first difference energy)
-    for (let j = 0; j < frameSize; j++) {
-      const x = norm[start + j];
-      sumSq += x * x;
-      if (j > 0) {
-        const prev = norm[start + j - 1];
-        if ((x >= 0 && prev < 0) || (x < 0 && prev >= 0)) zcr++;
-        const d = x - prev;
-        diffSq += d * d;
+  if (opts.mode === "list") {
+    const list = falsifiers.map((f) => ({ id: f.id, domain: f.domain, name: f.name }));
+    if (opts.format === "json") {
+      console.log(JSON.stringify(list, null, 2));
+    } else {
+      const lines = [`[UNKAWAII FALSIFIERS] (${list.length} active)`];
+      for (const f of list) {
+        lines.push(`  - ${f.id} [${f.domain}] ${f.name}`);
       }
+      console.log(lines.join("\n"));
     }
-    const rms = Math.sqrt(sumSq / frameSize);
-    const zcrRate = zcr / frameSize;
-    // Normalized spectral tilt proxy: high-frequency energy ratio
-    const hfRatio = sumSq > 1e-8 ? Math.min(1, diffSq / (sumSq * 2.0)) : 0;
+    return;
+  }
 
-    // Autocorrelation for periodicity (voicedness) and F0
-    let bestCorr = 0;
-    let bestLag = 0;
-    if (rms > 0.04) {
-      for (let lag = minLag; lag <= maxLag; lag++) {
-        let num = 0;
-        let denA = 0;
-        let denB = 0;
-        const limit = frameSize - lag;
-        for (let j = 0; j < limit; j++) {
-          const a = norm[start + j];
-          const b = norm[start + j + lag];
-          num += a * b;
-          denA += a * a;
-          denB += b * b;
-        }
-        const denom = Math.sqrt(denA * denB);
-        const c = denom > 1e-8 ? num / denom : 0;
-        if (c > bestCorr) {
-          bestCorr = c;
-          bestLag = lag;
-        }
-      }
-    }
-
-    const voiced = bestCorr >= 0.55 && rms > 0.05;
-    const f0 = voiced && bestLag > 0 ? sampleRate / bestLag : 0;
-
-    frames.push({
-      timeSec: (start + frameSize * 0.5) / sampleRate,
-      rms,
-      zcrRate,
-      hfRatio,
-      periodicity: bestCorr,
-      voiced,
-      f0
+  if (opts.mode === "discover") {
+    const res = runDiscoveryLoop({
+      includeDossiers: Boolean(opts.view) || opts.format === "json",
+      viewMode: opts.view || "micro",
+      charset: opts.charset,
     });
-  }
-
-  // Active frames (above 8% of max RMS)
-  const maxRms = frames.reduce((m, f) => Math.max(m, f.rms), 0);
-  const activeThresh = Math.max(0.03, maxRms * 0.12);
-  const activeIndices = [];
-  for (let i = 0; i < frames.length; i++) {
-    if (frames[i].rms >= activeThresh) activeIndices.push(i);
-  }
-
-  // 1. Envelope attack sharpness (max positive 10ms RMS jump)
-  let maxAttackSlope = 0;
-  let maxAttackTimeSec = 0;
-  for (let i = 1; i < frames.length; i++) {
-    const slope = (frames[i].rms - frames[i - 1].rms) / Math.max(maxRms, 1e-6);
-    if (slope > maxAttackSlope) {
-      maxAttackSlope = slope;
-      maxAttackTimeSec = frames[i].timeSec;
+    if (opts.format === "json") {
+      console.log(JSON.stringify(res, null, 2));
+    } else {
+      console.log(formatDiscoveryForLLM(res, { view: Boolean(opts.view) }));
     }
+    return;
   }
 
-  // 2. Mean HF ratio on active frames
-  const meanHfRatio = activeIndices.length
-    ? activeIndices.reduce((s, idx) => s + frames[idx].hfRatio, 0) / activeIndices.length
-    : 0;
-
-  // 3. Voiced ratio & micro-variation (jitter / shimmer)
-  const voicedFrames = activeIndices.map(i => frames[i]).filter(f => f.voiced);
-  const voicedRatio = activeIndices.length ? voicedFrames.length / activeIndices.length : 0;
-
-  let jitterSum = 0;
-  let shimmerSum = 0;
-  let pairCount = 0;
-  for (let i = 1; i < voicedFrames.length; i++) {
-    const prev = voicedFrames[i - 1];
-    const curr = voicedFrames[i];
-    if (curr.timeSec - prev.timeSec <= 0.025) {
-      jitterSum += Math.abs(curr.f0 - prev.f0) / Math.max(prev.f0, 1);
-      shimmerSum += Math.abs(curr.rms - prev.rms) / Math.max(prev.rms, 1e-6);
-      pairCount++;
+  if (opts.mode === "compare" || opts.mode === "diff") {
+    const [fileA, fileB] = opts.files;
+    if (!fileA || !fileB) {
+      throw new Error(`--${opts.mode} requires two WAV paths`);
     }
-  }
-  const jitter = pairCount ? jitterSum / pairCount : 0;
-  const shimmer = pairCount ? shimmerSum / pairCount : 0;
+    const wavA = loadWavFile(fileA);
+    const wavB = loadWavFile(fileB);
+    const chA = wavA.channels ? { channels: wavA.channels } : {};
+    const chB = wavB.channels ? { channels: wavB.channels } : {};
+    const contestedOpt = opts.contestedIds.length ? { contestedIds: opts.contestedIds } : {};
+    const repA = analyzeSamples(wavA.samples, wavA.sampleRate, {
+      label: path.basename(fileA),
+      falsifiers,
+      policy: opts.policy,
+      ...contestedOpt,
+      ...precedentsOpt,
+      ...chA,
+    });
+    const repB = analyzeSamples(wavB.samples, wavB.sampleRate, {
+      label: path.basename(fileB),
+      falsifiers,
+      policy: opts.policy,
+      ...contestedOpt,
+      ...precedentsOpt,
+      ...chB,
+    });
 
-  // 4. Cross-channel coupling (Common Cause proxy: |corr(rms, hfRatio)| and |corr(rms, f0)|)
-  const corrRmsHf = Math.abs(pearson(activeIndices.map(i => frames[i].rms), activeIndices.map(i => frames[i].hfRatio)));
-  const corrRmsF0 = voicedFrames.length >= 4
-    ? Math.abs(pearson(voicedFrames.map(f => f.rms), voicedFrames.map(f => f.f0)))
-    : 0;
-  const commonCauseCoupling = Math.max(corrRmsHf, corrRmsF0);
+    const needProfiles = opts.mode === "diff" || Boolean(opts.view) || Boolean(opts.svgOut) || Boolean(opts.pngOut);
+    const profA = needProfiles ? extractAudioProfile(wavA.samples, wavA.sampleRate, chA) : null;
+    const profB = needProfiles ? extractAudioProfile(wavB.samples, wavB.sampleRate, chB) : null;
 
-  // 5. Tail decay smoothness (time from last 70% peak down to 12% peak)
-  let tailDecaySec = 0;
-  let tailStartSec = 0;
-  if (activeIndices.length >= 3) {
-    const lastActive = activeIndices[activeIndices.length - 1];
-    let highIdx = lastActive;
-    for (let i = lastActive; i >= activeIndices[0]; i--) {
-      if (frames[i].rms >= maxRms * 0.65) {
-        highIdx = i;
-        break;
-      }
+    if (opts.svgOut) {
+      fs.writeFileSync(opts.svgOut, renderSvgDiff(profA, profB, repA, repB), "utf8");
     }
-    tailStartSec = frames[highIdx].timeSec;
-    tailDecaySec = Math.max(0, frames[lastActive].timeSec - frames[highIdx].timeSec);
-  }
-
-  return {
-    sampleRate,
-    durationSec: +durationSec.toFixed(3),
-    frameCount: frames.length,
-    activeFrameCount: activeIndices.length,
-    peak: +peak.toFixed(4),
-    clipRatio: +(clipCount / Math.max(n, 1)).toFixed(5),
-    maxSampleJump: +maxSampleJump.toFixed(4),
-    maxAttackSlope: +maxAttackSlope.toFixed(4),
-    maxAttackTimeSec: +maxAttackTimeSec.toFixed(3),
-    meanHfRatio: +meanHfRatio.toFixed(4),
-    voicedRatio: +voicedRatio.toFixed(4),
-    jitter: +jitter.toFixed(5),
-    shimmer: +shimmer.toFixed(5),
-    commonCauseCoupling: +commonCauseCoupling.toFixed(4),
-    tailDecaySec: +tailDecaySec.toFixed(3),
-    tailStartSec: +tailStartSec.toFixed(3)
-  };
-}
-
-function pearson(xs, ys) {
-  const n = Math.min(xs.length, ys.length);
-  if (n < 3) return 0;
-  let mx = 0, my = 0;
-  for (let i = 0; i < n; i++) { mx += xs[i]; my += ys[i]; }
-  mx /= n; my /= n;
-  let num = 0, dx = 0, dy = 0;
-  for (let i = 0; i < n; i++) {
-    const ax = xs[i] - mx;
-    const ay = ys[i] - my;
-    num += ax * ay;
-    dx += ax * ax;
-    dy += ay * ay;
-  }
-  const den = Math.sqrt(dx * dy);
-  return den > 1e-9 ? num / den : 0;
-}
-
-// ============================================================================
-// 3. Extensible Multidimensional "Unkawaii" Falsifiers
-//    Add new dimensions via falsifiers.push({ id, domain, name, detect(f) })
-// ============================================================================
-export const DEFAULT_FALSIFIERS = [
-  {
-    id: "F1_HARSH_EDGE",
-    domain: "aggression",
-    name: "Sharp Edge / High-Freq Aggression",
-    detect(f) {
-      const score = +(f.maxAttackSlope * 0.60 + f.meanHfRatio * 0.40).toFixed(3);
-      const threshold = 0.42;
-      const triggered = score > threshold || f.maxAttackSlope > 0.38;
-      return {
-        triggered,
-        score,
-        threshold,
-        evidence: `attackSlope=${f.maxAttackSlope} @ ${f.maxAttackTimeSec}s, hfRatio=${f.meanHfRatio}`,
-        hint: "Soften glottal attack curvature and deepen high-frequency spectral tilt."
-      };
+    if (opts.pngOut) {
+      fs.writeFileSync(opts.pngOut, renderPngDiff(profA, profB, repA, repB));
     }
-  },
-  {
-    id: "F2_PURE_ROBOT",
-    domain: "absence_of_presence",
-    name: "Mechanical Rigidity (Zero Micro-Variation)",
-    detect(f) {
-      const triggered = f.voicedRatio >= 0.4 && (f.jitter < 0.0005 || (f.jitter < 0.0015 && f.shimmer < 0.012));
-      const score = f.voicedRatio >= 0.4 ? +(1 - Math.min(1, f.jitter * 200 + f.shimmer * 25)).toFixed(3) : 0;
-      return {
-        triggered,
-        score,
-        threshold: 0.70,
-        evidence: `voicedRatio=${f.voicedRatio}, jitter=${f.jitter}, shimmer=${f.shimmer}`,
-        hint: "Introduce physical inertia, lung-pressure drift, or 1/f micro-fluctuation."
-      };
+
+    if (opts.mode === "diff") {
+      console.log(
+        renderTextDiff(profA, profB, repA, repB, {
+          width: opts.width,
+          charset: opts.charset,
+        })
+      );
+      return;
     }
-  },
-  {
-    id: "F3_PURE_NOISE",
-    domain: "absence_of_presence",
-    name: "Unstructured Noise (Wind / Static)",
-    detect(f) {
-      const triggered = f.activeFrameCount === 0 || f.voicedRatio < 0.22;
-      const score = +(1 - f.voicedRatio).toFixed(3);
-      return {
-        triggered,
-        score,
-        threshold: 0.78,
-        evidence: `voicedRatio=${f.voicedRatio} (activeFrames=${f.activeFrameCount})`,
-        hint: "Establish coherent periodic vocal-fold / resonant body structure."
-      };
-    }
-  },
-  {
-    id: "F4_NO_COMMON_CAUSE",
-    domain: "absence_of_presence",
-    name: "Uncoupled Channels (Hollow / Stitched)",
-    detect(f) {
-      const triggered = f.activeFrameCount >= 8 && f.commonCauseCoupling < 0.22;
-      const score = +(1 - f.commonCauseCoupling).toFixed(3);
-      return {
-        triggered,
-        score,
-        threshold: 0.78,
-        evidence: `crossChannelCoupling=${f.commonCauseCoupling}`,
-        hint: "Couple pitch, breathiness, and amplitude to a single latent physical state (e.g., lung air reservoir)."
-      };
-    }
-  },
-  {
-    id: "F5_ABRUPT_TAIL",
-    domain: "no_arrow_of_time",
-    name: "Abrupt Cut-Off Tail (Symbolic / Katakana)",
-    detect(f) {
-      const triggered = f.activeFrameCount >= 5 && f.tailDecaySec < 0.055;
-      const score = +(1 - Math.min(1, f.tailDecaySec / 0.14)).toFixed(3);
-      return {
-        triggered,
-        score,
-        threshold: 0.61,
-        evidence: `tailDecay=${f.tailDecaySec}s (from ${f.tailStartSec}s)`,
-        hint: "Allow phrase tail to release gradually with breath/tension decay instead of hard cut-off."
-      };
-    }
-  },
-  {
-    id: "F6_PHYSICAL_GLITCH",
-    domain: "mechanical_failure",
-    name: "Physical Discontinuity / Clipping",
-    detect(f) {
-      const triggered = f.clipRatio > 0.005 || f.maxSampleJump > 0.85;
-      const score = +(Math.min(1, f.clipRatio * 50 + Math.max(0, f.maxSampleJump - 0.5))).toFixed(3);
-      return {
-        triggered,
-        score,
-        threshold: 0.35,
-        evidence: `clipRatio=${f.clipRatio}, maxSampleJump=${f.maxSampleJump}`,
-        hint: "Check waveguide stability, clicks, or output gain normalization."
-      };
-    }
-  }
-];
 
-// ============================================================================
-// 4. Main Analysis, Comparison & LLM-Friendly Formatter
-// ============================================================================
-export function analyzeSamples(samples, sampleRate, options = {}) {
-  const label = options.label || "untitled";
-  const falsifiers = options.falsifiers || DEFAULT_FALSIFIERS;
-  const features = extractFeatures(samples, sampleRate);
-
-  const results = falsifiers.map(fn => {
-    const out = fn.detect(features);
-    return {
-      id: fn.id,
-      domain: fn.domain,
-      name: fn.name,
-      ...out
-    };
-  });
-
-  const triggered = results.filter(r => r.triggered);
-  const survived = triggered.length === 0;
-
-  return {
-    schema: "unkawaii_report/v0.1",
-    label,
-    verdict: survived ? "SURVIVED_KAWAII_CANDIDATE" : "REJECTED_UNKAWAII",
-    triggeredCount: triggered.length,
-    totalFalsifiers: results.length,
-    mirrorSummary: survived
-      ? "Mirror clear: failed to detect any 'do-not-want-to-be-with' signature across all dimensions."
-      : `Mirror reflects: ${triggered.map(t => `${t.id} (${t.name})`).join("; ")}.`,
-    features,
-    falsifiers: results
-  };
-}
-
-export function compareReports(reportA, reportB) {
-  const deltas = reportA.falsifiers.map((fa, i) => {
-    const fb = reportB.falsifiers[i];
-    return {
-      id: fa.id,
-      name: fa.name,
-      aScore: fa.score,
-      bScore: fb ? fb.score : null,
-      deltaBMinusA: fb ? +(fb.score - fa.score).toFixed(3) : null,
-      aTriggered: fa.triggered,
-      bTriggered: fb ? fb.triggered : null
-    };
-  });
-  return {
-    schema: "unkawaii_compare/v0.1",
-    a: { label: reportA.label, verdict: reportA.verdict, triggeredCount: reportA.triggeredCount },
-    b: { label: reportB.label, verdict: reportB.verdict, triggeredCount: reportB.triggeredCount },
-    deltas
-  };
-}
-
-export function formatForLLM(report) {
-  const lines = [
-    `[UNKAWAII REPORT] ${report.label}`,
-    `VERDICT: ${report.verdict} (${report.triggeredCount}/${report.totalFalsifiers} falsifiers triggered)`,
-    `MIRROR: ${report.mirrorSummary}`,
-    `OBSERVABLES: dur=${report.features.durationSec}s | attack=${report.features.maxAttackSlope} | hf=${report.features.meanHfRatio} | voiced=${report.features.voicedRatio} | jitter=${report.features.jitter} | coupling=${report.features.commonCauseCoupling} | tail=${report.features.tailDecaySec}s`,
-    `DIMENSIONS:`
-  ];
-  for (const f of report.falsifiers) {
-    const mark = f.triggered ? "TRIGGERED" : "clear    ";
-    lines.push(`  - [${mark}] ${f.id} (score=${f.score}, thr=${f.threshold}) | ${f.evidence}`);
-    if (f.triggered) lines.push(`      hint: ${f.hint}`);
-  }
-  return lines.join("\n");
-}
-
-export function formatCompareForLLM(cmp) {
-  const lines = [
-    `[UNKAWAII COMPARE] A="${cmp.a.label}" vs B="${cmp.b.label}"`,
-    `A: ${cmp.a.verdict} (${cmp.a.triggeredCount} triggered)`,
-    `B: ${cmp.b.verdict} (${cmp.b.triggeredCount} triggered)`,
-    `DELTAS (B - A; positive = B is MORE unkawaii on that axis):`
-  ];
-  for (const d of cmp.deltas) {
-    const sign = d.deltaBMinusA > 0 ? "+" : "";
-    lines.push(`  - ${d.id}: A=${d.aScore}${d.aTriggered ? "*" : ""} -> B=${d.bScore}${d.bTriggered ? "*" : ""} (${sign}${d.deltaBMinusA})`);
-  }
-  return lines.join("\n");
-}
-
-// ============================================================================
-// 5. CLI Entrypoint
-// ============================================================================
-function main() {
-  const args = process.argv.slice(2);
-  if (args.length === 0 || args.includes("-h") || args.includes("--help")) {
-    console.log(
-      "Usage:\n" +
-      "  node unkawaii_detector.mjs <file.wav> [--format llm|json]\n" +
-      "  node unkawaii_detector.mjs --compare <a.wav> <b.wav> [--format llm|json]"
-    );
-    process.exit(0);
-  }
-
-  const fmtIdx = args.indexOf("--format");
-  const format = fmtIdx >= 0 ? args[fmtIdx + 1] : "llm";
-  const cmpIdx = args.indexOf("--compare");
-
-  if (cmpIdx >= 0) {
-    const fileA = args[cmpIdx + 1];
-    const fileB = args[cmpIdx + 2];
-    if (!fileA || !fileB) throw new Error("--compare requires two WAV paths");
-    const wavA = decodeWavBuffer(fs.readFileSync(fileA));
-    const wavB = decodeWavBuffer(fs.readFileSync(fileB));
-    const repA = analyzeSamples(wavA.samples, wavA.sampleRate, { label: path.basename(fileA) });
-    const repB = analyzeSamples(wavB.samples, wavB.sampleRate, { label: path.basename(fileB) });
     const cmp = compareReports(repA, repB);
-    console.log(format === "json" ? JSON.stringify(cmp, null, 2) : formatCompareForLLM(cmp));
+    if (opts.format === "json") {
+      console.log(JSON.stringify(cmp, null, 2));
+    } else {
+      const out = [formatCompareForLLM(cmp, { verbose: opts.verbose })];
+      if (opts.view) {
+        out.push(
+          "",
+          renderTextDiff(profA, profB, repA, repB, {
+            width: opts.width,
+            charset: opts.charset,
+          })
+        );
+      }
+      console.log(out.join("\n"));
+    }
+    return;
+  }
+
+  // Single-file analysis
+  const file = opts.files[0];
+  if (!file) {
+    throw new Error("Missing WAV file path");
+  }
+  const wav = loadWavFile(file);
+  const chOpt = wav.channels ? { channels: wav.channels } : {};
+  const contestedOpt = opts.contestedIds.length ? { contestedIds: opts.contestedIds } : {};
+  const rep = analyzeSamples(wav.samples, wav.sampleRate, {
+    label: path.basename(file),
+    falsifiers,
+    policy: opts.policy,
+    ...contestedOpt,
+    ...precedentsOpt,
+    ...chOpt,
+  });
+
+  const needProfile =
+    Boolean(opts.view) ||
+    Boolean(opts.zoom) ||
+    Boolean(opts.timeline) ||
+    Boolean(opts.svgOut) ||
+    Boolean(opts.pngOut);
+  const profile = needProfile ? extractAudioProfile(wav.samples, wav.sampleRate, chOpt) : null;
+  const timeline = opts.timeline ? extractSegmentTimeline(profile, wav.samples, wav.sampleRate) : null;
+
+  if (opts.svgOut) {
+    fs.writeFileSync(opts.svgOut, renderSvgVision(profile, rep), "utf8");
+  }
+  if (opts.pngOut) {
+    fs.writeFileSync(opts.pngOut, renderPngVision(profile, rep));
+  }
+
+  if (opts.format === "json") {
+    const outObj = timeline ? { ...rep, timeline } : rep;
+    console.log(JSON.stringify(outObj, null, 2));
+  } else if (opts.view || opts.zoom) {
+    const parts = [
+      renderTextVision(profile, rep, {
+        mode: opts.view || "compact",
+        width: opts.width,
+        charset: opts.charset,
+        zoom: opts.zoom,
+      }),
+    ];
+    if (timeline) {
+      parts.push("", renderSegmentTimeline(timeline, { charset: opts.charset }));
+    }
+    console.log(parts.join("\n"));
   } else {
-    const file = args.find(a => !a.startsWith("--") && a !== format);
-    if (!file) throw new Error("Missing WAV file path");
-    const wav = decodeWavBuffer(fs.readFileSync(file));
-    const rep = analyzeSamples(wav.samples, wav.sampleRate, { label: path.basename(file) });
-    console.log(format === "json" ? JSON.stringify(rep, null, 2) : formatForLLM(rep));
+    const parts = [formatForLLM(rep, { verbose: opts.verbose })];
+    if (timeline) {
+      parts.push("", renderSegmentTimeline(timeline, { charset: opts.charset }));
+    }
+    console.log(parts.join("\n"));
   }
 }
 
-const __filename = fileURLToPath(import.meta.url);
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename)) {
-  main();
+function isMainModule() {
+  if (!process.argv[1]) return false;
+  try {
+    const selfReal = fs.realpathSync(fileURLToPath(import.meta.url));
+    const entryReal = fs.realpathSync(process.argv[1]);
+    return selfReal === entryReal;
+  } catch {
+    return path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+  }
+}
+
+if (isMainModule()) {
+  try {
+    runCli(process.argv.slice(2));
+  } catch (err) {
+    console.error(`[yata] Error: ${err?.message || String(err)}`);
+    process.exit(1);
+  }
 }
