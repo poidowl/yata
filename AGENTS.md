@@ -40,19 +40,23 @@
 ## 現在の見張りメモ（オブザーバー引き継ぎ用・2026-11-24）
 
 - **現行安定版**: `main`（`v0.1.0` — 6次元検出器）
-- **レビュー対象ブランチ**: `dev/v0.3`（ゼロ依存純JS）
-  - **実装済み（v0.2 → v0.3）**:
+- **レビュー対象ブランチ**: `dev/v0.4`（ゼロ依存純JS）
+  - **実装済み（v0.2 → v0.3 → v0.4）**:
     - 32軸検出器（`F1`–`F32`）の階層分離：**Core-6（`ORIGINAL_6_FALSIFIERS`）**／**診断ツールボックス（`TOOLBOX_FALSIFIERS`: F7–F32 から直交軸を除く25軸）**／**直交軸マップ（`ORTHOGONAL_AXES`: `F30` ステレオ逆相）**
-    - 判定ポリシー分離（`--policy core_veto|veto_all`）：`core_veto` は基本6軸のみでハード拒否し、ツールボックス軸は診断ヒントとして非拒否で併記
-    - **Protected Shelf 監査エンジン**（`src/shelf.mjs`: `auditFalsifiersAgainstShelf` / `formatShelfAuditForLLM`）と、再現可能な実音監査レポート [bench/real_audio_audit/RESULTS.md](bench/real_audio_audit/RESULTS.md)（`manifest.json` + `run_real_audio_audit.mjs` + `results.json`）
-    - **ブラインド鏡審査デモ**（Observer #1 提案の実装）[bench/mirror_audit_demo.html](bench/mirror_audit_demo.html)（6ペア完全ブラインド・投票後のみ種明かし）
-    - **DSP / 視覚の v0.3 修正**: 周期ベース（cycle-to-cycle）の `jitter` 計測修正、`<80Hz` 風切り誤認対策、`F12/F13` 周辺の実音校正、テキスト視覚メル下限の低域拡張
+    - **判定ポリシー（v0.4 既定 = `core_veto`）**: `--policy core_veto|shelf_veto|veto_all`
+      - `core_veto`（コード既定値と完全一致）: 基本6軸のみでハード拒否し、ツールボックス軸は診断ヒントとして非拒否で併記
+      - `shelf_veto`（`--policy shelf_veto --contested ...`）: Protected Shelf で `CONTESTED` になった軸の拒否権を自動停止し、クリア済み軸のみで判定
+      - `veto_all`: 全32軸でハード拒否（研究・厳格監査向け）
+    - **Protected Shelf 監査エンジン**（`src/shelf.mjs`: `auditFalsifiersAgainstShelf` / `formatShelfAuditForLLM`）と、再現可能な実音監査レポート [bench/real_audio_audit/RESULTS.md](bench/real_audio_audit/RESULTS.md)（Wikimedia Commons 全クリップの検証済みライセンス入り `manifest.json` + ポータブル `--tokiko-dir` 対応 `run_real_audio_audit.mjs` + `results.json`）
+    - **3択ブラインド鏡審査デモ**（Observer #1 提案の v0.4 拡張）[bench/mirror_audit_demo.html](bench/mirror_audit_demo.html)（`「なる」` 3プリセットを **原音 vs 抑揚保持・揺れ弱め版 vs 完全フラット版** の3択完全ブラインドで比較＋長文3ペア、投票後のみ種明かし）
+    - **DSP / 視覚の v0.3 → v0.4 修正**: 周期ベース（cycle-to-cycle）の `jitter` 計測と `F2_PURE_ROBOT` のゼロジッタ定常ロボ音修正、`<80 Hz` ランブル F0 誤認ガード、`60 Hz` MEL 下限の v0.4 テキスト視覚拡張
   - **オーナー耳ジャッジ結果（v0.2 合成25新軸）**: `👏 でかした/OK: 24` / `🤨 かわいくねーよ: 0` / `F30 ステレオ逆相 = 直交軸（かわいいでもかわいくないでもない）第1号`
   - **重要：LLM 視覚の読解力と、検出器の誤爆率（FPR）を明確に区別すること**:
     - **LLM 視覚の読解力（目隠し視力検査・ラベル全隠し）**: 一般実音10本で **v0.1（数値のみ）25/100 → v0.2（コンパクト視覚）80/100**、動物・子ども vs 大人5ペアで **v0.1 3/5 → v0.2 4/5**。これは「LLM が音声視覚テキストから音の構造を読める」証拠であり、**検出器32軸の誤爆率の低さを意味しない**。
     - **検出器の誤爆率（実音＋`tokiko` 保護棚19本の再現監査: [RESULTS.md](bench/real_audio_audit/RESULTS.md)）**:
-      - `core_veto`（F1–F6）: 保護棚生存率 **68.4%（13/19）**（`tokiko` 単体では **88.9% = 8/9**）
-      - `veto_all`（F1–F32）: 保護棚生存率 **5.3%（1/19）**（`tokiko` 単体では **0.0% = 0/9**）— `F24`（57.9%）、`F23`（47.4%）、`F14`（36.8%）など計 **13軸が `CONTESTED`**。
-      - この事実に基づき、v0.3 では `veto_all` の単独拒否を既定とせず、`core_veto` + Protected Shelf 監査 + ブラインド鏡審査（[mirror_audit_demo.html](bench/mirror_audit_demo.html)）で鏡自身を耳で検証する運用へ移行した。
+      - `core_veto`（F1–F6・v0.4既定）: 保護棚生存率 **68.4%（13/19）**（`tokiko` 単体 **88.9% = 8/9**）／期待かわいくない実音再現率 **60.0%（3/5）**
+      - `shelf_veto`（棚クリア19軸）: 保護棚生存率 **100.0%（19/19）**／期待かわいくない実音再現率 **80.0%（4/5）**
+      - `veto_all`（F1–F32）: 保護棚生存率 **5.3%（1/19）**（`tokiko` 単体 **0.0% = 0/9**）／期待かわいくない実音再現率 **100.0%（5/5）** — `F24`（57.9%）、`F23`（47.4%）、`F14`（36.8%）など計 **13軸が `CONTESTED`**。
+      - この事実に基づき、v0.4 では `core_veto` をコード既定とし、`shelf_veto` + Protected Shelf 監査 + 3択ブラインド鏡審査（[mirror_audit_demo.html](bench/mirror_audit_demo.html)）で鏡自身を耳で検証する運用を確立した。
 - **番人への申し送り**: オーナーが疲れているときは細かい設計論議を振らず、**「耳で聴ける A/B デモ」と「3行サマリー」** だけ差し出すこと。
 

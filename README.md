@@ -33,6 +33,15 @@
 
 全軸の一覧は `node unkawaii_detector.mjs --list-falsifiers` で確認できます。
 
+### 判定ポリシーと v0.4 の主な改善
+
+- **既定ポリシー = `core_veto`**: `F1`–`F6`（`ORIGINAL_6_FALSIFIERS`）のみでハード拒否を行い、`F7`–`F32`（`TOOLBOX_FALSIFIERS`）は非拒否の診断ヒント、`F30`（ステレオ逆相）は直交軸（`ORTHOGONAL_AXES`）として分離します。
+- **`--policy shelf_veto --contested ...`**: Protected Shelf 監査（`auditFalsifiersAgainstShelf`）で `CONTESTED` になった軸の拒否権を自動停止します。全32軸ハード拒否が必要な場合のみ `--policy veto_all` を明示指定します。
+- **DSP & LLM 視覚（v0.4）**: 周期ベース（cycle-to-cycle）の `jitter` 計測と `F2_PURE_ROBOT` のゼロジッタ定常ロボ音検出を両立し、テキスト音声視覚は **`60 Hz` MEL 下限**＋**`<80 Hz` ランブル F0 誤認ガード**に対応しました。
+- **鏡の耳審査 & 実音監査**:
+  - 3択ブラインド「なる」鏡審査デモ（原音 vs 抑揚保持・揺れ弱め vs 完全フラット）: [`bench/mirror_audit_demo.html`](bench/mirror_audit_demo.html)
+  - 再現可能な実音・保護棚監査レポート: [`bench/real_audio_audit/RESULTS.md`](bench/real_audio_audit/RESULTS.md)
+
 ---
 
 ## 使い方（CLI）
@@ -40,12 +49,14 @@
 Node.js v18+ があれば外部パッケージなしでそのまま動きます。
 
 ```bash
-# 1. 基本解析（トークン節約型の発火優先サマリー / JSON）
+# 1. 基本解析（既定は --policy core_veto：基本6軸で判定＋ツールボックス軸を診断併記）
 node unkawaii_detector.mjs sample.wav
 node unkawaii_detector.mjs sample.wav --format json
+node unkawaii_detector.mjs sample.wav --policy shelf_veto --contested F24_CALCULATED_PITCH_LFO,F23_ERRATIC_PITCH_WARBLE
+node unkawaii_detector.mjs sample.wav --policy veto_all    # 全32軸でハード拒否
 node unkawaii_detector.mjs sample.wav --falsifiers core   # v0.1 の6軸のみで検証
 
-# 2. LLM 音声可視化（高密度テキスト / 異常区間ズーム / SVG / PNG）
+# 2. LLM 音声可視化（高密度テキスト / 60Hz MEL下限 / 異常区間ズーム / SVG / PNG）
 node unkawaii_detector.mjs sample.wav --view compact --charset unicode
 node unkawaii_detector.mjs sample.wav --view micro
 node unkawaii_detector.mjs sample.wav --view compact --zoom auto
@@ -57,7 +68,7 @@ node unkawaii_detector.mjs --compare a.wav b.wav
 node unkawaii_detector.mjs --compare a.wav b.wav --view compact --svg cmp.svg --png cmp.png
 node unkawaii_detector.mjs --diff a.wav b.wav --charset unicode --svg diff.svg --png diff.png
 
-# 4. 反例発見ループ（合成コーパスで v0.1 6軸 vs v0.2 32軸を比較）
+# 4. 反例発見ループ（合成コーパスで v0.1 6軸 vs 全32軸を比較）
 node unkawaii_detector.mjs --discover
 node unkawaii_detector.mjs --discover --view
 
@@ -79,10 +90,14 @@ import {
   extractAudioProfile,
   DEFAULT_FALSIFIERS,
   ORIGINAL_6_FALSIFIERS,
+  TOOLBOX_FALSIFIERS,
+  ORTHOGONAL_AXES,
   createFalsifiers,
   analyzeSamples,
   compareReports,
   formatForLLM,
+  auditFalsifiersAgainstShelf,
+  formatShelfAuditForLLM,
   renderTextVision,
   renderSvgVision,
   renderPngVision,
@@ -90,6 +105,7 @@ import {
   runDiscoveryLoop,
 } from "./unkawaii_detector.mjs";
 
+// 既定は policy: "core_veto"（必要に応じ "shelf_veto" / "veto_all" を指定）
 const report = analyzeSamples(float32Samples, 24000, { label: "take_01" });
 console.log(formatForLLM(report));
 
@@ -137,8 +153,8 @@ npm run discover  # 反例発見ループ
 
 - `unkawaii_detector.mjs` — 後方互換ファサード＆CLI
 - `src/wav.mjs`, `src/dsp.mjs`, `src/features.mjs` — ゼロ依存 WAV I/O・Radix-2 FFT/STFT・音響特徴量・`AudioProfile`
-- `src/falsifiers/*.mjs`, `src/report.mjs` — 32次元反証軸レジストリ・ID安全な比較・トークン節約型レポート
-- `src/visualize/*.mjs` — 段階的テキスト可視化・6パネル SVG・純 JS PNG エンコーダ＆可視化
+- `src/falsifiers/*.mjs`, `src/report.mjs`, `src/shelf.mjs` — 32次元反証軸レジストリ・ポリシー分離（`core_veto` / `shelf_veto` / `veto_all`）・Protected Shelf 監査
+- `src/visualize/*.mjs` — 段階的テキスト可視化（60Hz MEL下限）・6パネル SVG・純 JS PNG エンコーダ＆可視化
 - `src/synth.mjs`, `src/discovery.mjs` — 決定論的合成コーパス＆反例発見ループ
-- `bench/` — ベンチマーク＆A/B試聴デモページ
+- `bench/` — ベンチマーク・3択ブラインド鏡審査デモ（[`mirror_audit_demo.html`](bench/mirror_audit_demo.html)）・実音監査（[`real_audio_audit/RESULTS.md`](bench/real_audio_audit/RESULTS.md)）
 - `docs/PHILOSOPHY.md`, `AGENTS.md` — 思想ブリーフ＆番人ガイド

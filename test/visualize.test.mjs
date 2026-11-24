@@ -239,4 +239,21 @@ describe("M3: LLM Audio Vision (Text / SVG / PNG)", () => {
       verifyPngBuffer(renderPngVision(prof, null));
     }
   });
+
+  it("v0.4: 8-row compact text MEL spectrogram covers down to ~60 Hz within 32-line budget", () => {
+    const compact = renderTextVision(warmProfile, cleanReport, { mode: "compact", charset: "ascii" });
+    assert.ok(countLines(compact) <= 32, `compact exceeded 32 lines: ${countLines(compact)}`);
+    const lines = compact.split("\n");
+    const melHeaderIdx = lines.findIndex((l) => l.startsWith("MEL ("));
+    assert.ok(melHeaderIdx >= 0, "Expected MEL header in compact vision");
+    const lowestRow = lines[melHeaderIdx + 8];
+    assert.ok(lowestRow, "Expected 8th MEL row");
+    const m = /^\s*(\d+)\s*\|/.exec(lowestRow);
+    assert.ok(m, `Expected numeric low-frequency label on lowest MEL row, got: ${lowestRow}`);
+    const lowestHz = Number.parseInt(m[1], 10);
+    assert.ok(
+      lowestHz >= 45 && lowestHz <= 90,
+      `Expected lowest MEL row label around ~60 Hz (45..90 Hz), got ${lowestHz} Hz`
+    );
+  });
 });

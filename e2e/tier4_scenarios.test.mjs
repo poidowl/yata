@@ -42,11 +42,13 @@ describe("Tier 4: Real-World End-to-End Scenarios", () => {
       const optsCore = {
         label: item.id,
         falsifiers: ORIGINAL_6_FALSIFIERS,
+        policy: "veto_all",
         ...(item.channels ? { channels: item.channels } : {}),
       };
       const optsAll = {
         label: item.id,
         falsifiers: DEFAULT_FALSIFIERS,
+        policy: "veto_all",
         ...(item.channels ? { channels: item.channels } : {}),
       };
       const rCore = analyzeSamples(item.samples, item.sampleRate, optsCore);
@@ -105,6 +107,7 @@ describe("Tier 4: Real-World End-to-End Scenarios", () => {
       const report = analyzeSamples(item.samples, item.sampleRate, {
         label: item.id,
         falsifiers: DEFAULT_FALSIFIERS,
+        policy: "veto_all",
         ...(item.channels ? { channels: item.channels } : {}),
       });
       if (

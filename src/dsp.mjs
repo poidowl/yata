@@ -141,7 +141,7 @@ function melToHz(mel) {
  * @param {number} fftSize
  * @param {number} sampleRate
  * @param {number} [melBands=48]
- * @param {number} [fMin=60]
+ * @param {number} [fMin=30]
  * @param {number} [fMax=8000]
  * @returns {{
  *   bands: Array<{ startBin: number, endBin: number, weights: Float32Array, centerHz: number }>,
@@ -151,7 +151,7 @@ function melToHz(mel) {
  *   sampleRate: number
  * }}
  */
-export function computeMelFilterbank(fftSize, sampleRate, melBands = 48, fMin = 60, fMax = 8000) {
+export function computeMelFilterbank(fftSize, sampleRate, melBands = 48, fMin = 30, fMax = 8000) {
   const numBins = (fftSize >> 1) + 1;
   const nyquist = sampleRate * 0.5;
   const effFMax = Math.max(100, Math.min(fMax, nyquist));
@@ -231,41 +231,14 @@ function getAcScratch(fftLen, frameLen) {
 }
 
 /**
- * Estimate fundamental frequency F0 via FFT-accelerated exact normalized autocorrelation
- * with octave-halving guard and parabolic peak interpolation.
- *
- * @param {Float32Array|ArrayLike<number>} frame
- * @param {number} sampleRate
- * @param {number} [fMin=55]
- * @param {number} [fMax=1000]
- * @returns {{ f0: number, periodicity: number, hnrDb: number }}
+ * Internal FFT-accelerated exact normalized autocorrelation F0 estimator on a prepared frame.
  */
-export function estimateF0Parabolic(frame, sampleRate, fMin = 55, fMax = 1000) {
-  const rawN = frame?.length ?? 0;
-  if (rawN < 16 || sampleRate <= 0) {
-    return { f0: 0, periodicity: 0, hnrDb: 0 };
-  }
-
-  // 2x box-average decimation for high sample rates (>= 32 kHz): halves FFT size
-  // while keeping Nyquist >= 16 kHz (far above fMax <= 1500 Hz) and preserving accuracy.
-  let sig = frame;
-  let sr = sampleRate;
-  let n = rawN;
-  if (sampleRate >= 32000 && fMax <= 1500 && rawN >= 64) {
-    const decN = rawN >> 1;
-    const dec = new Float32Array(decN);
-    for (let i = 0; i < decN; i++) {
-      dec[i] = 0.5 * (frame[i << 1] + frame[(i << 1) + 1]);
-    }
-    sig = dec;
-    sr = sampleRate * 0.5;
-    n = decN;
-  }
-
+function runAutocorrF0(sig, sr, fMin, fMax) {
+  const n = sig.length;
   const minLag = Math.max(2, Math.floor(sr / fMax));
   const maxLag = Math.min(n - 3, Math.ceil(sr / fMin));
   if (maxLag <= minLag + 1) {
-    return { f0: 0, periodicity: 0, hnrDb: 0 };
+    return { f0: 0, periodicity: 0, hnrDb: 0, totalSq: 0, mean: 0 };
   }
 
   // Remove frame mean (DC) so DC offset does not bias periodicity
@@ -290,7 +263,7 @@ export function estimateF0Parabolic(frame, sampleRate, fMin = 55, fMax = 1000) {
 
   const rms = Math.sqrt(totalSq / n);
   if (rms < 1e-6) {
-    return { f0: 0, periodicity: 0, hnrDb: 0 };
+    return { f0: 0, periodicity: 0, hnrDb: 0, totalSq, mean };
   }
 
   re.fill(0, n, fftLen);
@@ -321,7 +294,7 @@ export function estimateF0Parabolic(frame, sampleRate, fMin = 55, fMax = 1000) {
   }
 
   if (globalMax <= 0.05) {
-    return { f0: 0, periodicity: Math.max(0, globalMax), hnrDb: -20 };
+    return { f0: 0, periodicity: Math.max(0, globalMax), hnrDb: -20, totalSq, mean };
   }
 
   // Octave-halving guard: choose the smallest lag local maximum reaching >= 92% of globalMax
@@ -372,7 +345,96 @@ export function estimateF0Parabolic(frame, sampleRate, fMin = 55, fMax = 1000) {
   const rClamped = Math.max(1e-6, Math.min(0.9999, periodicity));
   const hnrDb = Math.max(-20, Math.min(40, 10 * Math.log10(rClamped / (1 - rClamped))));
 
-  return { f0, periodicity, hnrDb };
+  return { f0, periodicity, hnrDb, totalSq, mean };
+}
+
+/**
+ * Zero-phase (forward + backward) 1st-order RC high-pass filter for <80 Hz rumble rejection.
+ */
+function highPassZeroPhase(sig, mean, sr, fcHz = 110) {
+  const n = sig.length;
+  const alpha = 1 / (1 + (2 * Math.PI * fcHz) / sr);
+  const fwd = new Float32Array(n);
+  let prevX = sig[0] - mean;
+  let prevY = 0;
+  fwd[0] = 0;
+  for (let i = 1; i < n; i++) {
+    const x = sig[i] - mean;
+    const y = alpha * (prevY + x - prevX);
+    fwd[i] = y;
+    prevX = x;
+    prevY = y;
+  }
+
+  const out = new Float32Array(n);
+  prevX = fwd[n - 1];
+  prevY = 0;
+  out[n - 1] = 0;
+  let hpSq = 0;
+  for (let i = n - 2; i >= 0; i--) {
+    const x = fwd[i];
+    const y = alpha * (prevY + x - prevX);
+    out[i] = y;
+    hpSq += y * y;
+    prevX = x;
+    prevY = y;
+  }
+  return { out, hpSq };
+}
+
+/**
+ * Estimate fundamental frequency F0 via FFT-accelerated exact normalized autocorrelation
+ * with octave-halving guard, parabolic peak interpolation, and <80 Hz wind/handling
+ * rumble F0-hijack guard.
+ *
+ * @param {Float32Array|ArrayLike<number>} frame
+ * @param {number} sampleRate
+ * @param {number} [fMin=55]
+ * @param {number} [fMax=1000]
+ * @returns {{ f0: number, periodicity: number, hnrDb: number }}
+ */
+export function estimateF0Parabolic(frame, sampleRate, fMin = 55, fMax = 1000) {
+  const rawN = frame?.length ?? 0;
+  if (rawN < 16 || sampleRate <= 0) {
+    return { f0: 0, periodicity: 0, hnrDb: 0 };
+  }
+
+  // 2x box-average decimation for high sample rates (>= 32 kHz): halves FFT size
+  // while keeping Nyquist >= 16 kHz (far above fMax <= 1500 Hz) and preserving accuracy.
+  let sig = frame;
+  let sr = sampleRate;
+  if (sampleRate >= 32000 && fMax <= 1500 && rawN >= 64) {
+    const decN = rawN >> 1;
+    const dec = new Float32Array(decN);
+    for (let i = 0; i < decN; i++) {
+      dec[i] = 0.5 * (frame[i << 1] + frame[(i << 1) + 1]);
+    }
+    sig = dec;
+    sr = sampleRate * 0.5;
+  }
+
+  const raw = runAutocorrF0(sig, sr, fMin, fMax);
+
+  // Guard against <80 Hz microphone handling / wind rumble hijacking F0 when
+  // substantial mid/high vocal energy (>110 Hz) is present in the frame.
+  // True 60 Hz mains hum has tiny >110 Hz energy (hpRatio < 0.08) and true deep
+  // harmonic voices (e.g. 70 Hz with 140/210/280 Hz harmonics) still peak at ~70 Hz
+  // after high-pass filtering, so both remain intact.
+  if (raw.f0 > 0 && raw.f0 < 85 && fMin < 85 && raw.totalSq > 1e-12) {
+    const { out: hpSig, hpSq } = highPassZeroPhase(sig, raw.mean, sr, 110);
+    const hpRatio = hpSq / raw.totalSq;
+    if (hpRatio >= 0.08) {
+      const hpEst = runAutocorrF0(hpSig, sr, fMin, fMax);
+      if (hpEst.f0 >= 85 && hpEst.periodicity >= 0.5) {
+        return { f0: hpEst.f0, periodicity: hpEst.periodicity, hnrDb: hpEst.hnrDb };
+      }
+      if (hpRatio >= 0.2 && hpEst.periodicity < 0.35) {
+        return { f0: hpEst.f0, periodicity: hpEst.periodicity, hnrDb: hpEst.hnrDb };
+      }
+    }
+  }
+
+  return { f0: raw.f0, periodicity: raw.periodicity, hnrDb: raw.hnrDb };
 }
 
 /**

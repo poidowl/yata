@@ -39,6 +39,7 @@ for (const item of corpus.positives) {
   const rep = analyzeSamples(item.samples, item.sampleRate, {
     label: item.id,
     falsifiers: DEFAULT_FALSIFIERS,
+    policy: "veto_all",
     ...(item.channels ? { channels: item.channels } : {}),
   });
   const dt = performance.now() - t0;
@@ -70,12 +71,14 @@ for (const item of corpus.counterexamples) {
   const rep6 = analyzeSamples(item.samples, item.sampleRate, {
     label: item.id,
     falsifiers: ORIGINAL_6_FALSIFIERS,
+    policy: "veto_all",
     ...chOpt,
   });
   const t0 = performance.now();
   const rep32 = analyzeSamples(item.samples, item.sampleRate, {
     label: item.id,
     falsifiers: DEFAULT_FALSIFIERS,
+    policy: "veto_all",
     ...chOpt,
   });
   const dt = performance.now() - t0;
@@ -107,6 +110,7 @@ for (const item of corpus.legacyNegatives) {
   const rep32 = analyzeSamples(item.samples, item.sampleRate, {
     label: item.id,
     falsifiers: DEFAULT_FALSIFIERS,
+    policy: "veto_all",
   });
   const dt = performance.now() - t0;
   totalAnalyzeMs += dt;

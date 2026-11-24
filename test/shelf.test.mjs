@@ -15,6 +15,7 @@ import {
   auditFalsifiersAgainstShelf,
   formatShelfAuditForLLM,
   encodeWavBuffer,
+  buildCorpus,
 } from "../unkawaii_detector.mjs";
 
 const SR = 24000;
@@ -157,13 +158,13 @@ describe("v0.3: ORTHOGONAL_AXES, Protected Shelf Audit, and core_veto Policy", (
       subBassOnly[i] = 0.5 * cleanVoice[i] + 0.42 * env * Math.sin(2 * Math.PI * 45 * t);
     }
 
-    const vetoAllRep = analyzeSamples(subBassOnly, SR, { label: "sub_veto_all" });
+    const vetoAllRep = analyzeSamples(subBassOnly, SR, { label: "sub_veto_all", policy: "veto_all" });
     assert.equal(vetoAllRep.policy, "veto_all");
     assert.equal(vetoAllRep.verdict, "REJECTED_UNKAWAII");
     assert.ok(vetoAllRep.triggeredCount >= 1);
     assert.equal(vetoAllRep.diagnosticCount, 0);
 
-    const coreVetoRep = analyzeSamples(subBassOnly, SR, { label: "sub_core_veto", policy: "core_veto" });
+    const coreVetoRep = analyzeSamples(subBassOnly, SR, { label: "sub_core_veto" });
     assert.equal(coreVetoRep.policy, "core_veto");
     assert.equal(coreVetoRep.verdict, "SURVIVED_KAWAII_CANDIDATE");
     assert.equal(coreVetoRep.triggeredCount, 0);
@@ -175,6 +176,7 @@ describe("v0.3: ORTHOGONAL_AXES, Protected Shelf Audit, and core_veto Policy", (
 
     const llmText = formatForLLM(coreVetoRep);
     assert.ok(llmText.includes("SURVIVED_KAWAII_CANDIDATE"));
+    assert.ok(llmText.includes("policy=core_veto"));
     assert.ok(llmText.includes("DIAGNOSTIC"));
     assert.ok(llmText.includes("F13_SUBBASS_RUMBLE"));
 
@@ -191,7 +193,90 @@ describe("v0.3: ORTHOGONAL_AXES, Protected Shelf Audit, and core_veto Policy", (
     assert.equal(f6Res.diagnostic, undefined);
   });
 
-  it("CLI supports --policy core_veto and --policy veto_all", () => {
+  it("v0.4 default analyzeSamples uses core_veto (F24-only clip survives with diagnosticCount >= 1)", () => {
+    const corpus = buildCorpus({ sampleRate: SR, seed: 2026 });
+    const ceF24 = corpus.counterexamples.find((x) => x.id === "ce_F24");
+    assert.ok(ceF24, "Expected canonical ce_F24 counterexample in corpus");
+
+    // Default policy (no policy option) must be core_veto
+    const defRep = analyzeSamples(ceF24.samples, ceF24.sampleRate, { label: "f24_default" });
+    assert.equal(defRep.policy, "core_veto");
+    assert.equal(defRep.verdict, "SURVIVED_KAWAII_CANDIDATE");
+    assert.equal(defRep.triggeredCount, 0);
+    assert.ok(defRep.diagnosticCount >= 1);
+    const f24Res = defRep.falsifiers.find((f) => f.id === "F24_CALCULATED_PITCH_LFO");
+    assert.equal(f24Res.triggered, true);
+    assert.equal(f24Res.diagnostic, true);
+
+    // Explicit veto_all rejects the same clip
+    const strictRep = analyzeSamples(ceF24.samples, ceF24.sampleRate, {
+      label: "f24_veto_all",
+      policy: "veto_all",
+    });
+    assert.equal(strictRep.policy, "veto_all");
+    assert.equal(strictRep.verdict, "REJECTED_UNKAWAII");
+    assert.ok(strictRep.triggeredCount >= 1);
+  });
+
+  it("v0.4 policy: 'shelf_veto' suspends veto on contestedIds from auditFalsifiersAgainstShelf (including core F5)", () => {
+    const cleanVoice = makeWarmVoice(0.65, 505);
+    // Loved staccato/short-tail voice: warm voice with abrupt cut-off tail (triggers core F5_ABRUPT_TAIL)
+    const shortTail = new Float32Array(cleanVoice.length);
+    const cutIdx = Math.round(SR * 0.45);
+    for (let i = 0; i < cutIdx; i++) {
+      const t = i / SR;
+      const atk = t < 0.08 ? 0.5 - 0.5 * Math.cos((Math.PI * t) / 0.08) : 1;
+      const env = smoothEnv(t, 0.65, 0.08, 0.17);
+      shortTail[i] = env > 0.01 ? (cleanVoice[i] / env) * atk * 0.42 : 0;
+    }
+
+    const audit = auditFalsifiersAgainstShelf([
+      { id: "loved_clean", label: "Loved Clean", samples: cleanVoice, sampleRate: SR },
+      { id: "loved_staccato", label: "Loved Staccato", samples: shortTail, sampleRate: SR },
+    ]);
+    assert.ok(
+      audit.contestedIds.includes("F5_ABRUPT_TAIL"),
+      `Expected F5_ABRUPT_TAIL in contestedIds, got ${JSON.stringify(audit.contestedIds)}`
+    );
+
+    // Under core_veto, F5_ABRUPT_TAIL rejects shortTail
+    const coreRep = analyzeSamples(shortTail, SR, { label: "staccato_core", policy: "core_veto" });
+    assert.equal(coreRep.verdict, "REJECTED_UNKAWAII");
+
+    // Under shelf_veto with audit.contestedIds, F5_ABRUPT_TAIL veto is suspended -> SURVIVED_KAWAII_CANDIDATE
+    const shelfRep = analyzeSamples(shortTail, SR, {
+      label: "staccato_shelf",
+      policy: "shelf_veto",
+      contestedIds: audit.contestedIds,
+    });
+    assert.equal(shelfRep.policy, "shelf_veto");
+    assert.equal(shelfRep.verdict, "SURVIVED_KAWAII_CANDIDATE");
+    assert.equal(shelfRep.triggeredCount, 0);
+    assert.ok(shelfRep.diagnosticCount >= 1);
+    const f5Res = shelfRep.falsifiers.find((f) => f.id === "F5_ABRUPT_TAIL");
+    assert.equal(f5Res.triggered, true);
+    assert.equal(f5Res.diagnostic, true);
+    assert.equal(f5Res.contested, true);
+
+    const llmText = formatForLLM(shelfRep);
+    assert.ok(llmText.includes("policy=shelf_veto"));
+    assert.ok(llmText.includes("[CONTESTED]"));
+
+    // Non-contested axis (e.g. F6_PHYSICAL_GLITCH on clipped audio) MUST still veto under shelf_veto
+    const clipped = new Float32Array(Math.round(SR * 0.5));
+    for (let i = 0; i < clipped.length; i++) {
+      clipped[i] = Math.max(-1, Math.min(1, 3.0 * Math.sin((2 * Math.PI * 300 * i) / SR)));
+    }
+    const clippedShelfRep = analyzeSamples(clipped, SR, {
+      label: "clipped_shelf",
+      policy: "shelf_veto",
+      contestedIds: audit.contestedIds,
+    });
+    assert.equal(clippedShelfRep.verdict, "REJECTED_UNKAWAII");
+    assert.ok(clippedShelfRep.triggeredCount >= 1);
+  });
+
+  it("CLI defaults to --policy core_veto and supports veto_all and shelf_veto with --contested", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "yata-policy-"));
     try {
       const cleanVoice = makeWarmVoice(0.65, 303);
@@ -206,16 +291,17 @@ describe("v0.3: ORTHOGONAL_AXES, Protected Shelf Audit, and core_veto Policy", (
       fs.writeFileSync(wavPath, encodeWavBuffer(subBassOnly, SR));
 
       const cliPath = path.resolve("unkawaii_detector.mjs");
-      const outCore = execFileSync(
+      // Default CLI policy is core_veto
+      const outDefault = execFileSync(
         process.execPath,
-        [cliPath, wavPath, "--policy", "core_veto", "--format", "json"],
+        [cliPath, wavPath, "--format", "json"],
         { encoding: "utf8" }
       );
-      const parsedCore = JSON.parse(outCore);
-      assert.equal(parsedCore.policy, "core_veto");
-      assert.equal(parsedCore.verdict, "SURVIVED_KAWAII_CANDIDATE");
-      assert.equal(parsedCore.triggeredCount, 0);
-      assert.ok(parsedCore.diagnosticCount >= 1);
+      const parsedDefault = JSON.parse(outDefault);
+      assert.equal(parsedDefault.policy, "core_veto");
+      assert.equal(parsedDefault.verdict, "SURVIVED_KAWAII_CANDIDATE");
+      assert.equal(parsedDefault.triggeredCount, 0);
+      assert.ok(parsedDefault.diagnosticCount >= 1);
 
       const outAll = execFileSync(
         process.execPath,
@@ -225,6 +311,28 @@ describe("v0.3: ORTHOGONAL_AXES, Protected Shelf Audit, and core_veto Policy", (
       const parsedAll = JSON.parse(outAll);
       assert.equal(parsedAll.policy, "veto_all");
       assert.equal(parsedAll.verdict, "REJECTED_UNKAWAII");
+
+      // shelf_veto with --contested F13_SUBBASS_RUMBLE suspends F13 veto
+      const triggeredIds = parsedAll.falsifiers.filter((f) => f.triggered).map((f) => f.id);
+      const outShelf = execFileSync(
+        process.execPath,
+        [
+          cliPath,
+          wavPath,
+          "--policy",
+          "shelf_veto",
+          "--contested",
+          triggeredIds.join(","),
+          "--format",
+          "json",
+        ],
+        { encoding: "utf8" }
+      );
+      const parsedShelf = JSON.parse(outShelf);
+      assert.equal(parsedShelf.policy, "shelf_veto");
+      assert.equal(parsedShelf.verdict, "SURVIVED_KAWAII_CANDIDATE");
+      assert.equal(parsedShelf.triggeredCount, 0);
+      assert.ok(parsedShelf.diagnosticCount >= 1);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

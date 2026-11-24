@@ -101,7 +101,7 @@ describe("Tier 2: Boundary & Error-Handling E2E", () => {
       writeWavFile(phasePath, genStereoPhaseInverted(SR, 0.6), SR);
 
       // Hard-clipped flat-top
-      const clipRes = runCli([clippedPath, "--format", "json"]);
+      const clipRes = runCli([clippedPath, "--policy", "veto_all", "--format", "json"]);
       assert.equal(clipRes.status, 0, `stderr: ${clipRes.stderr}`);
       const clipReport = JSON.parse(clipRes.stdout);
       assertAllNumericFinite(clipReport.features, "clipped.features");
@@ -112,7 +112,7 @@ describe("Tier 2: Boundary & Error-Handling E2E", () => {
       );
 
       // DC-offset bias
-      const dcRes = runCli([dcPath, "--format", "json"]);
+      const dcRes = runCli([dcPath, "--policy", "veto_all", "--format", "json"]);
       assert.equal(dcRes.status, 0, `stderr: ${dcRes.stderr}`);
       const dcReport = JSON.parse(dcRes.stdout);
       assertAllNumericFinite(dcReport.features, "dc.features");
@@ -123,7 +123,7 @@ describe("Tier 2: Boundary & Error-Handling E2E", () => {
       );
 
       // Stereo phase inversion (R = -L)
-      const phaseRes = runCli([phasePath, "--format", "json"]);
+      const phaseRes = runCli([phasePath, "--policy", "veto_all", "--format", "json"]);
       assert.equal(phaseRes.status, 0, `stderr: ${phaseRes.stderr}`);
       const phaseReport = JSON.parse(phaseRes.stdout);
       assertAllNumericFinite(phaseReport.features, "phase.features");

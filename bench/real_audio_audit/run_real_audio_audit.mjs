@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * bench/real_audio_audit/run_real_audio_audit.mjs — Reproducible Real-Audio & Protected Shelf Audit (v0.3)
+ * bench/real_audio_audit/run_real_audio_audit.mjs — Reproducible Real-Audio & Protected Shelf Audit (v0.4)
  *
- * Loads cached 24kHz mono WAVs listed in `manifest.json` (from `--cache-dir` or default scratch cache,
+ * Loads cached 24kHz mono WAVs listed in `manifest.json` (from `--cache-dir` or relative `.cache_wav`,
  * or fetches via `curl` + `ffmpeg` when `--fetch` is passed), optionally synthesizes the 9 `tokiko-axis`
- * Japanese speech clips via `/home/antigravity/poidowl/tokiko-axis/kuda.mjs`, and audits every falsifier
- * using `auditFalsifiersAgainstShelf` (`core_veto` vs `veto_all`).
+ * Japanese speech clips via `--tokiko-dir` / `TOKIKO_PATH` / `../tokiko-axis/kuda.mjs`, and audits every
+ * falsifier using `auditFalsifiersAgainstShelf` (`core_veto` vs `shelf_veto` vs `veto_all`).
  *
  * Outputs:
  *   - bench/real_audio_audit/results.json
@@ -14,6 +14,7 @@
  * Usage:
  *   node bench/real_audio_audit/run_real_audio_audit.mjs
  *   node bench/real_audio_audit/run_real_audio_audit.mjs --cache-dir /path/to/wavs
+ *   node bench/real_audio_audit/run_real_audio_audit.mjs --tokiko-dir ../tokiko-axis
  *   node bench/real_audio_audit/run_real_audio_audit.mjs --fetch --cache-dir /tmp/yata_real_wavs
  *
  * Zero external npm dependencies. Pure ES Module.
@@ -38,10 +39,10 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const REPO_ROOT = path.resolve(__dirname, "../..");
 const MANIFEST_PATH = path.join(__dirname, "manifest.json");
 const RESULTS_JSON_PATH = path.join(__dirname, "results.json");
 const RESULTS_MD_PATH = path.join(__dirname, "RESULTS.md");
-const KUDA_PATH = "/home/antigravity/poidowl/tokiko-axis/kuda.mjs";
 
 const TOKIKO_TEXTS = [
   { key: "naru", text: "なる" },
@@ -51,15 +52,32 @@ const TOKIKO_TEXTS = [
 const TOKIKO_PRESETS = ["kawaii", "amae", "genki"];
 
 function parseArgs(argv) {
-  const opts = { cacheDir: null, fetch: false };
+  const opts = { cacheDirs: [], fetch: false, tokikoDir: null };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--cache-dir" && argv[i + 1]) {
-      opts.cacheDir = path.resolve(argv[++i]);
+      opts.cacheDirs.push(path.resolve(argv[++i]));
+    } else if (argv[i].startsWith("--cache-dir=")) {
+      opts.cacheDirs.push(path.resolve(argv[i].slice("--cache-dir=".length)));
+    } else if (argv[i] === "--tokiko-dir" && argv[i + 1]) {
+      opts.tokikoDir = argv[++i];
+    } else if (argv[i].startsWith("--tokiko-dir=")) {
+      opts.tokikoDir = argv[i].slice("--tokiko-dir=".length);
     } else if (argv[i] === "--fetch") {
       opts.fetch = true;
     }
   }
+  if (process.env.YATA_AUDIT_CACHE_DIR) {
+    for (const part of process.env.YATA_AUDIT_CACHE_DIR.split(path.delimiter)) {
+      if (part.trim()) opts.cacheDirs.push(path.resolve(part.trim()));
+    }
+  }
   return opts;
+}
+
+function resolveKudaPath(tokikoDir) {
+  const base = tokikoDir || process.env.TOKIKO_PATH || path.resolve(REPO_ROOT, "../tokiko-axis");
+  const resolved = path.resolve(base);
+  return resolved.endsWith(".mjs") ? resolved : path.join(resolved, "kuda.mjs");
 }
 
 function sha256Buffer(buf) {
@@ -71,15 +89,18 @@ function pct(num, den) {
   return `${((num / den) * 100).toFixed(1)}%`;
 }
 
-function resolveClipWavPath(clip, manifest, cacheDir) {
+function resolveClipWavPath(clip, manifest, cacheDirs) {
   const candidates = [];
-  if (cacheDir) {
-    candidates.push(path.join(cacheDir, clip.wavFilename));
-    candidates.push(path.join(cacheDir, clip.suite, clip.wavFilename));
+  for (const dir of cacheDirs) {
+    candidates.push(path.join(dir, clip.wavFilename));
+    candidates.push(path.join(dir, clip.suite, clip.wavFilename));
   }
   const suiteDefaultDir = manifest.defaultCacheDirs?.[clip.suite];
   if (suiteDefaultDir) {
-    candidates.push(path.join(suiteDefaultDir, clip.wavFilename));
+    const resolvedDefault = path.isAbsolute(suiteDefaultDir)
+      ? suiteDefaultDir
+      : path.resolve(__dirname, suiteDefaultDir);
+    candidates.push(path.join(resolvedDefault, clip.wavFilename));
   }
   for (const p of candidates) {
     if (fs.existsSync(p)) return p;
@@ -142,14 +163,14 @@ function fetchClipToWav(clip, outWavPath, resolvedWavsById) {
   return outWavPath;
 }
 
-async function synthesizeTokikoClips() {
-  if (!fs.existsSync(KUDA_PATH)) {
-    console.log(`[run_real_audio_audit] Optional tokiko-axis not found at ${KUDA_PATH}; skipping tokiko shelf.`);
+async function synthesizeTokikoClips(kudaPath) {
+  if (!fs.existsSync(kudaPath)) {
+    console.log(`[run_real_audio_audit] Optional tokiko-axis not found at ${kudaPath}; skipping tokiko shelf.`);
     return [];
   }
-  const kuda = await import(pathToFileURL(KUDA_PATH).href);
+  const kuda = await import(pathToFileURL(kudaPath).href);
   if (typeof kuda.synthKuda !== "function") {
-    console.log(`[run_real_audio_audit] synthKuda not found in ${KUDA_PATH}; skipping.`);
+    console.log(`[run_real_audio_audit] synthKuda not found in ${kudaPath}; skipping.`);
     return [];
   }
 
@@ -174,7 +195,7 @@ async function synthesizeTokikoClips() {
   return items;
 }
 
-function analyzeBothPolicies(samples, sampleRate, label) {
+function analyzePolicies(samples, sampleRate, label, contestedIds = []) {
   const repCore = analyzeSamples(samples, sampleRate, {
     label,
     falsifiers: DEFAULT_FALSIFIERS,
@@ -185,19 +206,40 @@ function analyzeBothPolicies(samples, sampleRate, label) {
     falsifiers: DEFAULT_FALSIFIERS,
     policy: "veto_all",
   });
+  const repShelf = analyzeSamples(samples, sampleRate, {
+    label,
+    falsifiers: DEFAULT_FALSIFIERS,
+    policy: "shelf_veto",
+    contestedAxes: contestedIds,
+  });
 
   const coreTriggered = repCore.falsifiers
     .filter((f) => f.triggered && ORIGINAL_6_FALSIFIERS.some((c) => c.id === f.id))
     .map((f) => f.id);
   const allTriggered = repAll.falsifiers.filter((f) => f.triggered).map((f) => f.id);
 
+  const contestedSet = new Set(contestedIds);
+  let shelfTriggered;
+  let verdictShelfVeto;
+  if (repShelf.policy === "shelf_veto") {
+    shelfTriggered = repShelf.falsifiers
+      .filter((f) => f.triggered && !f.contested && !contestedSet.has(f.id))
+      .map((f) => f.id);
+    verdictShelfVeto = repShelf.verdict;
+  } else {
+    shelfTriggered = allTriggered.filter((id) => !contestedSet.has(id));
+    verdictShelfVeto = shelfTriggered.length === 0 ? "SURVIVED_KAWAII_CANDIDATE" : "REJECTED_UNKAWAII";
+  }
+
   return {
     verdictCoreVeto: repCore.verdict,
+    verdictShelfVeto,
     verdictVetoAll: repAll.verdict,
     coreTriggered,
+    shelfTriggered,
     allTriggered,
-    f0MedianHz: repAll.features?.f0MedianHz ?? 0,
-    hnrDb: repAll.features?.hnrDb ?? 0,
+    f0MedianHz: repAll.features?.medianF0 ?? 0,
+    hnrDb: repAll.features?.meanVoicedHnrDb ?? 0,
     jitter: repAll.features?.jitter ?? 0,
   };
 }
@@ -206,45 +248,54 @@ function shortAxisId(id) {
   return String(id).split("_")[0];
 }
 
+function countShelfVetoSurvival(items, contestedSet) {
+  let survived = 0;
+  for (const it of items) {
+    const vetoed = (it.triggeredIds || []).some((id) => !contestedSet.has(id));
+    if (!vetoed) survived++;
+  }
+  return survived;
+}
+
 function buildMarkdownReport(summary) {
   const {
     generatedAt,
     realClipCount,
-    uniqueBenignCount,
     expectedUnkawaiiCount,
     tokikoCount,
     tokikoAudit,
     benignRealAudit,
     combinedShelfAudit,
+    shelfVetoSummary,
     expectedUnkawaiiSummary,
     perClipReal,
     perClipTokiko,
   } = summary;
 
   const lines = [];
-  lines.push("# yata v0.3 — Reproducible Real-Audio & Protected Shelf Audit (`RESULTS.md`)");
+  lines.push("# yata v0.4 — Reproducible Real-Audio & Protected Shelf Audit (`RESULTS.md`)");
   lines.push("");
   lines.push(`Generated: \`${generatedAt}\` by \`node bench/real_audio_audit/run_real_audio_audit.mjs\``);
-  lines.push(`Manifest: [\`manifest.json\`](./manifest.json) (${realClipCount} trimmed 24kHz mono clips from 16 Wikimedia Commons sources + ${tokikoCount} \`tokiko-axis\` clips).`);
+  lines.push(`Manifest: [\`manifest.json\`](./manifest.json) (${realClipCount} trimmed 24kHz mono clips from 16 Wikimedia Commons sources with verified licenses + ${tokikoCount} \`tokiko-axis\` clips).`);
   lines.push("");
-  lines.push("> **Brutal Honesty First**: On synthetic unit tests, all 32 falsifiers pass 100%. On **real human/animal recordings and `tokiko-axis` Japanese speech**, running all 32 axes with unilateral veto power (`--policy veto_all`) causes a high false-positive rate. This report quantifies that exact gap, lists every `CONTESTED` axis, and separates **LLM visual readability** from **detector precision/recall**.");
+  lines.push("> **Brutal Honesty First**: On synthetic unit tests, all 32 falsifiers pass 100%. On **real human/animal recordings and `tokiko-axis` Japanese speech**, running all 32 axes with unilateral veto power (`--policy veto_all`) causes a high false-positive rate. This report quantifies that exact gap across **`core_veto`** (v0.4 default), **`shelf_veto`** (suspends veto on shelf-contested axes), and **`veto_all`**, lists every `CONTESTED` axis, and separates **LLM visual readability** from **detector precision/recall**.");
   lines.push("");
 
   // Section A
-  lines.push("## A. False-Positive Rate (FPR): `core_veto` (F1–F6) vs `veto_all` (F1–F32)");
+  lines.push("## A. False-Positive Rate (FPR): `core_veto` vs `shelf_veto` vs `veto_all`");
   lines.push("");
-  lines.push("A **False Positive** here means a clip on the Protected Shelf (loved `tokiko` speech or benign real PD/CC0 audio) is rejected (`REJECTED_UNKAWAII`). Lower FPR / higher Survival Rate is better on the Protected Shelf; higher True-Positive Rate (TPR) is better on expected-unkawaii real audio.");
+  lines.push("A **False Positive** here means a clip on the Protected Shelf (loved `tokiko` speech or benign real Wikimedia Commons audio) is rejected (`REJECTED_UNKAWAII`). Lower FPR / higher Survival Rate is better on the Protected Shelf; higher True-Positive Rate (TPR) is better on expected-unkawaii real audio.");
   lines.push("");
-  lines.push("| Evaluation Group | Clips | `core_veto` (F1–F6) Survival | `core_veto` FPR | `veto_all` (F1–F32) Survival | `veto_all` FPR |");
-  lines.push("| :--- | ---: | ---: | ---: | ---: | ---: |");
+  lines.push("| Evaluation Group | Clips | `core_veto` (F1–F6) Survival (FPR) | `shelf_veto` (Cleared Axes) Survival (FPR) | `veto_all` (F1–F32) Survival (FPR) |");
+  lines.push("| :--- | ---: | ---: | ---: | ---: |");
   lines.push(
-    `| **\`tokiko-axis\` Japanese Speech** (\`kawaii\`/\`amae\`/\`genki\` × 3) | ${tokikoAudit.shelfSize} | **${pct(tokikoAudit.shelfSurvivalRate.core6Survived, tokikoAudit.shelfSize)}** (${tokikoAudit.shelfSurvivalRate.core6Survived}/${tokikoAudit.shelfSize}) | ${pct(tokikoAudit.shelfSize - tokikoAudit.shelfSurvivalRate.core6Survived, tokikoAudit.shelfSize)} | **${pct(tokikoAudit.shelfSurvivalRate.fullSurvived, tokikoAudit.shelfSize)}** (${tokikoAudit.shelfSurvivalRate.fullSurvived}/${tokikoAudit.shelfSize}) | ${pct(tokikoAudit.shelfSize - tokikoAudit.shelfSurvivalRate.fullSurvived, tokikoAudit.shelfSize)} |`
+    `| **\`tokiko-axis\` Japanese Speech** (\`kawaii\`/\`amae\`/\`genki\` × 3) | ${tokikoAudit.shelfSize} | **${pct(tokikoAudit.shelfSurvivalRate.core6Survived, tokikoAudit.shelfSize)}** (${tokikoAudit.shelfSurvivalRate.core6Survived}/${tokikoAudit.shelfSize}; FPR ${pct(tokikoAudit.shelfSize - tokikoAudit.shelfSurvivalRate.core6Survived, tokikoAudit.shelfSize)}) | **${pct(shelfVetoSummary.tokikoSurvived, tokikoAudit.shelfSize)}** (${shelfVetoSummary.tokikoSurvived}/${tokikoAudit.shelfSize}; FPR ${pct(tokikoAudit.shelfSize - shelfVetoSummary.tokikoSurvived, tokikoAudit.shelfSize)}) | **${pct(tokikoAudit.shelfSurvivalRate.fullSurvived, tokikoAudit.shelfSize)}** (${tokikoAudit.shelfSurvivalRate.fullSurvived}/${tokikoAudit.shelfSize}; FPR ${pct(tokikoAudit.shelfSize - tokikoAudit.shelfSurvivalRate.fullSurvived, tokikoAudit.shelfSize)}) |`
   );
   lines.push(
-    `| **Benign Real PD/CC0 Audio** (deduped by SHA-256) | ${benignRealAudit.shelfSize} | **${pct(benignRealAudit.shelfSurvivalRate.core6Survived, benignRealAudit.shelfSize)}** (${benignRealAudit.shelfSurvivalRate.core6Survived}/${benignRealAudit.shelfSize}) | ${pct(benignRealAudit.shelfSize - benignRealAudit.shelfSurvivalRate.core6Survived, benignRealAudit.shelfSize)} | **${pct(benignRealAudit.shelfSurvivalRate.fullSurvived, benignRealAudit.shelfSize)}** (${benignRealAudit.shelfSurvivalRate.fullSurvived}/${benignRealAudit.shelfSize}) | ${pct(benignRealAudit.shelfSize - benignRealAudit.shelfSurvivalRate.fullSurvived, benignRealAudit.shelfSize)} |`
+    `| **Benign Real Wikimedia Audio** (deduped by SHA-256) | ${benignRealAudit.shelfSize} | **${pct(benignRealAudit.shelfSurvivalRate.core6Survived, benignRealAudit.shelfSize)}** (${benignRealAudit.shelfSurvivalRate.core6Survived}/${benignRealAudit.shelfSize}; FPR ${pct(benignRealAudit.shelfSize - benignRealAudit.shelfSurvivalRate.core6Survived, benignRealAudit.shelfSize)}) | **${pct(shelfVetoSummary.benignRealSurvived, benignRealAudit.shelfSize)}** (${shelfVetoSummary.benignRealSurvived}/${benignRealAudit.shelfSize}; FPR ${pct(benignRealAudit.shelfSize - shelfVetoSummary.benignRealSurvived, benignRealAudit.shelfSize)}) | **${pct(benignRealAudit.shelfSurvivalRate.fullSurvived, benignRealAudit.shelfSize)}** (${benignRealAudit.shelfSurvivalRate.fullSurvived}/${benignRealAudit.shelfSize}; FPR ${pct(benignRealAudit.shelfSize - benignRealAudit.shelfSurvivalRate.fullSurvived, benignRealAudit.shelfSize)}) |`
   );
   lines.push(
-    `| **Combined Protected Shelf** (\`tokiko\` + Benign Real) | ${combinedShelfAudit.shelfSize} | **${pct(combinedShelfAudit.shelfSurvivalRate.core6Survived, combinedShelfAudit.shelfSize)}** (${combinedShelfAudit.shelfSurvivalRate.core6Survived}/${combinedShelfAudit.shelfSize}) | ${pct(combinedShelfAudit.shelfSize - combinedShelfAudit.shelfSurvivalRate.core6Survived, combinedShelfAudit.shelfSize)} | **${pct(combinedShelfAudit.shelfSurvivalRate.fullSurvived, combinedShelfAudit.shelfSize)}** (${combinedShelfAudit.shelfSurvivalRate.fullSurvived}/${combinedShelfAudit.shelfSize}) | ${pct(combinedShelfAudit.shelfSize - combinedShelfAudit.shelfSurvivalRate.fullSurvived, combinedShelfAudit.shelfSize)} |`
+    `| **Combined Protected Shelf** (\`tokiko\` + Benign Real) | ${combinedShelfAudit.shelfSize} | **${pct(combinedShelfAudit.shelfSurvivalRate.core6Survived, combinedShelfAudit.shelfSize)}** (${combinedShelfAudit.shelfSurvivalRate.core6Survived}/${combinedShelfAudit.shelfSize}; FPR ${pct(combinedShelfAudit.shelfSize - combinedShelfAudit.shelfSurvivalRate.core6Survived, combinedShelfAudit.shelfSize)}) | **${pct(shelfVetoSummary.combinedSurvived, combinedShelfAudit.shelfSize)}** (${shelfVetoSummary.combinedSurvived}/${combinedShelfAudit.shelfSize}; FPR ${pct(combinedShelfAudit.shelfSize - shelfVetoSummary.combinedSurvived, combinedShelfAudit.shelfSize)}) | **${pct(combinedShelfAudit.shelfSurvivalRate.fullSurvived, combinedShelfAudit.shelfSize)}** (${combinedShelfAudit.shelfSurvivalRate.fullSurvived}/${combinedShelfAudit.shelfSize}; FPR ${pct(combinedShelfAudit.shelfSize - combinedShelfAudit.shelfSurvivalRate.fullSurvived, combinedShelfAudit.shelfSize)}) |`
   );
   lines.push("");
 
@@ -252,15 +303,16 @@ function buildMarkdownReport(summary) {
   lines.push("");
   lines.push(`On the **${expectedUnkawaiiCount}** unique expected-unkawaii real clips (cat hiss, alarm siren, 60Hz hum+click injection, wild boar growl, giant canine growl):`);
   lines.push(`- \`core_veto\` (F1–F6) caught **${expectedUnkawaiiSummary.coreCaught}/${expectedUnkawaiiCount}** (${pct(expectedUnkawaiiSummary.coreCaught, expectedUnkawaiiCount)})`);
+  lines.push(`- \`shelf_veto\` (${combinedShelfAudit.clearedCount} shelf-cleared axes) caught **${expectedUnkawaiiSummary.shelfCaught}/${expectedUnkawaiiCount}** (${pct(expectedUnkawaiiSummary.shelfCaught, expectedUnkawaiiCount)})`);
   lines.push(`- \`veto_all\` (F1–F32) caught **${expectedUnkawaiiSummary.allCaught}/${expectedUnkawaiiCount}** (${pct(expectedUnkawaiiSummary.allCaught, expectedUnkawaiiCount)})`);
   lines.push("");
-  lines.push("This confirms why v0.3 introduces **`--policy core_veto`** (defaulting to Core-6 for hard veto while surfacing `TOOLBOX_FALSIFIERS` F7–F32 as non-vetoing diagnostics, and separating `F30` into `ORTHOGONAL_AXES`).");
+  lines.push("This confirms why v0.4 makes **`--policy core_veto`** the default (Core-6 hard veto + `TOOLBOX_FALSIFIERS` F7–F32 as non-vetoing diagnostics, `F30` in `ORTHOGONAL_AXES`), and provides **`--policy shelf_veto --contested ...`** to automatically suspend veto power on every axis marked `CONTESTED` by the Protected Shelf.");
   lines.push("");
 
   // Section B
   lines.push("## B. Axes Marked `CONTESTED` by the Protected Shelf");
   lines.push("");
-  lines.push("Any falsifier that rejects ≥ 1 clip on the Combined Protected Shelf is formally marked **`CONTESTED`** by `auditFalsifiersAgainstShelf` (`src/shelf.mjs`). Its veto power is suspended until calibrated or reclassified.");
+  lines.push("Any falsifier that rejects ≥ 1 clip on the Combined Protected Shelf is formally marked **`CONTESTED`** by `auditFalsifiersAgainstShelf` (`src/shelf.mjs`). Under `--policy shelf_veto`, its veto power is suspended until calibrated or reclassified.");
   lines.push("");
   lines.push("```text");
   lines.push(formatShelfAuditForLLM(combinedShelfAudit));
@@ -285,23 +337,25 @@ function buildMarkdownReport(summary) {
   // Per-clip breakdown tables
   lines.push("### Per-Clip Breakdown: `tokiko-axis` Speech (9 clips)");
   lines.push("");
-  lines.push("| Clip ID | Utterance | Preset | `core_veto` | `veto_all` Triggered Axes | F0 med | Jitter |");
-  lines.push("| :--- | :--- | :--- | :--- | :--- | ---: | ---: |");
+  lines.push("| Clip ID | Utterance | Preset | `core_veto` | `shelf_veto` | `veto_all` Triggered Axes | F0 med | Jitter |");
+  lines.push("| :--- | :--- | :--- | :--- | :--- | :--- | ---: | ---: |");
   for (const c of perClipTokiko) {
     const coreTxt = c.coreTriggered.length ? c.coreTriggered.map(shortAxisId).join(", ") : "PASS";
+    const shelfTxt = c.shelfTriggered.length ? c.shelfTriggered.map(shortAxisId).join(", ") : "PASS";
     const allTxt = c.allTriggered.length ? c.allTriggered.map(shortAxisId).join(", ") : "CLEAN";
-    lines.push(`| \`${c.id}\` | ${c.utterance} | \`${c.preset}\` | ${coreTxt} | ${allTxt} | ${c.f0MedianHz} Hz | ${c.jitter} |`);
+    lines.push(`| \`${c.id}\` | ${c.utterance} | \`${c.preset}\` | ${coreTxt} | ${shelfTxt} | ${allTxt} | ${c.f0MedianHz} Hz | ${c.jitter} |`);
   }
   lines.push("");
 
-  lines.push("### Per-Clip Breakdown: Real Wikimedia Commons PD/CC0 Audio (20 clips)");
+  lines.push("### Per-Clip Breakdown: Real Wikimedia Commons Audio (20 clips)");
   lines.push("");
-  lines.push("| Clip ID | Suite | Group | Title | SHA-256 Match | `core_veto` | `veto_all` Triggered Axes |");
-  lines.push("| :--- | :--- | :--- | :--- | :---: | :--- | :--- |");
+  lines.push("| Clip ID | Suite | Group | Title | License | SHA-256 | `core_veto` | `shelf_veto` | `veto_all` Triggered Axes |");
+  lines.push("| :--- | :--- | :--- | :--- | :--- | :---: | :--- | :--- | :--- |");
   for (const c of perClipReal) {
     const coreTxt = c.coreTriggered.length ? c.coreTriggered.map(shortAxisId).join(", ") : "PASS";
+    const shelfTxt = c.shelfTriggered.length ? c.shelfTriggered.map(shortAxisId).join(", ") : "PASS";
     const allTxt = c.allTriggered.length ? c.allTriggered.map(shortAxisId).join(", ") : "CLEAN";
-    lines.push(`| \`${c.id}\` | ${c.suite} | \`${c.auditGroup}\` | ${c.title} | ${c.sha256Match ? "✅" : "⚠️"} | ${coreTxt} | ${allTxt} |`);
+    lines.push(`| \`${c.id}\` | ${c.suite} | \`${c.auditGroup}\` | ${c.title} | ${c.license} | ${c.sha256Match ? "✅" : "⚠️"} | ${coreTxt} | ${shelfTxt} | ${allTxt} |`);
   }
   lines.push("");
 
@@ -331,6 +385,7 @@ function buildMarkdownReport(summary) {
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
+  const kudaPath = resolveKudaPath(opts.tokikoDir);
   const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
 
   const resolvedWavsById = new Map();
@@ -338,9 +393,9 @@ async function main() {
   const missing = [];
 
   for (const clip of manifest.clips) {
-    let wavPath = resolveClipWavPath(clip, manifest, opts.cacheDir);
+    let wavPath = resolveClipWavPath(clip, manifest, opts.cacheDirs);
     if (!wavPath && opts.fetch) {
-      const targetDir = opts.cacheDir || path.join(__dirname, ".cache_wav");
+      const targetDir = opts.cacheDirs[0] || path.join(__dirname, ".cache_wav");
       const outPath = path.join(targetDir, clip.wavFilename);
       console.log(`[run_real_audio_audit] Fetching ${clip.id} -> ${outPath}`);
       wavPath = fetchClipToWav(clip, outPath, resolvedWavsById);
@@ -367,36 +422,7 @@ async function main() {
     console.warn(`[run_real_audio_audit] Warning: ${missing.length} clips missing (${missing.join(", ")}). Pass --fetch or --cache-dir to load them.`);
   }
 
-  const tokikoItems = await synthesizeTokikoClips();
-
-  // Analyze all real clips
-  const perClipReal = realLoaded.map(({ clip, actualSha, sha256Match, samples, sampleRate }) => {
-    const analysis = analyzeBothPolicies(samples, sampleRate, clip.id);
-    return {
-      id: clip.id,
-      suite: clip.suite,
-      title: clip.title,
-      category: clip.category,
-      auditGroup: clip.auditGroup,
-      sourceUrl: clip.sourceUrl,
-      license: clip.license,
-      sha256: actualSha,
-      sha256Match,
-      ...analysis,
-    };
-  });
-
-  // Analyze all tokiko clips
-  const perClipTokiko = tokikoItems.map((item) => {
-    const analysis = analyzeBothPolicies(item.samples, item.sampleRate, item.id);
-    return {
-      id: item.id,
-      utterance: item.utterance,
-      preset: item.preset,
-      source: item.source,
-      ...analysis,
-    };
-  });
+  const tokikoItems = await synthesizeTokikoClips(kudaPath);
 
   // Deduplicate benign real audio by SHA-256 so shared clips (Baby_Laugh, Chakrulo) aren't double-counted
   const seenBenignSha = new Set();
@@ -415,6 +441,52 @@ async function main() {
     });
   }
 
+  // Run Protected Shelf Audits via src/shelf.mjs FIRST so shelf_veto uses combinedShelfAudit.contestedIds
+  const tokikoAudit = auditFalsifiersAgainstShelf(tokikoItems, DEFAULT_FALSIFIERS);
+  const benignRealAudit = auditFalsifiersAgainstShelf(benignShelfItems, DEFAULT_FALSIFIERS);
+  const combinedShelfAudit = auditFalsifiersAgainstShelf([...tokikoItems, ...benignShelfItems], DEFAULT_FALSIFIERS);
+  const contestedIds = combinedShelfAudit.contestedIds || [];
+  const contestedSet = new Set(contestedIds);
+
+  const shelfVetoSummary = {
+    contestedCount: contestedIds.length,
+    clearedCount: combinedShelfAudit.clearedCount,
+    tokikoSurvived: countShelfVetoSurvival(tokikoAudit.items, contestedSet),
+    benignRealSurvived: countShelfVetoSurvival(benignRealAudit.items, contestedSet),
+    combinedSurvived: countShelfVetoSurvival(combinedShelfAudit.items, contestedSet),
+  };
+
+  // Analyze all real clips across core_veto, shelf_veto, veto_all
+  const perClipReal = realLoaded.map(({ clip, actualSha, sha256Match, samples, sampleRate }) => {
+    const analysis = analyzePolicies(samples, sampleRate, clip.id, contestedIds);
+    return {
+      id: clip.id,
+      suite: clip.suite,
+      title: clip.title,
+      category: clip.category,
+      auditGroup: clip.auditGroup,
+      sourceUrl: clip.sourceUrl,
+      license: clip.license,
+      licenseUrl: clip.licenseUrl ?? null,
+      artist: clip.artist ?? null,
+      sha256: actualSha,
+      sha256Match,
+      ...analysis,
+    };
+  });
+
+  // Analyze all tokiko clips across core_veto, shelf_veto, veto_all
+  const perClipTokiko = tokikoItems.map((item) => {
+    const analysis = analyzePolicies(item.samples, item.sampleRate, item.id, contestedIds);
+    return {
+      id: item.id,
+      utterance: item.utterance,
+      preset: item.preset,
+      source: item.source,
+      ...analysis,
+    };
+  });
+
   // Deduplicate expected_unkawaii real audio by SHA-256
   const seenUnkawaiiSha = new Set();
   const expectedUnkawaiiEntries = [];
@@ -428,23 +500,20 @@ async function main() {
   const expectedUnkawaiiSummary = {
     count: expectedUnkawaiiEntries.length,
     coreCaught: expectedUnkawaiiEntries.filter((c) => c.coreTriggered.length > 0).length,
+    shelfCaught: expectedUnkawaiiEntries.filter((c) => c.shelfTriggered.length > 0).length,
     allCaught: expectedUnkawaiiEntries.filter((c) => c.allTriggered.length > 0).length,
     clips: expectedUnkawaiiEntries.map((c) => ({
       id: c.id,
       title: c.title,
       coreTriggered: c.coreTriggered,
+      shelfTriggered: c.shelfTriggered,
       allTriggered: c.allTriggered,
     })),
   };
 
-  // Run Protected Shelf Audits via src/shelf.mjs
-  const tokikoAudit = auditFalsifiersAgainstShelf(tokikoItems, DEFAULT_FALSIFIERS);
-  const benignRealAudit = auditFalsifiersAgainstShelf(benignShelfItems, DEFAULT_FALSIFIERS);
-  const combinedShelfAudit = auditFalsifiersAgainstShelf([...tokikoItems, ...benignShelfItems], DEFAULT_FALSIFIERS);
-
   const generatedAt = new Date().toISOString();
   const resultsObj = {
-    schema: "yata_real_audio_audit/v0.3",
+    schema: "yata_real_audio_audit/v0.4",
     generatedAt,
     axisCounts: {
       core: ORIGINAL_6_FALSIFIERS.length,
@@ -459,6 +528,7 @@ async function main() {
     tokikoAudit,
     benignRealAudit,
     combinedShelfAudit,
+    shelfVetoSummary,
     expectedUnkawaiiSummary,
     perClipTokiko,
     perClipReal,

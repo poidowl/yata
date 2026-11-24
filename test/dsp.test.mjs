@@ -196,6 +196,39 @@ test("estimateF0Parabolic: accurate across 110 Hz, 302 Hz, 780 Hz without octave
   assert.ok(estNoise.periodicity < 0.45, `Noise periodicity too high: ${estNoise.periodicity}`);
 });
 
+test("estimateF0Parabolic: <80 Hz wind/handling rumble guard prevents F0 hijack on 520 Hz meow while preserving 60 Hz hum", () => {
+  const sr = 24000;
+  const frameLen = 720; // 30ms
+
+  // 1. 520 Hz cat-meow-like harmonic voice + strong 68 Hz wind rumble (rumble louder than voice)
+  const meowPlusRumble = new Float32Array(frameLen);
+  for (let i = 0; i < frameLen; i++) {
+    const t = i / sr;
+    const meow =
+      0.28 * Math.sin(2 * Math.PI * 520 * t) +
+      0.16 * Math.sin(2 * Math.PI * 1040 * t) +
+      0.08 * Math.sin(2 * Math.PI * 1560 * t);
+    const rumble = 0.55 * Math.sin(2 * Math.PI * 68 * t + 0.4);
+    meowPlusRumble[i] = meow + rumble;
+  }
+  const estMeow = estimateF0Parabolic(meowPlusRumble, sr, 55, 1000);
+  assert.ok(
+    Math.abs(estMeow.f0 - 520) < 15,
+    `Expected rumble guard to recover ~520 Hz meow F0, got ${estMeow.f0.toFixed(1)} Hz`
+  );
+
+  // 2. Pure 60 Hz mains hum still reports ~60 Hz F0
+  const pure60 = new Float32Array(frameLen);
+  for (let i = 0; i < frameLen; i++) {
+    pure60[i] = 0.5 * Math.sin((2 * Math.PI * 60 * i) / sr);
+  }
+  const est60 = estimateF0Parabolic(pure60, sr, 55, 1000);
+  assert.ok(
+    Math.abs(est60.f0 - 60) < 3,
+    `Expected pure 60 Hz hum to preserve ~60 Hz F0, got ${est60.f0.toFixed(1)} Hz`
+  );
+});
+
 test("computeCycleJitter & extractFeatures.jitter: glide-invariant RAP vs 1% cycle perturbation vs pure rigid tone", () => {
   const sr = 24000;
   const dur = 0.6;

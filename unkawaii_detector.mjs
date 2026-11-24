@@ -83,14 +83,15 @@ export {
 // ============================================================================
 const USAGE = `Usage:
   node unkawaii_detector.mjs <file.wav> [--format llm|json] [--verbose] [--falsifiers all|core]
-                                        [--policy veto_all|core_veto]
+                                        [--policy core_veto|veto_all|shelf_veto] [--contested <ID1,ID2,...>]
                                         [--view [micro|compact|full]] [--zoom [auto|<t0>..<t1>]]
                                         [--charset ascii|unicode] [--width <N>]
                                         [--svg <out.svg>] [--png <out.png>]
   node unkawaii_detector.mjs --compare <a.wav> <b.wav> [--format llm|json] [--verbose] [--falsifiers all|core]
-                                                       [--policy veto_all|core_veto]
+                                                       [--policy core_veto|veto_all|shelf_veto] [--contested <ID1,ID2,...>]
                                                        [--view [micro|compact|full]] [--svg <out.svg>] [--png <out.png>]
-  node unkawaii_detector.mjs --diff <a.wav> <b.wav> [--falsifiers all|core] [--policy veto_all|core_veto]
+  node unkawaii_detector.mjs --diff <a.wav> <b.wav> [--falsifiers all|core] [--policy core_veto|veto_all|shelf_veto]
+                                                    [--contested <ID1,ID2,...>]
                                                     [--charset ascii|unicode] [--width <N>]
                                                     [--svg <out.svg>] [--png <out.png>]
   node unkawaii_detector.mjs --discover [--format llm|json] [--view] [--charset ascii|unicode]
@@ -120,7 +121,8 @@ function parseCliArgs(argv) {
     format: "llm",
     verbose: false,
     falsifiersSet: "all",
-    policy: "veto_all",
+    policy: "core_veto",
+    contestedIds: [],
     view: null, // null | "micro" | "compact" | "full"
     zoom: null, // null | "auto" | { startSec, endSec }
     charset: "ascii",
@@ -194,10 +196,25 @@ function parseCliArgs(argv) {
 
     if (arg === "--policy") {
       const val = argv[++i];
-      if (val !== "veto_all" && val !== "core_veto") {
-        throw new Error(`Invalid --policy "${val ?? ""}": expected "veto_all" or "core_veto"`);
+      if (val !== "core_veto" && val !== "veto_all" && val !== "shelf_veto") {
+        throw new Error(
+          `Invalid --policy "${val ?? ""}": expected "core_veto", "veto_all", or "shelf_veto"`
+        );
       }
       opts.policy = val;
+      continue;
+    }
+
+    if (arg === "--contested") {
+      const val = argv[++i];
+      if (!val || val.startsWith("-")) {
+        throw new Error("--contested requires a comma-separated list of falsifier IDs");
+      }
+      const parsedIds = val
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      opts.contestedIds.push(...parsedIds);
       continue;
     }
 
@@ -327,16 +344,19 @@ function runCli(argv) {
     const wavB = loadWavFile(fileB);
     const chA = wavA.channels ? { channels: wavA.channels } : {};
     const chB = wavB.channels ? { channels: wavB.channels } : {};
+    const contestedOpt = opts.contestedIds.length ? { contestedIds: opts.contestedIds } : {};
     const repA = analyzeSamples(wavA.samples, wavA.sampleRate, {
       label: path.basename(fileA),
       falsifiers,
       policy: opts.policy,
+      ...contestedOpt,
       ...chA,
     });
     const repB = analyzeSamples(wavB.samples, wavB.sampleRate, {
       label: path.basename(fileB),
       falsifiers,
       policy: opts.policy,
+      ...contestedOpt,
       ...chB,
     });
 
@@ -387,10 +407,12 @@ function runCli(argv) {
   }
   const wav = loadWavFile(file);
   const chOpt = wav.channels ? { channels: wav.channels } : {};
+  const contestedOpt = opts.contestedIds.length ? { contestedIds: opts.contestedIds } : {};
   const rep = analyzeSamples(wav.samples, wav.sampleRate, {
     label: path.basename(file),
     falsifiers,
     policy: opts.policy,
+    ...contestedOpt,
     ...chOpt,
   });
 

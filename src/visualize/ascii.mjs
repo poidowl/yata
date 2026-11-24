@@ -294,12 +294,48 @@ function resampleSpectrogramGrid(prof, win, width, rows) {
   }
   const tCount = Math.max(1, tEnd - tStart + 1);
 
+  const fLo = Math.max(30, Math.min(60, freqsHz[0] > 0 ? freqsHz[0] : 60));
+  const fHi = Math.max(fLo * 2, freqsHz[melCount - 1] > 0 ? freqsHz[melCount - 1] : 8000);
+
   for (let r = 0; r < rows; r++) {
-    // r=0 is highest frequency, r=rows-1 is lowest
-    const mHi = Math.max(0, Math.min(melCount - 1, Math.floor(((rows - r) * melCount) / rows) - 1));
-    const mLo = Math.max(0, Math.min(mHi, Math.floor(((rows - 1 - r) * melCount) / rows)));
+    // r=0 is highest frequency, r=rows-1 is lowest (~60-120 Hz for 8 rows)
+    const bandLo = fLo * Math.pow(fHi / fLo, (rows - 1 - r) / rows);
+    const bandHi = fLo * Math.pow(fHi / fLo, (rows - r) / rows);
+
+    let mLo = -1;
+    let mHi = -1;
+    if (freqsHz.length === melCount) {
+      for (let mi = 0; mi < melCount; mi++) {
+        const hz = freqsHz[mi];
+        const inLo = r === rows - 1 ? true : hz >= bandLo;
+        const inHi = r === 0 ? true : hz < bandHi;
+        if (inLo && inHi) {
+          if (mLo < 0) mLo = mi;
+          mHi = mi;
+        }
+      }
+      if (mLo < 0) {
+        // Fallback: pick nearest mel bin to geometric band center
+        const targetHz = Math.sqrt(bandLo * bandHi);
+        let bestIdx = 0;
+        let bestDist = Infinity;
+        for (let mi = 0; mi < melCount; mi++) {
+          const d = Math.abs(freqsHz[mi] - targetHz);
+          if (d < bestDist) {
+            bestDist = d;
+            bestIdx = mi;
+          }
+        }
+        mLo = bestIdx;
+        mHi = bestIdx;
+      }
+    } else {
+      mHi = Math.max(0, Math.min(melCount - 1, Math.floor(((rows - r) * melCount) / rows) - 1));
+      mLo = Math.max(0, Math.min(mHi, Math.floor(((rows - 1 - r) * melCount) / rows)));
+    }
+
     const mMid = Math.floor(0.5 * (mLo + mHi));
-    rowFreqs[r] = freqsHz[mMid] ?? 60 * Math.pow(8000 / 60, rows > 1 ? 1 - r / (rows - 1) : 0.5);
+    rowFreqs[r] = freqsHz[mMid] ?? Math.sqrt(bandLo * bandHi);
 
     for (let c = 0; c < width; c++) {
       const i0 = tStart + Math.floor((c * tCount) / width);

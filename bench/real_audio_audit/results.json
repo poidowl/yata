@@ -1,6 +1,6 @@
 {
-  "schema": "yata_real_audio_audit/v0.3",
-  "generatedAt": "2026-11-24T04:29:25.672Z",
+  "schema": "yata_real_audio_audit/v0.4",
+  "generatedAt": "2026-11-24T05:04:02.596Z",
   "axisCounts": {
     "core": 6,
     "toolbox": 25,
@@ -311,7 +311,7 @@
             "label": "tokiko:amae:おはよう、きょうは、いいてんきだね",
             "score": 0.925,
             "threshold": 0.5,
-            "evidence": "f0Diff1=0.8325st, f0Diff2=1.2223st"
+            "evidence": "f0Diff1=0.8325st, f0Diff2=1.0812st"
           },
           {
             "id": "tokiko_ohayo_genki",
@@ -709,9 +709,9 @@
           {
             "id": "clip_09",
             "label": "clip_09 (bird_song)",
-            "score": 0.882,
+            "score": 0.812,
             "threshold": 0.78,
-            "evidence": "crossChannelCoupling=0.1178"
+            "evidence": "crossChannelCoupling=0.1878"
           },
           {
             "id": "p4_baby",
@@ -842,16 +842,16 @@
           {
             "id": "clip_05",
             "label": "clip_05 (acoustic_guitar_lullaby)",
-            "score": 0.793,
+            "score": 0.788,
             "threshold": 0.5,
-            "evidence": "medianF0=73.99Hz, centroid=655.03Hz, lowBandRatio=0.6341"
+            "evidence": "medianF0=116.94Hz, centroid=655.03Hz, lowBandRatio=0.6341"
           },
           {
             "id": "p2_baby",
             "label": "p2_baby (animal_young_cat_meow)",
             "score": 0.936,
             "threshold": 0.5,
-            "evidence": "medianF0=74.33Hz, centroid=1528.1Hz, lowBandRatio=0.7486"
+            "evidence": "medianF0=76.24Hz, centroid=1528.1Hz, lowBandRatio=0.7486"
           }
         ]
       },
@@ -1039,14 +1039,14 @@
             "label": "clip_02 (human_singing_ensemble)",
             "score": 1,
             "threshold": 0.5,
-            "evidence": "f0Diff1=3.1413st, f0Diff2=5.4534st"
+            "evidence": "f0Diff1=3.4418st, f0Diff2=6.5145st"
           },
           {
             "id": "clip_05",
             "label": "clip_05 (acoustic_guitar_lullaby)",
             "score": 1,
             "threshold": 0.5,
-            "evidence": "f0Diff1=3.0705st, f0Diff2=5.459st"
+            "evidence": "f0Diff1=3.7055st, f0Diff2=6.8296st"
           },
           {
             "id": "clip_06",
@@ -1060,7 +1060,7 @@
             "label": "p2_baby (animal_young_cat_meow)",
             "score": 1,
             "threshold": 0.5,
-            "evidence": "f0Diff1=5.5481st, f0Diff2=10.9196st"
+            "evidence": "f0Diff1=8.3249st, f0Diff2=16.2701st"
           },
           {
             "id": "p4_baby",
@@ -1074,7 +1074,7 @@
             "label": "p5_baby (animal_small_dog_bark)",
             "score": 1,
             "threshold": 0.5,
-            "evidence": "f0Diff1=5.5161st, f0Diff2=8.0938st"
+            "evidence": "f0Diff1=5.8732st, f0Diff2=6.9869st"
           }
         ]
       },
@@ -1112,9 +1112,9 @@
           {
             "id": "p5_baby",
             "label": "p5_baby (animal_small_dog_bark)",
-            "score": 0.658,
+            "score": 0.624,
             "threshold": 0.5,
-            "evidence": "f0ModDepth=14.6397st, sinusoidality=0.7403 @ 8.875Hz"
+            "evidence": "f0ModDepth=14.0408st, sinusoidality=0.7143 @ 9.5Hz"
           }
         ]
       },
@@ -1262,7 +1262,7 @@
         "id": "clip_06",
         "label": "clip_06 (human_baby_laugh)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Baby_Laugh.ogg",
-        "license": "Wikimedia Commons (Freesound; see Commons file page for exact license)",
+        "license": "CC BY 3.0",
         "core6Survived": true,
         "fullSurvived": false,
         "coreTriggeredIds": [],
@@ -1295,7 +1295,7 @@
         "id": "p1_baby",
         "label": "p1_baby (animal_baby_lamb)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Mudchute_lamb_1.ogg",
-        "license": "Wikimedia Commons (see Commons file page for exact license)",
+        "license": "CC BY-SA 3.0",
         "core6Survived": false,
         "fullSurvived": false,
         "coreTriggeredIds": [
@@ -1312,7 +1312,7 @@
         "id": "p2_baby",
         "label": "p2_baby (animal_young_cat_meow)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Maullido_de_gata_hembra_joven.ogg",
-        "license": "Wikimedia Commons (see Commons file page for exact license)",
+        "license": "CC0",
         "core6Survived": false,
         "fullSurvived": false,
         "coreTriggeredIds": [
@@ -1339,7 +1339,7 @@
         "id": "p4_baby",
         "label": "p4_baby (animal_small_squirrel)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/A_three-striped_palm_squirrel_(Funambulus_palmarum)_chirping_16January2015.oga",
-        "license": "Wikimedia Commons (see Commons file page for exact license)",
+        "license": "CC BY-SA 4.0",
         "core6Survived": false,
         "fullSurvived": false,
         "coreTriggeredIds": [
@@ -1357,7 +1357,7 @@
         "id": "p5_baby",
         "label": "p5_baby (animal_small_dog_bark)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Bark_Huayra.ogg",
-        "license": "Wikimedia Commons (see Commons file page for exact license)",
+        "license": "CC BY-SA 3.0",
         "core6Survived": true,
         "fullSurvived": false,
         "coreTriggeredIds": [],
@@ -1474,9 +1474,9 @@
           {
             "id": "clip_09",
             "label": "clip_09 (bird_song)",
-            "score": 0.882,
+            "score": 0.812,
             "threshold": 0.78,
-            "evidence": "crossChannelCoupling=0.1178"
+            "evidence": "crossChannelCoupling=0.1878"
           },
           {
             "id": "p4_baby",
@@ -1607,16 +1607,16 @@
           {
             "id": "clip_05",
             "label": "clip_05 (acoustic_guitar_lullaby)",
-            "score": 0.793,
+            "score": 0.788,
             "threshold": 0.5,
-            "evidence": "medianF0=73.99Hz, centroid=655.03Hz, lowBandRatio=0.6341"
+            "evidence": "medianF0=116.94Hz, centroid=655.03Hz, lowBandRatio=0.6341"
           },
           {
             "id": "p2_baby",
             "label": "p2_baby (animal_young_cat_meow)",
             "score": 0.936,
             "threshold": 0.5,
-            "evidence": "medianF0=74.33Hz, centroid=1528.1Hz, lowBandRatio=0.7486"
+            "evidence": "medianF0=76.24Hz, centroid=1528.1Hz, lowBandRatio=0.7486"
           }
         ]
       },
@@ -1818,7 +1818,7 @@
             "label": "tokiko:amae:おはよう、きょうは、いいてんきだね",
             "score": 0.925,
             "threshold": 0.5,
-            "evidence": "f0Diff1=0.8325st, f0Diff2=1.2223st"
+            "evidence": "f0Diff1=0.8325st, f0Diff2=1.0812st"
           },
           {
             "id": "tokiko_ohayo_genki",
@@ -1832,14 +1832,14 @@
             "label": "clip_02 (human_singing_ensemble)",
             "score": 1,
             "threshold": 0.5,
-            "evidence": "f0Diff1=3.1413st, f0Diff2=5.4534st"
+            "evidence": "f0Diff1=3.4418st, f0Diff2=6.5145st"
           },
           {
             "id": "clip_05",
             "label": "clip_05 (acoustic_guitar_lullaby)",
             "score": 1,
             "threshold": 0.5,
-            "evidence": "f0Diff1=3.0705st, f0Diff2=5.459st"
+            "evidence": "f0Diff1=3.7055st, f0Diff2=6.8296st"
           },
           {
             "id": "clip_06",
@@ -1853,7 +1853,7 @@
             "label": "p2_baby (animal_young_cat_meow)",
             "score": 1,
             "threshold": 0.5,
-            "evidence": "f0Diff1=5.5481st, f0Diff2=10.9196st"
+            "evidence": "f0Diff1=8.3249st, f0Diff2=16.2701st"
           },
           {
             "id": "p4_baby",
@@ -1867,7 +1867,7 @@
             "label": "p5_baby (animal_small_dog_bark)",
             "score": 1,
             "threshold": 0.5,
-            "evidence": "f0Diff1=5.5161st, f0Diff2=8.0938st"
+            "evidence": "f0Diff1=5.8732st, f0Diff2=6.9869st"
           }
         ]
       },
@@ -1954,9 +1954,9 @@
           {
             "id": "p5_baby",
             "label": "p5_baby (animal_small_dog_bark)",
-            "score": 0.658,
+            "score": 0.624,
             "threshold": 0.5,
-            "evidence": "f0ModDepth=14.6397st, sinusoidality=0.7403 @ 8.875Hz"
+            "evidence": "f0ModDepth=14.0408st, sinusoidality=0.7143 @ 9.5Hz"
           }
         ]
       },
@@ -2242,7 +2242,7 @@
         "id": "clip_06",
         "label": "clip_06 (human_baby_laugh)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Baby_Laugh.ogg",
-        "license": "Wikimedia Commons (Freesound; see Commons file page for exact license)",
+        "license": "CC BY 3.0",
         "core6Survived": true,
         "fullSurvived": false,
         "coreTriggeredIds": [],
@@ -2275,7 +2275,7 @@
         "id": "p1_baby",
         "label": "p1_baby (animal_baby_lamb)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Mudchute_lamb_1.ogg",
-        "license": "Wikimedia Commons (see Commons file page for exact license)",
+        "license": "CC BY-SA 3.0",
         "core6Survived": false,
         "fullSurvived": false,
         "coreTriggeredIds": [
@@ -2292,7 +2292,7 @@
         "id": "p2_baby",
         "label": "p2_baby (animal_young_cat_meow)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Maullido_de_gata_hembra_joven.ogg",
-        "license": "Wikimedia Commons (see Commons file page for exact license)",
+        "license": "CC0",
         "core6Survived": false,
         "fullSurvived": false,
         "coreTriggeredIds": [
@@ -2319,7 +2319,7 @@
         "id": "p4_baby",
         "label": "p4_baby (animal_small_squirrel)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/A_three-striped_palm_squirrel_(Funambulus_palmarum)_chirping_16January2015.oga",
-        "license": "Wikimedia Commons (see Commons file page for exact license)",
+        "license": "CC BY-SA 4.0",
         "core6Survived": false,
         "fullSurvived": false,
         "coreTriggeredIds": [
@@ -2337,7 +2337,7 @@
         "id": "p5_baby",
         "label": "p5_baby (animal_small_dog_bark)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Bark_Huayra.ogg",
-        "license": "Wikimedia Commons (see Commons file page for exact license)",
+        "license": "CC BY-SA 3.0",
         "core6Survived": true,
         "fullSurvived": false,
         "coreTriggeredIds": [],
@@ -2350,15 +2350,26 @@
       }
     ]
   },
+  "shelfVetoSummary": {
+    "contestedCount": 13,
+    "clearedCount": 19,
+    "tokikoSurvived": 9,
+    "benignRealSurvived": 10,
+    "combinedSurvived": 19
+  },
   "expectedUnkawaiiSummary": {
     "count": 5,
     "coreCaught": 3,
+    "shelfCaught": 4,
     "allCaught": 5,
     "clips": [
       {
         "id": "clip_07",
         "title": "Cat hissing aggressively",
         "coreTriggered": [],
+        "shelfTriggered": [
+          "F25_AUTOTUNE_STAIRCASE"
+        ],
         "allTriggered": [
           "F13_SUBBASS_RUMBLE",
           "F14_HELMHOLTZ_ROUGHNESS",
@@ -2372,6 +2383,14 @@
         "coreTriggered": [
           "F5_ABRUPT_TAIL",
           "F6_PHYSICAL_GLITCH"
+        ],
+        "shelfTriggered": [
+          "F6_PHYSICAL_GLITCH",
+          "F7_FLAT_TOP_CLIPPING",
+          "F9_MICRO_CLICK_DROPOUT",
+          "F17_HOLLOW_METALLIC_COMB",
+          "F22_MONOTONE_FLAT_PROSODY",
+          "F27_METRONOMIC_CADENCE"
         ],
         "allTriggered": [
           "F5_ABRUPT_TAIL",
@@ -2393,6 +2412,10 @@
           "F4_NO_COMMON_CAUSE",
           "F6_PHYSICAL_GLITCH"
         ],
+        "shelfTriggered": [
+          "F6_PHYSICAL_GLITCH",
+          "F9_MICRO_CLICK_DROPOUT"
+        ],
         "allTriggered": [
           "F4_NO_COMMON_CAUSE",
           "F6_PHYSICAL_GLITCH",
@@ -2410,6 +2433,10 @@
         "coreTriggered": [
           "F5_ABRUPT_TAIL"
         ],
+        "shelfTriggered": [
+          "F17_HOLLOW_METALLIC_COMB",
+          "F18_MUDDY_BOXINESS"
+        ],
         "allTriggered": [
           "F5_ABRUPT_TAIL",
           "F14_HELMHOLTZ_ROUGHNESS",
@@ -2422,6 +2449,7 @@
         "id": "p5_adult",
         "title": "Giant canine deep growl",
         "coreTriggered": [],
+        "shelfTriggered": [],
         "allTriggered": [
           "F14_HELMHOLTZ_ROUGHNESS",
           "F23_ERRATIC_PITCH_WARBLE"
@@ -2436,13 +2464,15 @@
       "preset": "kawaii",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F24_CALCULATED_PITCH_LFO"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 344.37,
+      "hnrDb": 12.37,
       "jitter": 0.02287
     },
     {
@@ -2451,13 +2481,15 @@
       "preset": "amae",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F24_CALCULATED_PITCH_LFO"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 329.49,
+      "hnrDb": 13.14,
       "jitter": 0.02387
     },
     {
@@ -2466,13 +2498,15 @@
       "preset": "genki",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F24_CALCULATED_PITCH_LFO"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 369.79,
+      "hnrDb": 11.74,
       "jitter": 0.01155
     },
     {
@@ -2481,13 +2515,15 @@
       "preset": "kawaii",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F24_CALCULATED_PITCH_LFO"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 337.61,
+      "hnrDb": 12.33,
       "jitter": 0.0318
     },
     {
@@ -2496,18 +2532,20 @@
       "preset": "amae",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F1_HARSH_EDGE"
       ],
+      "shelfTriggered": [],
       "allTriggered": [
         "F1_HARSH_EDGE",
         "F14_HELMHOLTZ_ROUGHNESS",
         "F23_ERRATIC_PITCH_WARBLE",
         "F26_INTERNAL_REBOUND_SHOCK"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 320.04,
+      "hnrDb": 11.61,
       "jitter": 0.04301
     },
     {
@@ -2516,14 +2554,16 @@
       "preset": "genki",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F24_CALCULATED_PITCH_LFO",
         "F26_INTERNAL_REBOUND_SHOCK"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 358.83,
+      "hnrDb": 11.78,
       "jitter": 0.03025
     },
     {
@@ -2532,13 +2572,15 @@
       "preset": "kawaii",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F24_CALCULATED_PITCH_LFO"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 354.27,
+      "hnrDb": 12.17,
       "jitter": 0.02866
     },
     {
@@ -2547,15 +2589,17 @@
       "preset": "amae",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F23_ERRATIC_PITCH_WARBLE",
         "F26_INTERNAL_REBOUND_SHOCK"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
-      "jitter": 0.03595
+      "f0MedianHz": 318.23,
+      "hnrDb": 12.03,
+      "jitter": 0.0334
     },
     {
       "id": "tokiko_ohayo_genki",
@@ -2563,14 +2607,16 @@
       "preset": "genki",
       "source": "poidowl/tokiko-axis/kuda.mjs",
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F23_ERRATIC_PITCH_WARBLE",
         "F24_CALCULATED_PITCH_LFO"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 372.24,
+      "hnrDb": 11.86,
       "jitter": 0.03486
     }
   ],
@@ -2583,19 +2629,23 @@
       "auditGroup": "benign_real_audio",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Chakrulo_(1957).ogg",
       "license": "Public Domain (1957 folk recording)",
+      "licenseUrl": null,
+      "artist": null,
       "sha256": "8bc5e5fc163cb658f1e3fc2571c86ab2dd2108e374a03d425a757e8f4ebee7e8",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F5_ABRUPT_TAIL"
       ],
+      "shelfTriggered": [],
       "allTriggered": [
         "F5_ABRUPT_TAIL",
         "F24_CALCULATED_PITCH_LFO"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 206.41,
+      "hnrDb": 13.33,
       "jitter": 0.02148
     },
     {
@@ -2606,18 +2656,22 @@
       "auditGroup": "benign_real_audio",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/W._A._Mozart_-_Die_Zauberfl%C3%B6te_-_06._Hm,_hm,_hm_(Ferenc_Fricsay,_1953).ogg",
       "license": "Public Domain (1953 performance)",
+      "licenseUrl": null,
+      "artist": null,
       "sha256": "35cbbff54f6762865fed7ca11c4bcccfefa83ba3c1482633462df6a5b420f0f0",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F14_HELMHOLTZ_ROUGHNESS",
         "F23_ERRATIC_PITCH_WARBLE"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
-      "jitter": 0.18376
+      "f0MedianHz": 154.89,
+      "hnrDb": 7.52,
+      "jitter": 0.16371
     },
     {
       "id": "clip_03",
@@ -2627,19 +2681,25 @@
       "auditGroup": "historical_recording",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Metropolitan_Quartet_-_Darling_Nellie_Gray_(1909).ogg",
       "license": "Public Domain (PD-US-1909)",
+      "licenseUrl": null,
+      "artist": null,
       "sha256": "1ee632602e9a593ec144e40ffb940ed04ada6880d03d64d04b0d797894275e66",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [
+        "F17_HOLLOW_METALLIC_COMB"
+      ],
       "allTriggered": [
         "F14_HELMHOLTZ_ROUGHNESS",
         "F17_HOLLOW_METALLIC_COMB",
         "F23_ERRATIC_PITCH_WARBLE"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
-      "jitter": 0.24184
+      "f0MedianHz": 121.16,
+      "hnrDb": 5.47,
+      "jitter": 0.23363
     },
     {
       "id": "clip_04",
@@ -2649,21 +2709,25 @@
       "auditGroup": "historical_recording",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Au_Clair_de_la_Lune_(1860).ogg",
       "license": "Public Domain (1860 phonautogram; First Sounds CC-BY-1.0 restoration)",
+      "licenseUrl": null,
+      "artist": null,
       "sha256": "c12ad24a202c7efd644d23bdd6b45c702650f3f574a41d555e991bb381a7eb3c",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F4_NO_COMMON_CAUSE",
         "F5_ABRUPT_TAIL"
       ],
+      "shelfTriggered": [],
       "allTriggered": [
         "F4_NO_COMMON_CAUSE",
         "F5_ABRUPT_TAIL",
         "F23_ERRATIC_PITCH_WARBLE"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 299.09,
+      "hnrDb": 13.01,
       "jitter": 0.10499
     },
     {
@@ -2674,19 +2738,23 @@
       "auditGroup": "benign_real_audio",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/El_Noi_de_la_Mare_(guitar).ogg",
       "license": "Public Domain / CC0",
+      "licenseUrl": null,
+      "artist": null,
       "sha256": "72e24e840375e791d90c2a8cba926b8e6254c9e28319886fc086d9b45ae25f8b",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F12_MENACING_LOW_REGISTER",
         "F14_HELMHOLTZ_ROUGHNESS",
         "F23_ERRATIC_PITCH_WARBLE"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
-      "jitter": 0.15612
+      "f0MedianHz": 116.94,
+      "hnrDb": 7.97,
+      "jitter": 0.18888
     },
     {
       "id": "clip_06",
@@ -2695,18 +2763,22 @@
       "category": "human_baby_laugh",
       "auditGroup": "benign_real_audio",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Baby_Laugh.ogg",
-      "license": "Wikimedia Commons (Freesound; see Commons file page for exact license)",
+      "license": "CC BY 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+      "artist": "reinsamba",
       "sha256": "43c46bdc7ff19c045d24a457d77d74aa51480d22bf1b286ab81471ac16c70637",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F23_ERRATIC_PITCH_WARBLE",
         "F24_CALCULATED_PITCH_LFO"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 404,
+      "hnrDb": 11.3,
       "jitter": 0.04624
     },
     {
@@ -2716,20 +2788,26 @@
       "category": "animal_menacing_hiss",
       "auditGroup": "expected_unkawaii",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Cat_hissing_-_Zabuhailo.wav",
-      "license": "Wikimedia Commons (Freesound; see Commons file page for exact license)",
+      "license": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "artist": "Zabuhailo",
       "sha256": "49d152839c2ebbab44f5339f61c3fef71a1ea4f72f9c87ae0b2cc7633316b6b6",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [
+        "F25_AUTOTUNE_STAIRCASE"
+      ],
       "allTriggered": [
         "F13_SUBBASS_RUMBLE",
         "F14_HELMHOLTZ_ROUGHNESS",
         "F23_ERRATIC_PITCH_WARBLE",
         "F25_AUTOTUNE_STAIRCASE"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 1021.28,
+      "hnrDb": 12.17,
       "jitter": 0.21794
     },
     {
@@ -2740,13 +2818,24 @@
       "auditGroup": "expected_unkawaii",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Alarm_or_siren.ogg",
       "license": "Public Domain (pdsounds.org #313, author stephan)",
+      "licenseUrl": null,
+      "artist": null,
       "sha256": "775db6f3fe20f7eccd8052afb9690519cee79fc277d578fabd143dcbc0422121",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F5_ABRUPT_TAIL",
         "F6_PHYSICAL_GLITCH"
+      ],
+      "shelfTriggered": [
+        "F6_PHYSICAL_GLITCH",
+        "F7_FLAT_TOP_CLIPPING",
+        "F9_MICRO_CLICK_DROPOUT",
+        "F17_HOLLOW_METALLIC_COMB",
+        "F22_MONOTONE_FLAT_PROSODY",
+        "F27_METRONOMIC_CADENCE"
       ],
       "allTriggered": [
         "F5_ABRUPT_TAIL",
@@ -2760,8 +2849,8 @@
         "F27_METRONOMIC_CADENCE",
         "F28_MAINS_HUM_DRONE"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 102.19,
+      "hnrDb": 14.19,
       "jitter": 0.12438
     },
     {
@@ -2772,15 +2861,19 @@
       "auditGroup": "benign_real_audio",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Red-winged_Blackbird_(Agelaius_phoeniceus).ogg",
       "license": "Public Domain (US Fish and Wildlife Service)",
+      "licenseUrl": null,
+      "artist": null,
       "sha256": "955b8b237c535fe6c8e1e46100a692009ef71c78f25c490c0988e77d09c14461",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F1_HARSH_EDGE",
         "F3_PURE_NOISE",
         "F4_NO_COMMON_CAUSE"
       ],
+      "shelfTriggered": [],
       "allTriggered": [
         "F1_HARSH_EDGE",
         "F3_PURE_NOISE",
@@ -2788,9 +2881,9 @@
         "F14_HELMHOLTZ_ROUGHNESS",
         "F28_MAINS_HUM_DRONE"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
-      "jitter": 0.53829
+      "f0MedianHz": 135.88,
+      "hnrDb": 2.26,
+      "jitter": 0.2407
     },
     {
       "id": "clip_10",
@@ -2800,13 +2893,20 @@
       "auditGroup": "expected_unkawaii",
       "sourceUrl": "derived://clip_05",
       "license": "Public Domain / CC0 (derived from clip_05)",
+      "licenseUrl": null,
+      "artist": null,
       "sha256": "5779f843fd37cdb6d3287f94aa7ffaf1d2c36fef3d8e9a99aa2f4519296e90f0",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F4_NO_COMMON_CAUSE",
         "F6_PHYSICAL_GLITCH"
+      ],
+      "shelfTriggered": [
+        "F6_PHYSICAL_GLITCH",
+        "F9_MICRO_CLICK_DROPOUT"
       ],
       "allTriggered": [
         "F4_NO_COMMON_CAUSE",
@@ -2818,9 +2918,9 @@
         "F23_ERRATIC_PITCH_WARBLE",
         "F28_MAINS_HUM_DRONE"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
-      "jitter": 0.23987
+      "f0MedianHz": 67.4,
+      "hnrDb": 6.54,
+      "jitter": 0.31295
     },
     {
       "id": "p1_baby",
@@ -2829,15 +2929,19 @@
       "category": "animal_baby_lamb",
       "auditGroup": "benign_real_audio",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Mudchute_lamb_1.ogg",
-      "license": "Wikimedia Commons (see Commons file page for exact license)",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+      "artist": "Secretlondon",
       "sha256": "19e229260bbd83c270db8f019be065d137ac1daacc627965433d995c50a65b67",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F3_PURE_NOISE",
         "F5_ABRUPT_TAIL"
       ],
+      "shelfTriggered": [],
       "allTriggered": [
         "F3_PURE_NOISE",
         "F5_ABRUPT_TAIL",
@@ -2854,13 +2958,20 @@
       "category": "animal_adult_sheep",
       "auditGroup": "neutral_adult_animal",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Mudchute_sheep_1.ogg",
-      "license": "Wikimedia Commons (see Commons file page for exact license)",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+      "artist": "Secretlondon",
       "sha256": "7c41f39798c109e70260d0222352b023d487b4badbfe0ee377c9b7498bb8368a",
-      "sha256Match": true,
+      "sha256Match": false,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F6_PHYSICAL_GLITCH"
+      ],
+      "shelfTriggered": [
+        "F6_PHYSICAL_GLITCH",
+        "F31_PRESSED_STRAIN"
       ],
       "allTriggered": [
         "F6_PHYSICAL_GLITCH",
@@ -2869,9 +2980,9 @@
         "F23_ERRATIC_PITCH_WARBLE",
         "F31_PRESSED_STRAIN"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
-      "jitter": 0.16482
+      "f0MedianHz": 141.14,
+      "hnrDb": 7.22,
+      "jitter": 0.16411
     },
     {
       "id": "p2_baby",
@@ -2880,23 +2991,27 @@
       "category": "animal_young_cat_meow",
       "auditGroup": "benign_real_audio",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Maullido_de_gata_hembra_joven.ogg",
-      "license": "Wikimedia Commons (see Commons file page for exact license)",
+      "license": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "artist": "George Miquilena",
       "sha256": "5b1d90a87248f9a32aea8a71f0c87e9d02223008d3e7d3952efc038d65653ab3",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F5_ABRUPT_TAIL"
       ],
+      "shelfTriggered": [],
       "allTriggered": [
         "F5_ABRUPT_TAIL",
         "F12_MENACING_LOW_REGISTER",
         "F13_SUBBASS_RUMBLE",
         "F23_ERRATIC_PITCH_WARBLE"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
-      "jitter": 0.25883
+      "f0MedianHz": 76.24,
+      "hnrDb": 6.69,
+      "jitter": 0.34809
     },
     {
       "id": "p2_adult",
@@ -2905,20 +3020,26 @@
       "category": "animal_menacing_hiss",
       "auditGroup": "expected_unkawaii",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Cat_hissing_-_Zabuhailo.wav",
-      "license": "Wikimedia Commons (Freesound; see Commons file page for exact license)",
+      "license": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "artist": "Zabuhailo",
       "sha256": "49d152839c2ebbab44f5339f61c3fef71a1ea4f72f9c87ae0b2cc7633316b6b6",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [
+        "F25_AUTOTUNE_STAIRCASE"
+      ],
       "allTriggered": [
         "F13_SUBBASS_RUMBLE",
         "F14_HELMHOLTZ_ROUGHNESS",
         "F23_ERRATIC_PITCH_WARBLE",
         "F25_AUTOTUNE_STAIRCASE"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 1021.28,
+      "hnrDb": 12.17,
       "jitter": 0.21794
     },
     {
@@ -2928,18 +3049,22 @@
       "category": "human_baby_laugh",
       "auditGroup": "benign_real_audio",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Baby_Laugh.ogg",
-      "license": "Wikimedia Commons (Freesound; see Commons file page for exact license)",
+      "license": "CC BY 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+      "artist": "reinsamba",
       "sha256": "43c46bdc7ff19c045d24a457d77d74aa51480d22bf1b286ab81471ac16c70637",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F23_ERRATIC_PITCH_WARBLE",
         "F24_CALCULATED_PITCH_LFO"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 404,
+      "hnrDb": 11.3,
       "jitter": 0.04624
     },
     {
@@ -2950,15 +3075,19 @@
       "auditGroup": "benign_real_audio",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Chakrulo_(1957).ogg",
       "license": "Public Domain (1957 folk recording)",
+      "licenseUrl": null,
+      "artist": null,
       "sha256": "dc2aeed8ad8dfc6d6c88c96d0259f995730daaaaef4ff79a95c4d02f57ff8012",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "SURVIVED_KAWAII_CANDIDATE",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
-      "jitter": 0.02578
+      "f0MedianHz": 201.66,
+      "hnrDb": 12.2,
+      "jitter": 0.03976
     },
     {
       "id": "p4_baby",
@@ -2967,14 +3096,18 @@
       "category": "animal_small_squirrel",
       "auditGroup": "benign_real_audio",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/A_three-striped_palm_squirrel_(Funambulus_palmarum)_chirping_16January2015.oga",
-      "license": "Wikimedia Commons (see Commons file page for exact license)",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "Subhashish Panigrahi",
       "sha256": "2867d6ec1bdcfcaba2dd5620506d41468421edbeabc06e7c6e663cce929940d4",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F4_NO_COMMON_CAUSE"
       ],
+      "shelfTriggered": [],
       "allTriggered": [
         "F4_NO_COMMON_CAUSE",
         "F14_HELMHOLTZ_ROUGHNESS",
@@ -2982,9 +3115,9 @@
         "F23_ERRATIC_PITCH_WARBLE",
         "F24_CALCULATED_PITCH_LFO"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
-      "jitter": 0.18487
+      "f0MedianHz": 991.74,
+      "hnrDb": 15.99,
+      "jitter": 0.18043
     },
     {
       "id": "p4_adult",
@@ -2993,13 +3126,20 @@
       "category": "animal_menacing_boar_growl",
       "auditGroup": "expected_unkawaii",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Boar.Grwls(1).ogg",
-      "license": "Wikimedia Commons (see Commons file page for exact license)",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "GrWolf1129",
       "sha256": "90748a4eeba290e56ea82c7fa9d6feda450600c70d13b2df419f7ede41e29ecd",
       "sha256Match": true,
       "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
         "F5_ABRUPT_TAIL"
+      ],
+      "shelfTriggered": [
+        "F17_HOLLOW_METALLIC_COMB",
+        "F18_MUDDY_BOXINESS"
       ],
       "allTriggered": [
         "F5_ABRUPT_TAIL",
@@ -3008,9 +3148,9 @@
         "F18_MUDDY_BOXINESS",
         "F23_ERRATIC_PITCH_WARBLE"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
-      "jitter": 0.32733
+      "f0MedianHz": 139.35,
+      "hnrDb": 5.38,
+      "jitter": 0.30166
     },
     {
       "id": "p5_baby",
@@ -3019,20 +3159,24 @@
       "category": "animal_small_dog_bark",
       "auditGroup": "benign_real_audio",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Bark_Huayra.ogg",
-      "license": "Wikimedia Commons (see Commons file page for exact license)",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "artist": "redpanal.org",
       "sha256": "77f2bfb3d43ae084ab971d5d8e35336b43b3d49d8982c6c671eab78bd2fedfe9",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F11_PUMPING_TREMOLO",
         "F14_HELMHOLTZ_ROUGHNESS",
         "F23_ERRATIC_PITCH_WARBLE",
         "F24_CALCULATED_PITCH_LFO"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
+      "f0MedianHz": 207.89,
+      "hnrDb": 3.79,
       "jitter": 0.12998
     },
     {
@@ -3042,19 +3186,23 @@
       "category": "animal_menacing_giant_canine",
       "auditGroup": "expected_unkawaii",
       "sourceUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Giant_Canine_(Koopzilla)_Sounds.ogg",
-      "license": "Wikimedia Commons (see Commons file page for exact license)",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "artist": "LokYYs",
       "sha256": "c5ce9734358e111a4f105c52fbc9c2ab0093782e30af34a2c3bdbd8112f74a78",
       "sha256Match": true,
       "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [],
+      "shelfTriggered": [],
       "allTriggered": [
         "F14_HELMHOLTZ_ROUGHNESS",
         "F23_ERRATIC_PITCH_WARBLE"
       ],
-      "f0MedianHz": 0,
-      "hnrDb": 0,
-      "jitter": 0.41625
+      "f0MedianHz": 114.38,
+      "hnrDb": 2.51,
+      "jitter": 0.26407
     }
   ]
 }

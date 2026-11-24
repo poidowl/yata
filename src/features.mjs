@@ -179,7 +179,7 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
 
   const hopMs = opts.hopMs ?? 10;
   const melBands = opts.melBands ?? 48;
-  const fMin = opts.fMin ?? 60;
+  const fMin = opts.fMin ?? 30;
   const fMax = opts.fMax ?? 8000;
 
   const frameSize = Math.max(256, Math.round(sampleRate * 0.025)); // 25ms (v0.1 exact)

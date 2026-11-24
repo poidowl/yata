@@ -2,7 +2,7 @@
 /**
  * bench/build_demo.mjs — Self-Contained Interactive A/B Audition Demo Builder
  *
- * Generates `/home/antigravity/poidowl/yata/bench/yata_audition_demo.html`:
+ * Generates `bench/yata_audition_demo.html`:
  *   - 100% self-contained single-file HTML (zero external URLs, zero CDN, offline-ready)
  *   - All 9 positive survivors + all 32 falsifier A/B pairs (F7–F32 new + F1–F6 core)
  *   - Optional bonus section with real Japanese speech from `tokiko-axis/kuda.mjs` (skips gracefully if absent)
@@ -11,7 +11,7 @@
  *   - One-click A/B playback + human judgement tally + Markdown export (with clipboard fallback modal)
  *
  * Usage:
- *   node bench/build_demo.mjs
+ *   node bench/build_demo.mjs [--tokiko-dir <path>]
  *   npm run build:demo
  *
  * Zero external dependencies. Pure ES Module.
@@ -33,8 +33,24 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const REPO_ROOT = path.resolve(__dirname, "..");
 const OUT_HTML = path.join(__dirname, "yata_audition_demo.html");
-const KUDA_PATH = "/home/antigravity/poidowl/tokiko-axis/kuda.mjs";
+
+function resolveKudaPath(argv) {
+  let dirOrFile = null;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--tokiko-dir" && argv[i + 1]) {
+      dirOrFile = argv[++i];
+    } else if (argv[i].startsWith("--tokiko-dir=")) {
+      dirOrFile = argv[i].slice("--tokiko-dir=".length);
+    }
+  }
+  const base = dirOrFile || process.env.TOKIKO_PATH || path.resolve(REPO_ROOT, "../tokiko-axis");
+  const resolved = path.resolve(base);
+  return resolved.endsWith(".mjs") ? resolved : path.join(resolved, "kuda.mjs");
+}
+
+const KUDA_PATH = resolveKudaPath(process.argv.slice(2));
 
 const SR = 24000;
 const SEED = 2026;

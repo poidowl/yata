@@ -49,13 +49,23 @@ function formatWhere(where) {
  *   channels?: Float32Array[],
  *   includeProfile?: boolean,
  *   thresholds?: Record<string, number | Record<string, number>>,
- *   policy?: "veto_all" | "core_veto"
+ *   policy?: "core_veto" | "veto_all" | "shelf_veto",
+ *   contestedIds?: Iterable<string>
  * }} [options={}]
  */
 export function analyzeSamples(samples, sampleRate, options = {}) {
   const label = options.label || "untitled";
   const falsifiers = options.falsifiers || DEFAULT_FALSIFIERS;
-  const policy = options.policy === "core_veto" ? "core_veto" : "veto_all";
+  const policy =
+    options.policy === "veto_all" || options.policy === "shelf_veto" || options.policy === "core_veto"
+      ? options.policy
+      : "core_veto";
+  const contestedSet =
+    policy === "shelf_veto" && options.contestedIds
+      ? options.contestedIds instanceof Set
+        ? options.contestedIds
+        : new Set(Array.from(options.contestedIds))
+      : null;
   const featOpts = options.channels ? { channels: options.channels } : {};
   const features = extractFeatures(samples, sampleRate, featOpts);
   const thresholds = options.thresholds && typeof options.thresholds === "object" ? options.thresholds : null;
@@ -77,8 +87,13 @@ export function analyzeSamples(samples, sampleRate, options = {}) {
       evidence: typeof out.evidence === "string" ? out.evidence : "",
       hint: typeof out.hint === "string" ? out.hint : "",
     };
-    if (policy === "core_veto" && isTriggered && !CORE_FALSIFIER_IDS.has(fn.id)) {
-      entry.diagnostic = true;
+    if (isTriggered) {
+      if (policy === "core_veto" && !CORE_FALSIFIER_IDS.has(fn.id)) {
+        entry.diagnostic = true;
+      } else if (policy === "shelf_veto" && contestedSet && contestedSet.has(fn.id)) {
+        entry.diagnostic = true;
+        entry.contested = true;
+      }
     }
     if (out.where && typeof out.where === "object") {
       entry.where = out.where;
@@ -86,14 +101,8 @@ export function analyzeSamples(samples, sampleRate, options = {}) {
     return entry;
   });
 
-  const vetoTriggered =
-    policy === "core_veto"
-      ? results.filter((r) => r.triggered && CORE_FALSIFIER_IDS.has(r.id))
-      : results.filter((r) => r.triggered);
-  const diagnosticTriggered =
-    policy === "core_veto"
-      ? results.filter((r) => r.triggered && !CORE_FALSIFIER_IDS.has(r.id))
-      : [];
+  const vetoTriggered = results.filter((r) => r.triggered && !r.diagnostic);
+  const diagnosticTriggered = results.filter((r) => r.triggered && r.diagnostic);
   const survived = vetoTriggered.length === 0;
 
   let mirrorSummary;
@@ -105,6 +114,15 @@ export function analyzeSamples(samples, sampleRate, options = {}) {
       mirrorSummary = `Mirror clear (core_veto): no core veto triggered; ${diagnosticTriggered.length} diagnostic note(s): ${diagnosticTriggered.map((t) => `${t.id} (${t.name})`).join("; ")}.`;
     } else {
       mirrorSummary = `Mirror reflects (core_veto): ${vetoTriggered.map((t) => `${t.id} (${t.name})`).join("; ")}.`;
+    }
+  } else if (policy === "shelf_veto") {
+    if (survived && diagnosticTriggered.length === 0) {
+      mirrorSummary =
+        "Mirror clear: failed to detect any 'do-not-want-to-be-with' signature across all dimensions.";
+    } else if (survived) {
+      mirrorSummary = `Mirror clear (shelf_veto): no non-contested veto triggered; ${diagnosticTriggered.length} contested diagnostic note(s): ${diagnosticTriggered.map((t) => `${t.id} (${t.name})`).join("; ")}.`;
+    } else {
+      mirrorSummary = `Mirror reflects (shelf_veto): ${vetoTriggered.map((t) => `${t.id} (${t.name})`).join("; ")}.`;
     }
   } else {
     mirrorSummary = survived
@@ -207,9 +225,11 @@ export function compareReports(reportA, reportB) {
 export function formatForLLM(report, opts = { verbose: false }) {
   const verbose = Boolean(opts?.verbose);
   const f = report.features || {};
+  const policy = report.policy || "core_veto";
+  const diagCount = Number.isFinite(report.diagnosticCount) ? report.diagnosticCount : 0;
   const lines = [
     `[UNKAWAII REPORT] ${report.label}`,
-    `VERDICT: ${report.verdict} (${report.triggeredCount}/${report.totalFalsifiers} falsifiers triggered)`,
+    `VERDICT: ${report.verdict} [policy=${policy}] (${report.triggeredCount}/${report.totalFalsifiers} veto, ${diagCount} diagnostic)`,
     `MIRROR: ${report.mirrorSummary}`,
     `OBSERVABLES: dur=${f.durationSec}s | atk=${f.maxAttackSlope} | hf=${f.meanHfRatio} | voiced=${f.voicedRatio} | f0=${f.medianF0 ?? 0}Hz | hnr=${f.meanVoicedHnrDb ?? 0}dB | rough=${f.meanRoughness ?? 0} | tail=${f.tailDecaySec}s`,
   ];
@@ -219,7 +239,13 @@ export function formatForLLM(report, opts = { verbose: false }) {
   if (verbose) {
     lines.push("DIMENSIONS:");
     for (const dim of all) {
-      const mark = dim.triggered ? (dim.diagnostic ? "DIAG     " : "TRIGGERED") : "clear    ";
+      const mark = dim.triggered
+        ? dim.contested
+          ? "CONTESTED"
+          : dim.diagnostic
+            ? "DIAG     "
+            : "VETO     "
+        : "clear    ";
       lines.push(
         `  - [${mark}] ${dim.id}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
       );
@@ -236,7 +262,7 @@ export function formatForLLM(report, opts = { verbose: false }) {
   const clearCount = all.length - vetoTriggered.length - diagTriggered.length;
 
   if (vetoTriggered.length === 0 && diagTriggered.length === 0) {
-    lines.push(`TRIGGERED: none (all ${all.length} dimensions clear)`);
+    lines.push(`VETO: none (all ${all.length} dimensions clear)`);
     const nearMiss = all
       .filter((d) => d.score > 0)
       .sort((a, b) => b.score - a.score)
@@ -248,7 +274,7 @@ export function formatForLLM(report, opts = { verbose: false }) {
     }
   } else {
     if (vetoTriggered.length > 0) {
-      lines.push("TRIGGERED:");
+      lines.push(`VETO (${vetoTriggered.length}):`);
       for (const dim of vetoTriggered) {
         lines.push(
           `  - ${dim.id}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
@@ -258,13 +284,15 @@ export function formatForLLM(report, opts = { verbose: false }) {
         }
       }
     } else {
-      lines.push("TRIGGERED: none (core_veto clear)");
+      lines.push(`VETO: none (${policy} clear)`);
     }
     if (diagTriggered.length > 0) {
-      lines.push(`DIAGNOSTIC (${diagTriggered.length} non-veto toolbox):`);
+      const diagLabel = policy === "shelf_veto" ? "contested/non-veto" : "non-veto toolbox";
+      lines.push(`DIAGNOSTIC (${diagTriggered.length} ${diagLabel}):`);
       for (const dim of diagTriggered) {
+        const tag = dim.contested ? " [CONTESTED]" : "";
         lines.push(
-          `  - ${dim.id}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
+          `  - ${dim.id}${tag}${formatWhere(dim.where)} (score=${dim.score}, thr=${dim.threshold}) | ${dim.evidence}`
         );
       }
     }

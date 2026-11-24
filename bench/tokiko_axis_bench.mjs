@@ -2,17 +2,37 @@
 /**
  * bench/tokiko_axis_bench.mjs — Optional Read-Only `tokiko-axis` Real-Speech Benchmark
  *
- * Gracefully skips with exit 0 if `/home/antigravity/poidowl/tokiko-axis/kuda.mjs`
- * is not present on this machine. Never imported by yata's core library.
+ * Gracefully skips with exit 0 if `tokiko-axis/kuda.mjs` is not present.
+ * Path resolution order: `--tokiko-dir <path>`, `process.env.TOKIKO_PATH`,
+ * or relative sibling `../tokiko-axis`. Never imported by yata's core library.
  *
  * Zero external dependencies. Pure ES Module.
  */
 
 import fs from "node:fs";
-import { pathToFileURL } from "node:url";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { analyzeSamples, DEFAULT_FALSIFIERS } from "../unkawaii_detector.mjs";
 
-const KUDA_PATH = "/home/antigravity/poidowl/tokiko-axis/kuda.mjs";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const REPO_ROOT = path.resolve(__dirname, "..");
+
+function resolveKudaPath(argv) {
+  let dirOrFile = null;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--tokiko-dir" && argv[i + 1]) {
+      dirOrFile = argv[++i];
+    } else if (argv[i].startsWith("--tokiko-dir=")) {
+      dirOrFile = argv[i].slice("--tokiko-dir=".length);
+    }
+  }
+  const base = dirOrFile || process.env.TOKIKO_PATH || path.resolve(REPO_ROOT, "../tokiko-axis");
+  const resolved = path.resolve(base);
+  return resolved.endsWith(".mjs") ? resolved : path.join(resolved, "kuda.mjs");
+}
+
+const KUDA_PATH = resolveKudaPath(process.argv.slice(2));
 
 if (!fs.existsSync(KUDA_PATH)) {
   console.log(`[tokiko_axis_bench] Optional reference not found at ${KUDA_PATH}; skipping gracefully.`);

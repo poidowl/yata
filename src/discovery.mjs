@@ -49,6 +49,7 @@ export function runDiscoveryLoop(opts = {}) {
     const repAll = analyzeSamples(item.samples, item.sampleRate, {
       label: item.id,
       falsifiers: fullFalsifiers,
+      policy: "veto_all",
       ...chOpt,
     });
     const survived = repAll.verdict === "SURVIVED_KAWAII_CANDIDATE" && repAll.triggeredCount === 0;
@@ -84,11 +85,13 @@ export function runDiscoveryLoop(opts = {}) {
     const repCore = analyzeSamples(item.samples, item.sampleRate, {
       label: item.id,
       falsifiers: coreFalsifiers,
+      policy: "veto_all",
       ...chOpt,
     });
     const repAll = analyzeSamples(item.samples, item.sampleRate, {
       label: item.id,
       falsifiers: fullFalsifiers,
+      policy: "veto_all",
       ...chOpt,
     });
 
@@ -147,6 +150,7 @@ export function runDiscoveryLoop(opts = {}) {
     const repAll = analyzeSamples(item.samples, item.sampleRate, {
       label: item.id,
       falsifiers: fullFalsifiers,
+      policy: "veto_all",
     });
     if (repAll.verdict === "REJECTED_UNKAWAII") legacyCaughtByAll32++;
   }

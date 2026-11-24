@@ -64,15 +64,21 @@ export const ORIGINAL_6_FALSIFIERS = [
       const voicedRatio = num(f.voicedRatio);
       const jitter = num(f.jitter);
       const shimmer = num(f.shimmer);
-      const score = voicedRatio >= 0.4 ? round3(1 - Math.min(1, jitter * 200 + shimmer * 25)) : 0;
       const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.7);
-      const minJitter = num(opts?.minJitter, 0.00015);
+      const minVoiced = num(opts?.minVoicedRatio, 0.45);
+      const minJitter = num(opts?.minJitter, 0.00025);
+      const minJitterShimmer = num(opts?.minJitterShimmer, 0.04);
       const softJitter = num(opts?.softJitter, 0.0025);
-      const softShimmer = num(opts?.softShimmer, 0.012);
+      const softShimmer = num(opts?.softShimmer, 0.015);
+      const baseScore = 1 - Math.min(1, jitter * 200 + shimmer * 20);
+      const zeroJitterScore =
+        jitter <= minJitter && shimmer <= minJitterShimmer ? Math.max(0.75, 1 - shimmer * 6) : 0;
+      const score = voicedRatio >= minVoiced ? round3(Math.max(baseScore, zeroJitterScore)) : 0;
       const triggered = isNumericOverride
-        ? voicedRatio >= 0.4 && score > threshold
-        : voicedRatio >= 0.4 &&
-          ((jitter < minJitter && shimmer < 0.025) || (jitter < softJitter && shimmer < softShimmer));
+        ? voicedRatio >= minVoiced && score > threshold
+        : voicedRatio >= minVoiced &&
+          ((jitter <= minJitter && shimmer <= minJitterShimmer) ||
+            (jitter <= softJitter && shimmer <= softShimmer));
       return {
         triggered,
         score,

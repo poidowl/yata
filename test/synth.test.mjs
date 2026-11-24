@@ -36,6 +36,7 @@ describe("M4A: Synthetic Corpus & Discovery Loop", () => {
       const rep = analyzeSamples(item.samples, item.sampleRate, {
         label: item.id,
         falsifiers: DEFAULT_FALSIFIERS,
+        policy: "veto_all",
         ...(item.channels ? { channels: item.channels } : {}),
       });
       const triggered = rep.falsifiers.filter((f) => f.triggered).map((f) => `${f.id}(${f.score})`);
@@ -63,11 +64,13 @@ describe("M4A: Synthetic Corpus & Discovery Loop", () => {
       const repCore = analyzeSamples(item.samples, item.sampleRate, {
         label: item.id,
         falsifiers: ORIGINAL_6_FALSIFIERS,
+        policy: "veto_all",
         ...chOpt,
       });
       const repAll = analyzeSamples(item.samples, item.sampleRate, {
         label: item.id,
         falsifiers: DEFAULT_FALSIFIERS,
+        policy: "veto_all",
         ...chOpt,
       });
 

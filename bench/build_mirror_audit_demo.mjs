@@ -1,18 +1,22 @@
 #!/usr/bin/env node
 /**
- * bench/build_mirror_audit_demo.mjs — Blind Mirror Audit HTML Demo Builder (v0.3)
+ * bench/build_mirror_audit_demo.mjs — Blind Mirror Audit HTML Demo Builder (v0.4)
  *
- * Implements Observer #1's proposal:
+ * Implements Observer #1's proposal & v0.4 3-choice upgrade:
  *   "First listen blind to 'naru' original vs a version altered just to clear F24.
- *    If the original is preferred, that single vote challenges F24's veto power.
- *    If sound is judged by the mirror, the mirror must also be judged by the ear."
+ *    Next, place a 3rd take that keeps the Japanese accent hill while damping only
+ *    the periodic oscillation F24 caught — that's where we discover what part of the
+ *    phrasing the ear actually loves."
  *
- * Generates `/home/antigravity/poidowl/yata/bench/mirror_audit_demo.html`:
+ * Generates `bench/mirror_audit_demo.html`:
  *   - 100% self-contained single-file HTML (zero external URLs, embedded PCM16 WAV base64)
- *   - 6 blind A/B pairs (Original vs Mirror-Compliant / Flattened) with randomized Take X / Take Y
+ *   - 3 blind 3-choice "なる" tests (Original vs Accent-Kept/Vibrato-Damped vs Fully Flat)
+ *     plus 3 blind 2-choice tests for longer utterances, with randomized Take X / Y / Z order
  *   - Labels and yata verdicts are strictly hidden until the user votes
- *   - Post-vote reveal shows exact triggered axes (truthfully from analyzeSamples) and tallies
- *     whether the ear overrules the mirror's veto.
+ *   - Post-vote reveal shows exact core_veto, veto_all, and F24 score/depth/range for each take
+ *
+ * Usage:
+ *   node bench/build_mirror_audit_demo.mjs [--tokiko-dir <path>]
  *
  * Zero external dependencies. Pure ES Module.
  */
@@ -29,9 +33,23 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const REPO_ROOT = path.resolve(__dirname, "..");
 const OUT_HTML = path.join(__dirname, "mirror_audit_demo.html");
-const KUDA_PATH = "/home/antigravity/poidowl/tokiko-axis/kuda.mjs";
 const SR = 24000;
+
+function resolveKudaPath(argv) {
+  let dirOrFile = null;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--tokiko-dir" && argv[i + 1]) {
+      dirOrFile = argv[++i];
+    } else if (argv[i].startsWith("--tokiko-dir=")) {
+      dirOrFile = argv[i].slice("--tokiko-dir=".length);
+    }
+  }
+  const base = dirOrFile || process.env.TOKIKO_PATH || path.resolve(REPO_ROOT, "../tokiko-axis");
+  const resolved = path.resolve(base);
+  return resolved.endsWith(".mjs") ? resolved : path.join(resolved, "kuda.mjs");
+}
 
 function lowpass1Pole(samples, sr, cutoffHz) {
   const rc = 1 / (2 * Math.PI * cutoffHz);
@@ -61,174 +79,298 @@ function safeJsonForScript(obj) {
 }
 
 function summarizeReport(samples, label) {
-  const repAll = analyzeSamples(samples, SR, { label, falsifiers: DEFAULT_FALSIFIERS });
-  const repCore = analyzeSamples(samples, SR, { label, falsifiers: ORIGINAL_6_FALSIFIERS });
+  const repAll = analyzeSamples(samples, SR, {
+    label,
+    falsifiers: DEFAULT_FALSIFIERS,
+    policy: "veto_all",
+  });
+  const repCore = analyzeSamples(samples, SR, {
+    label,
+    falsifiers: DEFAULT_FALSIFIERS,
+    policy: "core_veto",
+  });
   const triggeredAll = repAll.falsifiers
     .filter((f) => f.triggered)
     .map((f) => ({
       id: f.id,
       shortId: f.id.split("_")[0],
+      score: f.score,
       evidence: f.evidence || "",
     }));
   const triggeredCore = repCore.falsifiers
-    .filter((f) => f.triggered)
+    .filter((f) => f.triggered && ORIGINAL_6_FALSIFIERS.some((c) => c.id === f.id))
     .map((f) => f.id.split("_")[0]);
+  const f24 = repAll.falsifiers.find((f) => f.id === "F24_CALCULATED_PITCH_LFO");
 
   return {
     verdictAll: repAll.verdict,
     verdictCore: repCore.verdict,
     triggeredAll,
     triggeredCore,
+    f24Triggered: Boolean(f24?.triggered),
+    f24Score: f24 ? f24.score : 0,
+    f24Evidence: f24 ? f24.evidence : "",
+    f0MedianHz: repAll.features?.medianF0 ?? 0,
+    f0RangeSemitones: repAll.features?.f0RangeSemitones ?? 0,
     durationSec: Number((samples.length / SR).toFixed(2)),
   };
 }
 
 async function main() {
-  if (!fs.existsSync(KUDA_PATH)) {
-    throw new Error(`tokiko-axis/kuda.mjs not found at ${KUDA_PATH}; cannot synthesize mirror audit pairs.`);
+  const kudaPath = resolveKudaPath(process.argv.slice(2));
+  if (!fs.existsSync(kudaPath)) {
+    throw new Error(`tokiko-axis/kuda.mjs not found at ${kudaPath}; pass --tokiko-dir <path> or set TOKIKO_PATH.`);
   }
 
-  const kuda = await import(pathToFileURL(KUDA_PATH).href);
+  const kuda = await import(pathToFileURL(kudaPath).href);
   if (typeof kuda.synthKuda !== "function") {
-    throw new Error(`synthKuda export not found in ${KUDA_PATH}`);
+    throw new Error(`synthKuda export not found in ${kudaPath}`);
   }
+  const presets = kuda.KUDA_PRESETS || {};
 
-  const pairSpecs = [
+  const testSpecs = [
     {
-      id: "pair_01_naru_kawaii",
+      id: "test_01_naru_kawaii",
       number: 1,
       utterance: "「なる」",
       preset: "kawaii",
       targetAxes: ["F24"],
-      modificationDesc: "F24（機械ビブラート誤爆）を外すため、ピッチ曲線を 302Hz 固定・hopf=0 に平坦化",
-      originalIsX: true,
-      buildOriginal: () => kuda.synthKuda("なる", { preset: "kawaii", srOut: SR }).samples,
-      buildMirror: () => kuda.synthKuda("なる", { preset: "kawaii", srOut: SR, flatHz: 302, hopf: 0 }).samples,
+      modificationDesc:
+        "3択比較: (1) 原音（アクセント山あり＋F24発火）、(2) 抑揚保持・揺れ弱め版（日本語アクセント山を残し rate×1.35 / hopf=0 で周期揺れのみ低減 → F24未発火・0/32）、(3) 302Hz 完全フラット固定版",
+      order: ["original", "flat", "damped"],
+      takes: {
+        original: {
+          role: "original",
+          roleLabel: "原音（Original / アクセント山あり＋揺れあり）",
+          build: () => kuda.synthKuda("なる", { preset: "kawaii", srOut: SR }).samples,
+        },
+        damped: {
+          role: "damped",
+          roleLabel: "抑揚あり・揺れ弱め（Accent-Kept / Vibrato-Damped）",
+          build: () =>
+            kuda.synthKuda("なる", {
+              preset: "kawaii",
+              srOut: SR,
+              rate: (presets.kawaii?.rate ?? 1.0) * 1.35,
+              hopf: 0,
+            }).samples,
+        },
+        flat: {
+          role: "flat",
+          roleLabel: "完全フラット（Fully Flat / 302Hz固定）",
+          build: () => kuda.synthKuda("なる", { preset: "kawaii", srOut: SR, flatHz: 302, hopf: 0 }).samples,
+        },
+      },
     },
     {
-      id: "pair_02_naru_amae",
+      id: "test_02_naru_amae",
       number: 2,
       utterance: "「なる」",
       preset: "amae",
       targetAxes: ["F24"],
-      modificationDesc: "F24（機械ビブラート誤爆）を外すため、ピッチ曲線を 290Hz 固定・hopf=0 に平坦化",
-      originalIsX: false,
-      buildOriginal: () => kuda.synthKuda("なる", { preset: "amae", srOut: SR }).samples,
-      buildMirror: () => kuda.synthKuda("なる", { preset: "amae", srOut: SR, flatHz: 290, hopf: 0 }).samples,
+      modificationDesc:
+        "3択比較: (1) 原音（アクセント山あり＋F24発火）、(2) 抑揚保持・揺れ弱め版（日本語アクセント山を残し rate×1.30 / hopf=0 で周期揺れのみ低減 → F24未発火・0/32）、(3) 290Hz 完全フラット固定版",
+      order: ["damped", "original", "flat"],
+      takes: {
+        original: {
+          role: "original",
+          roleLabel: "原音（Original / アクセント山あり＋揺れあり）",
+          build: () => kuda.synthKuda("なる", { preset: "amae", srOut: SR }).samples,
+        },
+        damped: {
+          role: "damped",
+          roleLabel: "抑揚あり・揺れ弱め（Accent-Kept / Vibrato-Damped）",
+          build: () =>
+            kuda.synthKuda("なる", {
+              preset: "amae",
+              srOut: SR,
+              rate: (presets.amae?.rate ?? 1.09) * 1.3,
+              hopf: 0,
+            }).samples,
+        },
+        flat: {
+          role: "flat",
+          roleLabel: "完全フラット（Fully Flat / 290Hz固定）",
+          build: () => kuda.synthKuda("なる", { preset: "amae", srOut: SR, flatHz: 290, hopf: 0 }).samples,
+        },
+      },
     },
     {
-      id: "pair_03_naru_genki",
+      id: "test_03_naru_genki",
       number: 3,
       utterance: "「なる」",
       preset: "genki",
       targetAxes: ["F24"],
-      modificationDesc: "F24 を外すため、ピッチ曲線を 320Hz 固定・hopf=0 に平坦化（全軸クリア版）",
-      originalIsX: false,
-      buildOriginal: () => kuda.synthKuda("なる", { preset: "genki", srOut: SR }).samples,
-      buildMirror: () => kuda.synthKuda("なる", { preset: "genki", srOut: SR, flatHz: 320, hopf: 0 }).samples,
+      modificationDesc:
+        "3択比較: (1) 原音（アクセント山あり＋F24発火）、(2) 抑揚保持・揺れ弱め版（日本語アクセント山を残し rate×1.45 / hopf=0.35 で周期揺れのみ低減 → F24未発火・0/32）、(3) 320Hz 完全フラット固定版",
+      order: ["flat", "damped", "original"],
+      takes: {
+        original: {
+          role: "original",
+          roleLabel: "原音（Original / アクセント山あり＋揺れあり）",
+          build: () => kuda.synthKuda("なる", { preset: "genki", srOut: SR }).samples,
+        },
+        damped: {
+          role: "damped",
+          roleLabel: "抑揚あり・揺れ弱め（Accent-Kept / Vibrato-Damped）",
+          build: () =>
+            kuda.synthKuda("なる", {
+              preset: "genki",
+              srOut: SR,
+              rate: (presets.genki?.rate ?? 0.93) * 1.45,
+              hopf: 0.35,
+            }).samples,
+        },
+        flat: {
+          role: "flat",
+          roleLabel: "完全フラット（Fully Flat / 320Hz固定）",
+          build: () => kuda.synthKuda("なる", { preset: "genki", srOut: SR, flatHz: 320, hopf: 0 }).samples,
+        },
+      },
     },
     {
-      id: "pair_04_watashi_amae",
+      id: "test_04_watashi_amae",
       number: 4,
       utterance: "「わたし、にほんご、ちょっとしゃべれます」",
       preset: "amae",
       targetAxes: ["F14", "F23"],
       modificationDesc: "F14（粗さ）・F23（音程揺れ）を抑えるため、2.2kHz 1次ローパスで高域エッジを丸めた版",
-      originalIsX: true,
-      buildOriginal: () => kuda.synthKuda("わたし、にほんご、ちょっとしゃべれます", { preset: "amae", srOut: SR }).samples,
-      buildMirror: () => {
-        const raw = kuda.synthKuda("わたし、にほんご、ちょっとしゃべれます", { preset: "amae", srOut: SR }).samples;
-        return lowpass1Pole(raw, SR, 2200);
+      order: ["original", "flat"],
+      takes: {
+        original: {
+          role: "original",
+          roleLabel: "原音（Original / 加工なし）",
+          build: () => kuda.synthKuda("わたし、にほんご、ちょっとしゃべれます", { preset: "amae", srOut: SR }).samples,
+        },
+        flat: {
+          role: "flat",
+          roleLabel: "鏡に合わせた版（2.2kHz ローパス丸め）",
+          build: () => {
+            const raw = kuda.synthKuda("わたし、にほんご、ちょっとしゃべれます", { preset: "amae", srOut: SR }).samples;
+            return lowpass1Pole(raw, SR, 2200);
+          },
+        },
       },
     },
     {
-      id: "pair_05_ohayo_kawaii",
+      id: "test_05_ohayo_kawaii",
       number: 5,
       utterance: "「おはよう、きょうは、いいてんきだね」",
       preset: "kawaii",
       targetAxes: ["F24"],
       modificationDesc: "F24 を外すため、ピッチ曲線を 302Hz 固定・hopf=0 に平坦化（全軸クリア版）",
-      originalIsX: false,
-      buildOriginal: () => kuda.synthKuda("おはよう、きょうは、いいてんきだね", { preset: "kawaii", srOut: SR }).samples,
-      buildMirror: () => kuda.synthKuda("おはよう、きょうは、いいてんきだね", { preset: "kawaii", srOut: SR, flatHz: 302, hopf: 0 }).samples,
+      order: ["flat", "original"],
+      takes: {
+        original: {
+          role: "original",
+          roleLabel: "原音（Original / 加工なし）",
+          build: () => kuda.synthKuda("おはよう、きょうは、いいてんきだね", { preset: "kawaii", srOut: SR }).samples,
+        },
+        flat: {
+          role: "flat",
+          roleLabel: "完全フラット（302Hz 固定・hopf=0）",
+          build: () =>
+            kuda.synthKuda("おはよう、きょうは、いいてんきだね", {
+              preset: "kawaii",
+              srOut: SR,
+              flatHz: 302,
+              hopf: 0,
+            }).samples,
+        },
+      },
     },
     {
-      id: "pair_06_ohayo_genki",
+      id: "test_06_ohayo_genki",
       number: 6,
       utterance: "「おはよう、きょうは、いいてんきだね」",
       preset: "genki",
       targetAxes: ["F23", "F24"],
       modificationDesc: "F23・F24 を外すため、ピッチ曲線を 320Hz 固定・hopf=0.15 に平坦化（全軸クリア版）",
-      originalIsX: true,
-      buildOriginal: () => kuda.synthKuda("おはよう、きょうは、いいてんきだね", { preset: "genki", srOut: SR }).samples,
-      buildMirror: () => kuda.synthKuda("おはよう、きょうは、いいてんきだね", { preset: "genki", srOut: SR, flatHz: 320, hopf: 0.15 }).samples,
+      order: ["original", "flat"],
+      takes: {
+        original: {
+          role: "original",
+          roleLabel: "原音（Original / 加工なし）",
+          build: () => kuda.synthKuda("おはよう、きょうは、いいてんきだね", { preset: "genki", srOut: SR }).samples,
+        },
+        flat: {
+          role: "flat",
+          roleLabel: "完全フラット（320Hz 固定・hopf=0.15）",
+          build: () =>
+            kuda.synthKuda("おはよう、きょうは、いいてんきだね", {
+              preset: "genki",
+              srOut: SR,
+              flatHz: 320,
+              hopf: 0.15,
+            }).samples,
+        },
+      },
     },
   ];
 
-  const builtPairs = [];
-  console.log("[build_mirror_audit_demo] Synthesizing & verifying 6 blind A/B pairs...");
+  const LABELS = ["X", "Y", "Z"];
+  const builtTests = [];
+  console.log("[build_mirror_audit_demo] Synthesizing & verifying 6 blind mirror audit tests (3x 3-choice + 3x 2-choice)...");
 
-  for (const spec of pairSpecs) {
-    const origSamples = spec.buildOriginal();
-    const mirrorSamples = spec.buildMirror();
+  for (const spec of testSpecs) {
+    const builtByKey = {};
+    for (const [key, def] of Object.entries(spec.takes)) {
+      const samples = def.build();
+      const report = summarizeReport(samples, `${spec.id}_${key}`);
+      builtByKey[key] = {
+        role: def.role,
+        roleLabel: def.roleLabel,
+        audioUri: toWavDataUri(samples, SR),
+        report,
+      };
+    }
 
-    const origReport = summarizeReport(origSamples, `${spec.id}_orig`);
-    const mirrorReport = summarizeReport(mirrorSamples, `${spec.id}_mirror`);
+    const origAxes = new Set(builtByKey.original.report.triggeredAll.map((t) => t.shortId));
+    const compareTarget = builtByKey.damped || builtByKey.flat;
+    const compareAxes = new Set(compareTarget.report.triggeredAll.map((t) => t.shortId));
+    const eliminatedTargets = spec.targetAxes.filter((ax) => origAxes.has(ax) && !compareAxes.has(ax));
 
-    const origAxes = new Set(origReport.triggeredAll.map((t) => t.shortId));
-    const mirrorAxes = new Set(mirrorReport.triggeredAll.map((t) => t.shortId));
-    const eliminatedTargets = spec.targetAxes.filter((ax) => origAxes.has(ax) && !mirrorAxes.has(ax));
-
-    console.log(
-      `  #${spec.number} ${spec.utterance} (${spec.preset}): ` +
-      `orig=[${[...origAxes].join(",") || "CLEAN"}] -> mirror=[${[...mirrorAxes].join(",") || "CLEAN"}] ` +
-      `(cleared: ${eliminatedTargets.join(",") || "none"})`
-    );
+    const summaryParts = Object.entries(builtByKey).map(([k, v]) => {
+      const trig = v.report.triggeredAll.map((t) => t.shortId).join(",") || "CLEAN";
+      return `${k}=[${trig} F24=${v.report.f24Score} range=${v.report.f0RangeSemitones}st]`;
+    });
+    console.log(`  #${spec.number} ${spec.utterance} (${spec.preset}): ${summaryParts.join(" | ")}`);
 
     if (eliminatedTargets.length === 0) {
       throw new Error(
-        `Pair ${spec.id} failed verification: target axes [${spec.targetAxes.join(",")}] were not cleared ` +
-        `(orig=[${[...origAxes].join(",")}], mirror=[${[...mirrorAxes].join(",")}])`
+        `Test ${spec.id} failed verification: target axes [${spec.targetAxes.join(",")}] were not cleared.`
       );
     }
 
-    const origObj = {
-      role: "original",
-      roleLabel: "原音（Original / 加工なし）",
-      audioUri: toWavDataUri(origSamples, SR),
-      report: origReport,
-    };
-    const mirrorObj = {
-      role: "mirror",
-      roleLabel: "鏡に合わせた版（Mirror-Compliant / 平坦・丸め）",
-      audioUri: toWavDataUri(mirrorSamples, SR),
-      report: mirrorReport,
-    };
+    const takes = spec.order.map((key, idx) => ({
+      slot: LABELS[idx],
+      ...builtByKey[key],
+    }));
 
-    builtPairs.push({
+    builtTests.push({
       id: spec.id,
       number: spec.number,
       utterance: spec.utterance,
       preset: spec.preset,
+      choiceCount: takes.length,
       targetAxes: spec.targetAxes,
       eliminatedTargets,
       modificationDesc: spec.modificationDesc,
-      takeX: spec.originalIsX ? origObj : mirrorObj,
-      takeY: spec.originalIsX ? mirrorObj : origObj,
+      takes,
     });
   }
 
-  const html = renderHtml(builtPairs);
+  const html = renderHtml(builtTests);
   fs.writeFileSync(OUT_HTML, html, "utf8");
   const kb = (Buffer.byteLength(html, "utf8") / 1024).toFixed(1);
-  console.log(`[build_mirror_audit_demo] Wrote ${OUT_HTML} (${kb} KB, ${builtPairs.length} blind pairs, 0 external URLs).`);
+  console.log(`[build_mirror_audit_demo] Wrote ${OUT_HTML} (${kb} KB, ${builtTests.length} blind tests, 0 external URLs).`);
 }
 
-function renderHtml(pairs) {
+function renderHtml(tests) {
   const payload = safeJsonForScript({
-    version: "v0.3",
+    version: "v0.4",
     generatedAt: new Date().toISOString().slice(0, 10),
-    pairs,
+    tests,
   });
 
   return `<!DOCTYPE html>
@@ -236,7 +378,7 @@ function renderHtml(pairs) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>yata v0.3 — 鏡のブラインド耳審査（Mirror Audit）</title>
+<title>yata v0.4 — 鏡のブラインド耳審査（3択・Mirror Audit）</title>
 <style>
   :root {
     --bg: #121110;
@@ -247,10 +389,12 @@ function renderHtml(pairs) {
     --muted: #a69c92;
     --accent: #e89b5a;
     --accent-soft: rgba(232, 155, 90, 0.16);
-    --overrule: #f06d7a;
-    --overrule-soft: rgba(240, 109, 122, 0.16);
-    --mirror-win: #64c496;
-    --mirror-win-soft: rgba(100, 196, 150, 0.16);
+    --orig: #f06d7a;
+    --orig-soft: rgba(240, 109, 122, 0.16);
+    --damped: #64c496;
+    --damped-soft: rgba(100, 196, 150, 0.16);
+    --flat: #7aa7e8;
+    --flat-soft: rgba(122, 167, 232, 0.16);
     --tie: #9da8b8;
     --tie-soft: rgba(157, 168, 184, 0.16);
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -265,7 +409,7 @@ function renderHtml(pairs) {
     line-height: 1.6;
   }
   .wrap {
-    max-width: 820px;
+    max-width: 880px;
     margin: 0 auto;
     padding: 28px 18px 24px;
   }
@@ -300,18 +444,18 @@ function renderHtml(pairs) {
   }
   .summary-bar {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 10px;
     margin-bottom: 20px;
   }
-  @media (max-width: 640px) {
+  @media (max-width: 760px) {
     .summary-bar { grid-template-columns: repeat(2, 1fr); }
   }
   .stat {
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 12px 14px;
+    padding: 12px 10px;
     text-align: center;
   }
   .stat-val {
@@ -320,11 +464,14 @@ function renderHtml(pairs) {
     font-family: var(--mono);
   }
   .stat-lbl {
-    font-size: 12px;
+    font-size: 11.5px;
     color: var(--muted);
+    line-height: 1.35;
+    margin-top: 2px;
   }
-  .c-overrule { color: var(--overrule); }
-  .c-mirror { color: var(--mirror-win); }
+  .c-orig { color: var(--orig); }
+  .c-damped { color: var(--damped); }
+  .c-flat { color: var(--flat); }
   .c-tie { color: var(--tie); }
   .c-accent { color: var(--accent); }
 
@@ -336,8 +483,9 @@ function renderHtml(pairs) {
     margin-bottom: 16px;
     transition: border-color 0.15s ease;
   }
-  .card.voted-overrule { border-color: rgba(240, 109, 122, 0.55); }
-  .card.voted-mirror { border-color: rgba(100, 196, 150, 0.55); }
+  .card.voted-original { border-color: rgba(240, 109, 122, 0.55); }
+  .card.voted-damped { border-color: rgba(100, 196, 150, 0.55); }
+  .card.voted-flat { border-color: rgba(122, 167, 232, 0.55); }
   .card.voted-tie { border-color: rgba(157, 168, 184, 0.5); }
 
   .card-head {
@@ -372,9 +520,13 @@ function renderHtml(pairs) {
 
   .play-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
     gap: 12px;
     margin-bottom: 14px;
+  }
+  .play-row.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .play-row.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 600px) {
+    .play-row.cols-2, .play-row.cols-3 { grid-template-columns: 1fr; }
   }
   .play-btn {
     appearance: none;
@@ -408,13 +560,19 @@ function renderHtml(pairs) {
     font-family: var(--mono);
   }
 
+  .vote-prompt {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
   .vote-row {
     display: grid;
-    grid-template-columns: 1fr 1fr auto;
     gap: 10px;
   }
-  @media (max-width: 600px) {
-    .vote-row { grid-template-columns: 1fr; }
+  .vote-row.cols-2 { grid-template-columns: 1fr 1fr auto; }
+  .vote-row.cols-3 { grid-template-columns: 1fr 1fr 1fr auto; }
+  @media (max-width: 640px) {
+    .vote-row.cols-2, .vote-row.cols-3 { grid-template-columns: 1fr; }
   }
   .vote-btn {
     appearance: none;
@@ -422,8 +580,8 @@ function renderHtml(pairs) {
     background: #171513;
     color: var(--text);
     border-radius: 10px;
-    padding: 11px 14px;
-    font-size: 14px;
+    padding: 11px 12px;
+    font-size: 13.5px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.14s ease;
@@ -452,15 +610,20 @@ function renderHtml(pairs) {
     font-weight: 700;
     margin-bottom: 12px;
   }
-  .outcome-overrule {
-    background: var(--overrule-soft);
-    color: var(--overrule);
+  .outcome-original {
+    background: var(--orig-soft);
+    color: var(--orig);
     border: 1px solid rgba(240, 109, 122, 0.35);
   }
-  .outcome-mirror {
-    background: var(--mirror-win-soft);
-    color: var(--mirror-win);
+  .outcome-damped {
+    background: var(--damped-soft);
+    color: var(--damped);
     border: 1px solid rgba(100, 196, 150, 0.35);
+  }
+  .outcome-flat {
+    background: var(--flat-soft);
+    color: var(--flat);
+    border: 1px solid rgba(122, 167, 232, 0.35);
   }
   .outcome-tie {
     background: var(--tie-soft);
@@ -469,23 +632,34 @@ function renderHtml(pairs) {
   }
   .reveal-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 10px;
     margin-bottom: 10px;
   }
-  @media (max-width: 600px) {
-    .reveal-grid { grid-template-columns: 1fr; }
+  .reveal-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .reveal-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 720px) {
+    .reveal-grid.cols-2, .reveal-grid.cols-3 { grid-template-columns: 1fr; }
   }
   .reveal-box {
     background: var(--panel-2);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 12px;
-    font-size: 13px;
+    font-size: 12.5px;
+  }
+  .reveal-box.picked {
+    border-color: var(--accent);
   }
   .reveal-box-title {
     font-weight: 700;
     margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .metric-line {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 4px;
   }
   .pill {
     display: inline-block;
@@ -499,7 +673,7 @@ function renderHtml(pairs) {
   }
   .pill.clean {
     background: rgba(100, 196, 150, 0.18);
-    color: var(--mirror-win);
+    color: var(--damped);
   }
   .mod-note {
     font-size: 12px;
@@ -561,7 +735,7 @@ function renderHtml(pairs) {
   .modal h3 { margin: 0 0 10px; font-size: 16px; }
   .modal textarea {
     width: 100%;
-    height: 220px;
+    height: 240px;
     background: var(--bg);
     color: var(--text);
     border: 1px solid var(--border);
@@ -581,29 +755,33 @@ function renderHtml(pairs) {
 <body>
 <div class="wrap">
   <header>
-    <div class="kicker">yata v0.3 · Blind Mirror Audit</div>
-    <h1>🪞 鏡も耳の審査を受ける — ブラインド A/B 試聴</h1>
+    <div class="kicker">yata v0.4 · 3-Choice Blind Mirror Audit</div>
+    <h1>🪞 鏡も耳の審査を受ける — 3択ブラインド試聴（「なる」抑揚 vs 揺れ）</h1>
     <div style="font-size:14px;color:var(--muted);">
-      各ペアの <strong>Take X</strong> と <strong>Take Y</strong> は、片方が「原音」、もう片方が「鏡（yata）の指摘を外すように加工した版」です。<br>
-      どちらが原音かも、鏡が何を指摘したかも、<strong>投票するまで完全に伏せてあります</strong>。耳だけで好きなほうを選んでください。
+      #1〜#3 の「なる」は<strong>3択ブラインド（Take X / Y / Z）</strong>です。原音・抑揚を残して揺れだけ弱めた版・完全フラット版がランダム順に並んでいます。<br>
+      どれが何かも、鏡（yata）の判定も、<strong>投票するまで完全に伏せてあります</strong>。耳だけで「一番残したい」ものを選んでください。
     </div>
     <div class="quote">
-      「まず『なる』原音と、F24だけ外れるように変えた版を、判定を伏せて聴き比べる。原音が好かれたら、その一票でF24の拒否権を疑えるようにする。音が鏡の審査を受けるなら、鏡も耳の審査を受けてほしい。」
+      「僕なら次は、<strong>アクセントの山を残して、F24が拾った周期揺れだけ弱めた『なる』</strong>を三つ目に置く。そこで初めて『この節回しの、どこが好きやったんやろ』に手が届く。」
     </div>
   </header>
 
   <section class="summary-bar">
     <div class="stat">
-      <div class="stat-val c-overrule" id="stat-overrule">0</div>
-      <div class="stat-lbl">🪞 鏡に異議あり（原音勝ち）</div>
+      <div class="stat-val c-orig" id="stat-original">0</div>
+      <div class="stat-lbl">🪞 原音派（F24発火でも残したい）</div>
     </div>
     <div class="stat">
-      <div class="stat-val c-mirror" id="stat-mirror">0</div>
-      <div class="stat-lbl">✅ 鏡の勝ち（修正版勝ち）</div>
+      <div class="stat-val c-damped" id="stat-damped">0</div>
+      <div class="stat-lbl">🎯 抑揚あり・揺れ弱め派（アクセントが魅力）</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val c-flat" id="stat-flat">0</div>
+      <div class="stat-lbl">📏 フラット／丸め派</div>
     </div>
     <div class="stat">
       <div class="stat-val c-tie" id="stat-tie">0</div>
-      <div class="stat-lbl">🤷 どっちも同じ</div>
+      <div class="stat-lbl">🤷 どれも同じ</div>
     </div>
     <div class="stat">
       <div class="stat-val c-accent" id="stat-progress">0 / 6</div>
@@ -611,7 +789,7 @@ function renderHtml(pairs) {
     </div>
   </section>
 
-  <main id="pairs-root"></main>
+  <main id="tests-root"></main>
 </div>
 
 <div class="sticky-bar">
@@ -636,9 +814,9 @@ function renderHtml(pairs) {
 <script>
 (function () {
   const DATA = JSON.parse(document.getElementById("audit-data").textContent);
-  const root = document.getElementById("pairs-root");
+  const root = document.getElementById("tests-root");
   const player = document.getElementById("shared-player");
-  const votes = Object.create(null); // pairId -> "X" | "Y" | "tie"
+  const votes = Object.create(null); // testId -> "X" | "Y" | "Z" | "tie"
   let activePlayBtn = null;
 
   function stopAudio() {
@@ -664,6 +842,13 @@ function renderHtml(pairs) {
     player.play().catch(() => stopAudio());
   }
 
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/"/g, "&quot;");
+  }
+
   function renderPills(triggeredAll) {
     if (!triggeredAll || triggeredAll.length === 0) {
       return '<span class="pill clean">CLEAN (0/32)</span>';
@@ -673,108 +858,133 @@ function renderHtml(pairs) {
       .join("");
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-  function escapeAttr(s) {
-    return escapeHtml(s).replace(/"/g, "&quot;");
-  }
-
-  function classifyVote(pair, choice) {
+  function classifyVote(test, choice) {
     if (choice === "tie") return "tie";
-    const chosen = choice === "X" ? pair.takeX : pair.takeY;
-    return chosen.role === "original" ? "overrule" : "mirror";
+    const found = test.takes.find((t) => t.slot === choice);
+    return found ? found.role : "tie";
   }
 
   function updateSummary() {
-    let overrule = 0, mirror = 0, tie = 0, done = 0;
-    for (const pair of DATA.pairs) {
-      const v = votes[pair.id];
+    let orig = 0, damped = 0, flat = 0, tie = 0, done = 0;
+    for (const test of DATA.tests) {
+      const v = votes[test.id];
       if (!v) continue;
       done++;
-      const c = classifyVote(pair, v);
-      if (c === "overrule") overrule++;
-      else if (c === "mirror") mirror++;
+      const c = classifyVote(test, v);
+      if (c === "original") orig++;
+      else if (c === "damped") damped++;
+      else if (c === "flat") flat++;
       else tie++;
     }
-    document.getElementById("stat-overrule").textContent = String(overrule);
-    document.getElementById("stat-mirror").textContent = String(mirror);
+    document.getElementById("stat-original").textContent = String(orig);
+    document.getElementById("stat-damped").textContent = String(damped);
+    document.getElementById("stat-flat").textContent = String(flat);
     document.getElementById("stat-tie").textContent = String(tie);
-    document.getElementById("stat-progress").textContent = done + " / " + DATA.pairs.length;
+    document.getElementById("stat-progress").textContent = done + " / " + DATA.tests.length;
   }
 
   function renderCards() {
     root.innerHTML = "";
-    for (const pair of DATA.pairs) {
+    for (const test of DATA.tests) {
+      const colsClass = test.choiceCount === 3 ? "cols-3" : "cols-2";
       const card = document.createElement("article");
       card.className = "card";
-      card.id = "card-" + pair.id;
+      card.id = "card-" + test.id;
+
+      const playButtonsHtml = test.takes
+        .map(
+          (t) =>
+            '<button class="play-btn" data-play="' + t.slot + '">▶ Take ' + t.slot +
+            ' <span class="dur">' + t.report.durationSec + "s</span></button>"
+        )
+        .join("");
+
+      const voteButtonsHtml =
+        test.takes
+          .map(
+            (t) =>
+              '<button class="vote-btn" data-vote="' + t.slot + '">Take ' + t.slot + " が好き</button>"
+          )
+          .join("") +
+        '<button class="vote-btn" data-vote="tie">🤷 ' + (test.choiceCount === 3 ? "どれも同じ" : "どっちも同じ") + "</button>";
+
+      const revealBoxesHtml = test.takes
+        .map(
+          (t) =>
+            '<div class="reveal-box" data-reveal-slot="' + t.slot + '">' +
+              '<div class="reveal-box-title">Take ' + t.slot + ": " + escapeHtml(t.roleLabel) + "</div>" +
+              "<div>core_veto: " +
+                (t.report.triggeredCore.length
+                  ? '<span class="pill">' + escapeHtml(t.report.triggeredCore.join(", ")) + "</span>"
+                  : '<span class="pill clean">PASS</span>') +
+              "</div>" +
+              '<div style="margin-top:4px;">veto_all: ' + renderPills(t.report.triggeredAll) + "</div>" +
+              '<div class="metric-line">F24: score=' + t.report.f24Score +
+                (t.report.f24Triggered ? " (TRIG)" : " (pass)") +
+                " | F0 range=" + t.report.f0RangeSemitones + "st</div>" +
+            "</div>"
+        )
+        .join("");
 
       card.innerHTML =
         '<div class="card-head">' +
-          '<div>' +
-            '<div class="pair-title">Pair #' + pair.number + ' — ' + escapeHtml(pair.utterance) + '</div>' +
-            '<div class="pair-sub">preset: ' + escapeHtml(pair.preset) + '</div>' +
-          '</div>' +
-          '<span class="blind-badge" id="badge-' + pair.id + '">🙈 ブラインド中</span>' +
-        '</div>' +
-        '<div class="play-row">' +
-          '<button class="play-btn" data-play="X">▶ Take X <span class="dur">' + pair.takeX.report.durationSec + 's</span></button>' +
-          '<button class="play-btn" data-play="Y">▶ Take Y <span class="dur">' + pair.takeY.report.durationSec + 's</span></button>' +
-        '</div>' +
-        '<div class="vote-row">' +
-          '<button class="vote-btn" data-vote="X">👈 Take X が好き（残したい）</button>' +
-          '<button class="vote-btn" data-vote="Y">👉 Take Y が好き（残したい）</button>' +
-          '<button class="vote-btn" data-vote="tie">🤷 どっちも同じ</button>' +
-        '</div>' +
-        '<div class="reveal" id="reveal-' + pair.id + '">' +
-          '<div class="outcome-banner" id="outcome-' + pair.id + '"></div>' +
-          '<div class="reveal-grid">' +
-            '<div class="reveal-box">' +
-              '<div class="reveal-box-title">Take X: ' + escapeHtml(pair.takeX.roleLabel) + '</div>' +
-              '<div>Core-6: ' + (pair.takeX.report.triggeredCore.length ? escapeHtml(pair.takeX.report.triggeredCore.join(", ")) : '<span class="pill clean">PASS</span>') + '</div>' +
-              '<div style="margin-top:4px;">All-32: ' + renderPills(pair.takeX.report.triggeredAll) + '</div>' +
-            '</div>' +
-            '<div class="reveal-box">' +
-              '<div class="reveal-box-title">Take Y: ' + escapeHtml(pair.takeY.roleLabel) + '</div>' +
-              '<div>Core-6: ' + (pair.takeY.report.triggeredCore.length ? escapeHtml(pair.takeY.report.triggeredCore.join(", ")) : '<span class="pill clean">PASS</span>') + '</div>' +
-              '<div style="margin-top:4px;">All-32: ' + renderPills(pair.takeY.report.triggeredAll) + '</div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="mod-note">🔧 加工内容: ' + escapeHtml(pair.modificationDesc) + '（外れた対象軸: ' + escapeHtml(pair.eliminatedTargets.join(", ")) + '）</div>' +
-        '</div>';
+          "<div>" +
+            '<div class="pair-title">Test #' + test.number + " — " + escapeHtml(test.utterance) +
+              (test.choiceCount === 3 ? "（3択）" : "（2択）") + "</div>" +
+            '<div class="pair-sub">preset: ' + escapeHtml(test.preset) + "</div>" +
+          "</div>" +
+          '<span class="blind-badge" id="badge-' + test.id + '">🙈 ブラインド中</span>' +
+        "</div>" +
+        '<div class="play-row ' + colsClass + '">' + playButtonsHtml + "</div>" +
+        '<div class="vote-prompt">どれが好き？（残したい）</div>' +
+        '<div class="vote-row ' + colsClass + '">' + voteButtonsHtml + "</div>" +
+        '<div class="reveal" id="reveal-' + test.id + '">' +
+          '<div class="outcome-banner" id="outcome-' + test.id + '"></div>' +
+          '<div class="reveal-grid ' + colsClass + '">' + revealBoxesHtml + "</div>" +
+          '<div class="mod-note">🔧 比較設計: ' + escapeHtml(test.modificationDesc) + "</div>" +
+        "</div>";
 
-      card.querySelector('[data-play="X"]').addEventListener("click", (e) => playTake(pair.takeX.audioUri, e.currentTarget));
-      card.querySelector('[data-play="Y"]').addEventListener("click", (e) => playTake(pair.takeY.audioUri, e.currentTarget));
+      for (const take of test.takes) {
+        const btn = card.querySelector('[data-play="' + take.slot + '"]');
+        btn.addEventListener("click", (e) => playTake(take.audioUri, e.currentTarget));
+      }
 
       for (const btn of card.querySelectorAll("[data-vote]")) {
         btn.addEventListener("click", () => {
           const choice = btn.getAttribute("data-vote");
-          votes[pair.id] = choice;
+          votes[test.id] = choice;
 
           for (const b of card.querySelectorAll("[data-vote]")) {
             b.classList.toggle("selected", b === btn);
           }
+          for (const box of card.querySelectorAll("[data-reveal-slot]")) {
+            box.classList.toggle("picked", box.getAttribute("data-reveal-slot") === choice);
+          }
 
-          const cls = classifyVote(pair, choice);
-          card.classList.remove("voted-overrule", "voted-mirror", "voted-tie");
+          const cls = classifyVote(test, choice);
+          card.classList.remove("voted-original", "voted-damped", "voted-flat", "voted-tie");
           card.classList.add("voted-" + cls);
 
-          const badge = document.getElementById("badge-" + pair.id);
+          const badge = document.getElementById("badge-" + test.id);
           badge.textContent = "🔓 種明かし済み";
           badge.classList.add("revealed");
 
-          const outcomeEl = document.getElementById("outcome-" + pair.id);
+          const outcomeEl = document.getElementById("outcome-" + test.id);
           outcomeEl.className = "outcome-banner outcome-" + cls;
-          if (cls === "overrule") {
-            outcomeEl.textContent = "🪞 鏡の拒否権に異議あり（原音の勝ち）— " + pair.eliminatedTargets.join("/") + " を外すために音を潰すのは本末転倒！";
-          } else if (cls === "mirror") {
-            outcomeEl.textContent = "✅ 鏡の勝ち（修正版のほうが良い）— " + pair.eliminatedTargets.join("/") + " の指摘は耳にも合っていた";
+          if (cls === "original") {
+            outcomeEl.textContent =
+              "🪞 原音派（F24発火でも残したい）— " + test.eliminatedTargets.join("/") + " が拾った揺れごと原音の魅力だった！";
+          } else if (cls === "damped") {
+            outcomeEl.textContent =
+              "🎯 抑揚あり・揺れ弱め派 — 日本語アクセントの山が魅力で、F24 が指摘した周期揺れを弱める判断は妥当かも！";
+          } else if (cls === "flat") {
+            outcomeEl.textContent =
+              "📏 フラット／丸め派 — " + test.eliminatedTargets.join("/") + " を外した静かな版のほうが耳に心地よい";
           } else {
-            outcomeEl.textContent = "🤷 どっちも同じ（引き分け）— 少なくとも強い拒否権の根拠にはならない";
+            outcomeEl.textContent = "🤷 どれも同じ（引き分け）— 少なくとも強い拒否権の根拠にはならない";
           }
 
-          document.getElementById("reveal-" + pair.id).classList.add("show");
+          document.getElementById("reveal-" + test.id).classList.add("show");
           updateSummary();
         });
       }
@@ -784,28 +994,42 @@ function renderHtml(pairs) {
   }
 
   function buildMarkdownSummary() {
-    let overrule = 0, mirror = 0, tie = 0;
+    let orig = 0, damped = 0, flat = 0, tie = 0;
     const lines = [
-      "# yata v0.3 — 鏡のブラインド耳審査（Mirror Audit）結果",
+      "# yata v0.4 — 鏡のブラインド耳審査（3択・Mirror Audit）結果",
       "",
     ];
-    for (const pair of DATA.pairs) {
-      const v = votes[pair.id];
+    for (const test of DATA.tests) {
+      const v = votes[test.id];
       if (!v) {
-        lines.push("- Pair #" + pair.number + " " + pair.utterance + " (" + pair.preset + "): 未投票");
+        lines.push("- Test #" + test.number + " " + test.utterance + " (" + test.preset + "): 未投票");
         continue;
       }
-      const c = classifyVote(pair, v);
-      if (c === "overrule") overrule++;
-      else if (c === "mirror") mirror++;
+      const c = classifyVote(test, v);
+      if (c === "original") orig++;
+      else if (c === "damped") damped++;
+      else if (c === "flat") flat++;
       else tie++;
-      const label = c === "overrule" ? "🪞 原音の勝ち（鏡に異議あり）" : c === "mirror" ? "✅ 修正版の勝ち（鏡の勝ち）" : "🤷 どっちも同じ";
+
+      const label =
+        c === "original"
+          ? "🪞 原音派（F24発火でも残したい）"
+          : c === "damped"
+          ? "🎯 抑揚あり・揺れ弱め派（アクセントが魅力、F24は妥当かも）"
+          : c === "flat"
+          ? "📏 フラット／丸め派"
+          : "🤷 どれも同じ";
       lines.push(
-        "- Pair #" + pair.number + " " + pair.utterance + " (" + pair.preset + ", 対象軸: " +
-        pair.eliminatedTargets.join("/") + "): " + label + " [vote=" + v + "]"
+        "- Test #" + test.number + " " + test.utterance + " (" + test.preset + ", " + test.choiceCount +
+        "択, 対象軸: " + test.eliminatedTargets.join("/") + "): " + label + " [vote=Take " + v + "]"
       );
     }
-    lines.splice(2, 0, "**集計**: 🪞 鏡に異議あり（原音勝ち）=" + overrule + " / ✅ 鏡の勝ち（修正版勝ち）=" + mirror + " / 🤷 どっちも同じ=" + tie, "");
+    lines.splice(
+      2,
+      0,
+      "**集計**: 🪞 原音派=" + orig + " / 🎯 抑揚あり・揺れ弱め派=" + damped + " / 📏 フラット派=" + flat + " / 🤷 どれも同じ=" + tie,
+      ""
+    );
     return lines.join("\\n");
   }
 

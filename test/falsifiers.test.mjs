@@ -168,7 +168,7 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
     ];
 
     for (const item of positives) {
-      const rep = analyzeSamples(item.samples, SR, { label: item.label });
+      const rep = analyzeSamples(item.samples, SR, { label: item.label, policy: "veto_all" });
       const triggered = rep.falsifiers.filter((f) => f.triggered);
       assert.equal(
         rep.verdict,
@@ -192,7 +192,11 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
     }
     const mono = new Float32Array(left.length);
     for (let i = 0; i < left.length; i++) mono[i] = 0.5 * (left[i] + right[i]);
-    const stereoRep = analyzeSamples(mono, SR, { label: "clean_stereo", channels: [left, right] });
+    const stereoRep = analyzeSamples(mono, SR, {
+      label: "clean_stereo",
+      policy: "veto_all",
+      channels: [left, right],
+    });
     assert.equal(stereoRep.verdict, "SURVIVED_KAWAII_CANDIDATE");
     assert.equal(getFalsifierResult(stereoRep, "F30_STEREO_PHASE_DISCOMFORT").triggered, false);
   });
@@ -822,5 +826,28 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
     const verboseCmp = formatCompareForLLM(cmp, { verbose: true });
     assert.match(compactCmp, /F8_DC_OFFSET_BIAS/);
     assert.ok(compactCmp.split("\n").length < verboseCmp.split("\n").length);
+  });
+
+  it("v0.4 regression: F2_PURE_ROBOT catches zero-jitter steady 220 Hz saw/harmonic robot voice under both core_veto and veto_all", () => {
+    const n = Math.round(SR * 0.6);
+    const sawRobot = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      let s = 0;
+      for (let h = 1; h <= 8; h++) s += Math.sin(2 * Math.PI * 220 * h * t) / h;
+      sawRobot[i] = 0.35 * s;
+    }
+
+    for (const policy of ["core_veto", "veto_all"]) {
+      const rep = analyzeSamples(sawRobot, SR, { label: `robot_220_saw_${policy}`, policy });
+      const f2 = getFalsifierResult(rep, "F2_PURE_ROBOT");
+      assert.equal(
+        f2.triggered,
+        true,
+        `Expected F2_PURE_ROBOT to catch steady 220 Hz saw robot under ${policy} (evidence: ${f2.evidence}, score=${f2.score})`
+      );
+      assert.equal(rep.verdict, "REJECTED_UNKAWAII");
+      assert.ok(f2.score >= 0.7, `Expected F2 score >= 0.7, got ${f2.score}`);
+    }
   });
 });

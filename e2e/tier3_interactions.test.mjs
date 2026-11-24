@@ -123,7 +123,7 @@ describe("Tier 3: Cross-Feature Pairwise Interactions E2E", () => {
       assert.equal(coreRes.status, 0, `stderr: ${coreRes.stderr}`);
       const coreReport = JSON.parse(coreRes.stdout);
 
-      const allRes = runCli([phasePath, "--falsifiers", "all", "--format", "json"]);
+      const allRes = runCli([phasePath, "--falsifiers", "all", "--policy", "veto_all", "--format", "json"]);
       assert.equal(allRes.status, 0, `stderr: ${allRes.stderr}`);
       const allReport = JSON.parse(allRes.stdout);
 
