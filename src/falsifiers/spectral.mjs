@@ -519,11 +519,11 @@ export const SPECTRAL_EXTRA_FALSIFIERS = [
 
       let score = 0;
       if (eligible) {
-        const pJit = clamp01((0.048 - jitter) / 0.022);
+        // Pure body-floor + smeared-HF flatness (jitter removed after owner ear caught phlegm-rattle Goodhart trap)
         const pBody = clamp01((-35 - bodyBand80_200Db) / 11);
         const pFlatHf =
           clamp01((hf4500_7000Db - -22) / 5) * clamp01((9.5 - hiBand2800_11000StdDb) / 3.5);
-        score = round3(pJit * 0.4 + pBody * 0.35 + pFlatHf * 0.25);
+        score = round3(pBody * 0.55 + pFlatHf * 0.45);
       }
       const triggered = isNumericOverride ? eligible && score >= threshold : eligible && score >= threshold;
 
@@ -531,8 +531,8 @@ export const SPECTRAL_EXTRA_FALSIFIERS = [
         triggered,
         score,
         threshold,
-        evidence: `jitter=${jitter}, body80_200=${bodyBand80_200Db}dB, hf4.5_7k=${hf4500_7000Db}dB, hiStd=${hiBand2800_11000StdDb}dB`,
-        hint: "Restore organic cycle-to-cycle glottal micro-jitter (~0.05+), 80–200 Hz chest/body floor, and clean vowel-vs-consonant HF contrast.",
+        evidence: `body80_200=${bodyBand80_200Db}dB, hf4.5_7k=${hf4500_7000Db}dB, hiStd=${hiBand2800_11000StdDb}dB`,
+        hint: "Restore 80–200 Hz chest/body floor and clean vowel-vs-consonant HF contrast instead of a constant smeared 4.5–7 kHz shelf.",
       };
     },
   },
