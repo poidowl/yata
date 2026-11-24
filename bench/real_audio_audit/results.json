@@ -1,6 +1,6 @@
 {
   "schema": "yata_real_audio_audit/v0.6",
-  "generatedAt": "2026-11-24T07:34:02.156Z",
+  "generatedAt": "2026-11-24T08:19:18.565Z",
   "axisCounts": {
     "core": 6,
     "toolbox": 25,
@@ -16,15 +16,14 @@
     "shelfSize": 9,
     "totalFalsifiers": 32,
     "shelfSurvivalRate": {
-      "core6": 0.8889,
+      "core6": 1,
       "full": 0,
-      "core6Survived": 8,
+      "core6Survived": 9,
       "fullSurvived": 0
     },
-    "contestedCount": 5,
-    "clearedCount": 27,
+    "contestedCount": 4,
+    "clearedCount": 28,
     "contestedIds": [
-      "F1_HARSH_EDGE",
       "F14_HELMHOLTZ_ROUGHNESS",
       "F23_ERRATIC_PITCH_WARBLE",
       "F24_CALCULATED_PITCH_LFO",
@@ -37,18 +36,10 @@
         "name": "Sharp Edge / High-Freq Aggression",
         "isCore": true,
         "isOrthogonal": false,
-        "status": "CONTESTED",
-        "falsePositiveCount": 1,
-        "falsePositiveRate": 0.1111,
-        "rejectedItems": [
-          {
-            "id": "tokiko_watashi_amae",
-            "label": "tokiko:amae:わたし、にほんご、ちょっとしゃべれます",
-            "score": 0.307,
-            "threshold": 0.42,
-            "evidence": "attackSlope=0.4211 @ 3.103s, hfRatio=0.1367"
-          }
-        ]
+        "status": "CLEARED",
+        "falsePositiveCount": 0,
+        "falsePositiveRate": 0,
+        "rejectedItems": []
       },
       {
         "id": "F2_PURE_ROBOT",
@@ -548,13 +539,10 @@
         "label": "tokiko:amae:わたし、にほんご、ちょっとしゃべれます",
         "source": "poidowl/tokiko-axis/kuda.mjs",
         "license": "Project-local reference synthesizer",
-        "core6Survived": false,
+        "core6Survived": true,
         "fullSurvived": false,
-        "coreTriggeredIds": [
-          "F1_HARSH_EDGE"
-        ],
+        "coreTriggeredIds": [],
         "triggeredIds": [
-          "F1_HARSH_EDGE",
           "F14_HELMHOLTZ_ROUGHNESS",
           "F23_ERRATIC_PITCH_WARBLE",
           "F26_INTERNAL_REBOUND_SHOCK"
@@ -618,18 +606,16 @@
     "shelfSize": 10,
     "totalFalsifiers": 32,
     "shelfSurvivalRate": {
-      "core6": 0.5,
+      "core6": 0.8,
       "full": 0.1,
-      "core6Survived": 5,
+      "core6Survived": 8,
       "fullSurvived": 1
     },
-    "contestedCount": 12,
-    "clearedCount": 20,
+    "contestedCount": 10,
+    "clearedCount": 22,
     "contestedIds": [
       "F1_HARSH_EDGE",
-      "F3_PURE_NOISE",
       "F4_NO_COMMON_CAUSE",
-      "F5_ABRUPT_TAIL",
       "F11_PUMPING_TREMOLO",
       "F12_MENACING_LOW_REGISTER",
       "F13_SUBBASS_RUMBLE",
@@ -653,7 +639,7 @@
           {
             "id": "clip_09",
             "label": "clip_09 (bird_song)",
-            "score": 0.484,
+            "score": 0.858,
             "threshold": 0.42,
             "evidence": "attackSlope=0.4564 @ 0.023s, hfRatio=0.525"
           }
@@ -676,25 +662,10 @@
         "name": "Unstructured Noise (Wind / Static)",
         "isCore": true,
         "isOrthogonal": false,
-        "status": "CONTESTED",
-        "falsePositiveCount": 2,
-        "falsePositiveRate": 0.2,
-        "rejectedItems": [
-          {
-            "id": "clip_09",
-            "label": "clip_09 (bird_song)",
-            "score": 0.98,
-            "threshold": 0.78,
-            "evidence": "voicedRatio=0.0202 (activeFrames=297)"
-          },
-          {
-            "id": "p1_baby",
-            "label": "p1_baby (animal_baby_lamb)",
-            "score": 1,
-            "threshold": 0.78,
-            "evidence": "voicedRatio=0 (activeFrames=49)"
-          }
-        ]
+        "status": "CLEARED",
+        "falsePositiveCount": 0,
+        "falsePositiveRate": 0,
+        "rejectedItems": []
       },
       {
         "id": "F4_NO_COMMON_CAUSE",
@@ -703,16 +674,9 @@
         "isCore": true,
         "isOrthogonal": false,
         "status": "CONTESTED",
-        "falsePositiveCount": 2,
-        "falsePositiveRate": 0.2,
+        "falsePositiveCount": 1,
+        "falsePositiveRate": 0.1,
         "rejectedItems": [
-          {
-            "id": "clip_09",
-            "label": "clip_09 (bird_song)",
-            "score": 0.812,
-            "threshold": 0.78,
-            "evidence": "crossChannelCoupling=0.1878"
-          },
           {
             "id": "p4_baby",
             "label": "p4_baby (animal_small_squirrel)",
@@ -728,32 +692,10 @@
         "name": "Abrupt Cut-Off Tail (Symbolic / Katakana)",
         "isCore": true,
         "isOrthogonal": false,
-        "status": "CONTESTED",
-        "falsePositiveCount": 3,
-        "falsePositiveRate": 0.3,
-        "rejectedItems": [
-          {
-            "id": "clip_01",
-            "label": "clip_01 (human_singing_polyphonic)",
-            "score": 1,
-            "threshold": 0.61,
-            "evidence": "tailDecay=0s (from 2.983s)"
-          },
-          {
-            "id": "p1_baby",
-            "label": "p1_baby (animal_baby_lamb)",
-            "score": 0.929,
-            "threshold": 0.61,
-            "evidence": "tailDecay=0.01s (from 0.513s)"
-          },
-          {
-            "id": "p2_baby",
-            "label": "p2_baby (animal_young_cat_meow)",
-            "score": 1,
-            "threshold": 0.61,
-            "evidence": "tailDecay=0s (from 1.133s)"
-          }
-        ]
+        "status": "CLEARED",
+        "falsePositiveCount": 0,
+        "falsePositiveRate": 0,
+        "rejectedItems": []
       },
       {
         "id": "F6_PHYSICAL_GLITCH",
@@ -1221,13 +1163,10 @@
         "label": "clip_01 (human_singing_polyphonic)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Chakrulo_(1957).ogg",
         "license": "Public Domain (1957 folk recording)",
-        "core6Survived": false,
+        "core6Survived": true,
         "fullSurvived": false,
-        "coreTriggeredIds": [
-          "F5_ABRUPT_TAIL"
-        ],
+        "coreTriggeredIds": [],
         "triggeredIds": [
-          "F5_ABRUPT_TAIL",
           "F24_CALCULATED_PITCH_LFO"
         ]
       },
@@ -1279,14 +1218,10 @@
         "core6Survived": false,
         "fullSurvived": false,
         "coreTriggeredIds": [
-          "F1_HARSH_EDGE",
-          "F3_PURE_NOISE",
-          "F4_NO_COMMON_CAUSE"
+          "F1_HARSH_EDGE"
         ],
         "triggeredIds": [
           "F1_HARSH_EDGE",
-          "F3_PURE_NOISE",
-          "F4_NO_COMMON_CAUSE",
           "F14_HELMHOLTZ_ROUGHNESS",
           "F28_MAINS_HUM_DRONE"
         ]
@@ -1296,15 +1231,10 @@
         "label": "p1_baby (animal_baby_lamb)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Mudchute_lamb_1.ogg",
         "license": "CC BY-SA 3.0",
-        "core6Survived": false,
+        "core6Survived": true,
         "fullSurvived": false,
-        "coreTriggeredIds": [
-          "F3_PURE_NOISE",
-          "F5_ABRUPT_TAIL"
-        ],
+        "coreTriggeredIds": [],
         "triggeredIds": [
-          "F3_PURE_NOISE",
-          "F5_ABRUPT_TAIL",
           "F14_HELMHOLTZ_ROUGHNESS"
         ]
       },
@@ -1313,13 +1243,10 @@
         "label": "p2_baby (animal_young_cat_meow)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Maullido_de_gata_hembra_joven.ogg",
         "license": "CC0",
-        "core6Survived": false,
+        "core6Survived": true,
         "fullSurvived": false,
-        "coreTriggeredIds": [
-          "F5_ABRUPT_TAIL"
-        ],
+        "coreTriggeredIds": [],
         "triggeredIds": [
-          "F5_ABRUPT_TAIL",
           "F12_MENACING_LOW_REGISTER",
           "F13_SUBBASS_RUMBLE",
           "F23_ERRATIC_PITCH_WARBLE"
@@ -1375,18 +1302,16 @@
     "shelfSize": 19,
     "totalFalsifiers": 32,
     "shelfSurvivalRate": {
-      "core6": 0.6842,
+      "core6": 0.8947,
       "full": 0.0526,
-      "core6Survived": 13,
+      "core6Survived": 17,
       "fullSurvived": 1
     },
-    "contestedCount": 13,
-    "clearedCount": 19,
+    "contestedCount": 11,
+    "clearedCount": 21,
     "contestedIds": [
       "F1_HARSH_EDGE",
-      "F3_PURE_NOISE",
       "F4_NO_COMMON_CAUSE",
-      "F5_ABRUPT_TAIL",
       "F11_PUMPING_TREMOLO",
       "F12_MENACING_LOW_REGISTER",
       "F13_SUBBASS_RUMBLE",
@@ -1405,20 +1330,13 @@
         "isCore": true,
         "isOrthogonal": false,
         "status": "CONTESTED",
-        "falsePositiveCount": 2,
-        "falsePositiveRate": 0.1053,
+        "falsePositiveCount": 1,
+        "falsePositiveRate": 0.0526,
         "rejectedItems": [
-          {
-            "id": "tokiko_watashi_amae",
-            "label": "tokiko:amae:わたし、にほんご、ちょっとしゃべれます",
-            "score": 0.307,
-            "threshold": 0.42,
-            "evidence": "attackSlope=0.4211 @ 3.103s, hfRatio=0.1367"
-          },
           {
             "id": "clip_09",
             "label": "clip_09 (bird_song)",
-            "score": 0.484,
+            "score": 0.858,
             "threshold": 0.42,
             "evidence": "attackSlope=0.4564 @ 0.023s, hfRatio=0.525"
           }
@@ -1441,25 +1359,10 @@
         "name": "Unstructured Noise (Wind / Static)",
         "isCore": true,
         "isOrthogonal": false,
-        "status": "CONTESTED",
-        "falsePositiveCount": 2,
-        "falsePositiveRate": 0.1053,
-        "rejectedItems": [
-          {
-            "id": "clip_09",
-            "label": "clip_09 (bird_song)",
-            "score": 0.98,
-            "threshold": 0.78,
-            "evidence": "voicedRatio=0.0202 (activeFrames=297)"
-          },
-          {
-            "id": "p1_baby",
-            "label": "p1_baby (animal_baby_lamb)",
-            "score": 1,
-            "threshold": 0.78,
-            "evidence": "voicedRatio=0 (activeFrames=49)"
-          }
-        ]
+        "status": "CLEARED",
+        "falsePositiveCount": 0,
+        "falsePositiveRate": 0,
+        "rejectedItems": []
       },
       {
         "id": "F4_NO_COMMON_CAUSE",
@@ -1468,16 +1371,9 @@
         "isCore": true,
         "isOrthogonal": false,
         "status": "CONTESTED",
-        "falsePositiveCount": 2,
-        "falsePositiveRate": 0.1053,
+        "falsePositiveCount": 1,
+        "falsePositiveRate": 0.0526,
         "rejectedItems": [
-          {
-            "id": "clip_09",
-            "label": "clip_09 (bird_song)",
-            "score": 0.812,
-            "threshold": 0.78,
-            "evidence": "crossChannelCoupling=0.1878"
-          },
           {
             "id": "p4_baby",
             "label": "p4_baby (animal_small_squirrel)",
@@ -1493,32 +1389,10 @@
         "name": "Abrupt Cut-Off Tail (Symbolic / Katakana)",
         "isCore": true,
         "isOrthogonal": false,
-        "status": "CONTESTED",
-        "falsePositiveCount": 3,
-        "falsePositiveRate": 0.1579,
-        "rejectedItems": [
-          {
-            "id": "clip_01",
-            "label": "clip_01 (human_singing_polyphonic)",
-            "score": 1,
-            "threshold": 0.61,
-            "evidence": "tailDecay=0s (from 2.983s)"
-          },
-          {
-            "id": "p1_baby",
-            "label": "p1_baby (animal_baby_lamb)",
-            "score": 0.929,
-            "threshold": 0.61,
-            "evidence": "tailDecay=0.01s (from 0.513s)"
-          },
-          {
-            "id": "p2_baby",
-            "label": "p2_baby (animal_young_cat_meow)",
-            "score": 1,
-            "threshold": 0.61,
-            "evidence": "tailDecay=0s (from 1.133s)"
-          }
-        ]
+        "status": "CLEARED",
+        "falsePositiveCount": 0,
+        "falsePositiveRate": 0,
+        "rejectedItems": []
       },
       {
         "id": "F6_PHYSICAL_GLITCH",
@@ -2133,13 +2007,10 @@
         "label": "tokiko:amae:わたし、にほんご、ちょっとしゃべれます",
         "source": "poidowl/tokiko-axis/kuda.mjs",
         "license": "Project-local reference synthesizer",
-        "core6Survived": false,
+        "core6Survived": true,
         "fullSurvived": false,
-        "coreTriggeredIds": [
-          "F1_HARSH_EDGE"
-        ],
+        "coreTriggeredIds": [],
         "triggeredIds": [
-          "F1_HARSH_EDGE",
           "F14_HELMHOLTZ_ROUGHNESS",
           "F23_ERRATIC_PITCH_WARBLE",
           "F26_INTERNAL_REBOUND_SHOCK"
@@ -2201,13 +2072,10 @@
         "label": "clip_01 (human_singing_polyphonic)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Chakrulo_(1957).ogg",
         "license": "Public Domain (1957 folk recording)",
-        "core6Survived": false,
+        "core6Survived": true,
         "fullSurvived": false,
-        "coreTriggeredIds": [
-          "F5_ABRUPT_TAIL"
-        ],
+        "coreTriggeredIds": [],
         "triggeredIds": [
-          "F5_ABRUPT_TAIL",
           "F24_CALCULATED_PITCH_LFO"
         ]
       },
@@ -2259,14 +2127,10 @@
         "core6Survived": false,
         "fullSurvived": false,
         "coreTriggeredIds": [
-          "F1_HARSH_EDGE",
-          "F3_PURE_NOISE",
-          "F4_NO_COMMON_CAUSE"
+          "F1_HARSH_EDGE"
         ],
         "triggeredIds": [
           "F1_HARSH_EDGE",
-          "F3_PURE_NOISE",
-          "F4_NO_COMMON_CAUSE",
           "F14_HELMHOLTZ_ROUGHNESS",
           "F28_MAINS_HUM_DRONE"
         ]
@@ -2276,15 +2140,10 @@
         "label": "p1_baby (animal_baby_lamb)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Mudchute_lamb_1.ogg",
         "license": "CC BY-SA 3.0",
-        "core6Survived": false,
+        "core6Survived": true,
         "fullSurvived": false,
-        "coreTriggeredIds": [
-          "F3_PURE_NOISE",
-          "F5_ABRUPT_TAIL"
-        ],
+        "coreTriggeredIds": [],
         "triggeredIds": [
-          "F3_PURE_NOISE",
-          "F5_ABRUPT_TAIL",
           "F14_HELMHOLTZ_ROUGHNESS"
         ]
       },
@@ -2293,13 +2152,10 @@
         "label": "p2_baby (animal_young_cat_meow)",
         "source": "https://commons.wikimedia.org/wiki/Special:FilePath/Maullido_de_gata_hembra_joven.ogg",
         "license": "CC0",
-        "core6Survived": false,
+        "core6Survived": true,
         "fullSurvived": false,
-        "coreTriggeredIds": [
-          "F5_ABRUPT_TAIL"
-        ],
+        "coreTriggeredIds": [],
         "triggeredIds": [
-          "F5_ABRUPT_TAIL",
           "F12_MENACING_LOW_REGISTER",
           "F13_SUBBASS_RUMBLE",
           "F23_ERRATIC_PITCH_WARBLE"
@@ -2351,8 +2207,8 @@
     ]
   },
   "shelfVetoSummary": {
-    "contestedCount": 13,
-    "clearedCount": 19,
+    "contestedCount": 11,
+    "clearedCount": 21,
     "tokikoSurvived": 9,
     "benignRealSurvived": 10,
     "combinedSurvived": 19
@@ -2368,6 +2224,7 @@
           "id": "clip_09",
           "label": "clip_09 (bird_song)",
           "caughtBy": [
+            "F1_HARSH_EDGE",
             "F28_MAINS_HUM_DRONE"
           ]
         },
@@ -2382,6 +2239,7 @@
           "id": "p4_baby",
           "label": "p4_baby (animal_small_squirrel)",
           "caughtBy": [
+            "F4_NO_COMMON_CAUSE",
             "F15_PIERCING_WHISTLE"
           ]
         },
@@ -2396,8 +2254,8 @@
       "expectedUnkawaiiRecall": {
         "total": 5,
         "minCaught": 3,
-        "maxCaught": 4,
-        "meanCaught": 3.05
+        "maxCaught": 5,
+        "meanCaught": 3.16
       }
     },
     "crossDomain": {
@@ -2405,7 +2263,7 @@
         "trainDomain": "benign_real_audio",
         "testDomain": "tokiko_axis",
         "trainSize": 10,
-        "trainContestedCount": 12,
+        "trainContestedCount": 10,
         "survived": 6,
         "total": 9,
         "survivalRate": 0.6667,
@@ -2438,19 +2296,12 @@
         "trainDomain": "tokiko_axis",
         "testDomain": "benign_real_audio",
         "trainSize": 9,
-        "trainContestedCount": 5,
-        "survived": 3,
+        "trainContestedCount": 4,
+        "survived": 5,
         "total": 10,
-        "survivalRate": 0.3,
-        "fpr": 0.7,
+        "survivalRate": 0.5,
+        "fpr": 0.5,
         "failures": [
-          {
-            "id": "clip_01",
-            "label": "clip_01 (human_singing_polyphonic)",
-            "caughtBy": [
-              "F5_ABRUPT_TAIL"
-            ]
-          },
           {
             "id": "clip_05",
             "label": "clip_05 (acoustic_guitar_lullaby)",
@@ -2462,24 +2313,14 @@
             "id": "clip_09",
             "label": "clip_09 (bird_song)",
             "caughtBy": [
-              "F3_PURE_NOISE",
-              "F4_NO_COMMON_CAUSE",
+              "F1_HARSH_EDGE",
               "F28_MAINS_HUM_DRONE"
-            ]
-          },
-          {
-            "id": "p1_baby",
-            "label": "p1_baby (animal_baby_lamb)",
-            "caughtBy": [
-              "F3_PURE_NOISE",
-              "F5_ABRUPT_TAIL"
             ]
           },
           {
             "id": "p2_baby",
             "label": "p2_baby (animal_young_cat_meow)",
             "caughtBy": [
-              "F5_ABRUPT_TAIL",
               "F12_MENACING_LOW_REGISTER",
               "F13_SUBBASS_RUMBLE"
             ]
@@ -2505,16 +2346,19 @@
   },
   "expectedUnkawaiiSummary": {
     "count": 5,
-    "coreCaught": 3,
+    "coreCaught": 4,
     "shelfCaught": 3,
     "allCaught": 5,
     "clips": [
       {
         "id": "clip_07",
         "title": "Cat hissing aggressively",
-        "coreTriggered": [],
+        "coreTriggered": [
+          "F1_HARSH_EDGE"
+        ],
         "shelfTriggered": [],
         "allTriggered": [
+          "F1_HARSH_EDGE",
           "F13_SUBBASS_RUMBLE",
           "F14_HELMHOLTZ_ROUGHNESS",
           "F23_ERRATIC_PITCH_WARBLE"
@@ -2524,7 +2368,6 @@
         "id": "clip_08",
         "title": "Periodic alarm / siren beep",
         "coreTriggered": [
-          "F5_ABRUPT_TAIL",
           "F6_PHYSICAL_GLITCH"
         ],
         "shelfTriggered": [
@@ -2536,7 +2379,6 @@
           "F27_METRONOMIC_CADENCE"
         ],
         "allTriggered": [
-          "F5_ABRUPT_TAIL",
           "F6_PHYSICAL_GLITCH",
           "F7_FLAT_TOP_CLIPPING",
           "F9_MICRO_CLICK_DROPOUT",
@@ -2573,15 +2415,12 @@
       {
         "id": "p4_adult",
         "title": "Wild boar growling",
-        "coreTriggered": [
-          "F5_ABRUPT_TAIL"
-        ],
+        "coreTriggered": [],
         "shelfTriggered": [
           "F17_HOLLOW_METALLIC_COMB",
           "F18_MUDDY_BOXINESS"
         ],
         "allTriggered": [
-          "F5_ABRUPT_TAIL",
           "F14_HELMHOLTZ_ROUGHNESS",
           "F17_HOLLOW_METALLIC_COMB",
           "F18_MUDDY_BOXINESS",
@@ -2591,9 +2430,12 @@
       {
         "id": "p5_adult",
         "title": "Giant canine deep growl",
-        "coreTriggered": [],
+        "coreTriggered": [
+          "F1_HARSH_EDGE"
+        ],
         "shelfTriggered": [],
         "allTriggered": [
+          "F1_HARSH_EDGE",
           "F14_HELMHOLTZ_ROUGHNESS",
           "F23_ERRATIC_PITCH_WARBLE"
         ]
@@ -2801,8 +2643,8 @@
         "count": 9,
         "respiratoryScore": {
           "count": 9,
-          "mean": 0.9969,
-          "min": 0.9895,
+          "mean": 0.968,
+          "min": 0.9467,
           "max": 1
         },
         "directnessScore": {
@@ -2822,9 +2664,9 @@
         "count": 10,
         "respiratoryScore": {
           "count": 10,
-          "mean": 0.8119,
-          "min": 0.5962,
-          "max": 1
+          "mean": 0.8236,
+          "min": 0.5894,
+          "max": 0.9897
         },
         "directnessScore": {
           "count": 10,
@@ -2843,9 +2685,9 @@
         "count": 2,
         "respiratoryScore": {
           "count": 2,
-          "mean": 0.7296,
-          "min": 0.474,
-          "max": 0.9853
+          "mean": 0.7859,
+          "min": 0.6321,
+          "max": 0.9397
         },
         "directnessScore": {
           "count": 2,
@@ -2854,9 +2696,9 @@
           "max": 0.9079
         },
         "quadrants": {
-          "addressed_breath": 1,
+          "addressed_breath": 2,
           "distant_or_private_breath": 0,
-          "non_breath_signal": 1,
+          "non_breath_signal": 0,
           "ambient_or_hollow": 0
         }
       },
@@ -2864,9 +2706,9 @@
         "count": 5,
         "respiratoryScore": {
           "count": 5,
-          "mean": 0.7734,
-          "min": 0.3382,
-          "max": 0.9719
+          "mean": 0.7512,
+          "min": 0.4339,
+          "max": 0.8623
         },
         "directnessScore": {
           "count": 5,
@@ -2895,7 +2737,7 @@
         "id": "tokiko_naru_amae",
         "group": "tokiko",
         "title": "amae:なる",
-        "respiratoryScore": 1,
+        "respiratoryScore": 0.988,
         "directnessScore": 0.9648,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -2903,7 +2745,7 @@
         "id": "tokiko_naru_genki",
         "group": "tokiko",
         "title": "genki:なる",
-        "respiratoryScore": 1,
+        "respiratoryScore": 0.9872,
         "directnessScore": 0.9565,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -2911,7 +2753,7 @@
         "id": "tokiko_watashi_kawaii",
         "group": "tokiko",
         "title": "kawaii:わたし、にほんご、ちょっとしゃべれます",
-        "respiratoryScore": 1,
+        "respiratoryScore": 0.949,
         "directnessScore": 0.9967,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -2919,7 +2761,7 @@
         "id": "tokiko_watashi_amae",
         "group": "tokiko",
         "title": "amae:わたし、にほんご、ちょっとしゃべれます",
-        "respiratoryScore": 0.9899,
+        "respiratoryScore": 0.967,
         "directnessScore": 0.9967,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -2927,7 +2769,7 @@
         "id": "tokiko_watashi_genki",
         "group": "tokiko",
         "title": "genki:わたし、にほんご、ちょっとしゃべれます",
-        "respiratoryScore": 0.9895,
+        "respiratoryScore": 0.9467,
         "directnessScore": 0.9972,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -2935,7 +2777,7 @@
         "id": "tokiko_ohayo_kawaii",
         "group": "tokiko",
         "title": "kawaii:おはよう、きょうは、いいてんきだね",
-        "respiratoryScore": 0.9927,
+        "respiratoryScore": 0.949,
         "directnessScore": 0.999,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -2943,7 +2785,7 @@
         "id": "tokiko_ohayo_amae",
         "group": "tokiko",
         "title": "amae:おはよう、きょうは、いいてんきだね",
-        "respiratoryScore": 0.9998,
+        "respiratoryScore": 0.9535,
         "directnessScore": 0.9978,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -2951,7 +2793,7 @@
         "id": "tokiko_ohayo_genki",
         "group": "tokiko",
         "title": "genki:おはよう、きょうは、いいてんきだね",
-        "respiratoryScore": 1,
+        "respiratoryScore": 0.9715,
         "directnessScore": 0.9992,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -2959,7 +2801,7 @@
         "id": "clip_01",
         "group": "benign_real_audio",
         "title": "Georgian polyphonic folk song 'Chakrulo' (1957)",
-        "respiratoryScore": 0.7921,
+        "respiratoryScore": 0.9685,
         "directnessScore": 0.9688,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -2967,7 +2809,7 @@
         "id": "clip_02",
         "group": "benign_real_audio",
         "title": "Mozart 'Die Zauberflote' vocal ensemble (Ferenc Fricsay, 1953)",
-        "respiratoryScore": 0.9791,
+        "respiratoryScore": 0.9013,
         "directnessScore": 0.7833,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -2975,7 +2817,7 @@
         "id": "clip_03",
         "group": "historical_recording",
         "title": "Metropolitan Quartet 'Darling Nellie Gray' (1909 78rpm)",
-        "respiratoryScore": 0.9853,
+        "respiratoryScore": 0.9397,
         "directnessScore": 0.7071,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -2983,15 +2825,15 @@
         "id": "clip_04",
         "group": "historical_recording",
         "title": "Au Clair de la Lune (1860 phonautogram, oldest human voice)",
-        "respiratoryScore": 0.474,
+        "respiratoryScore": 0.6321,
         "directnessScore": 0.9079,
-        "voiceCompassLabel": "non_breath_signal"
+        "voiceCompassLabel": "addressed_breath"
       },
       {
         "id": "clip_05",
         "group": "benign_real_audio",
         "title": "Catalan folk lullaby 'El Noi de la Mare' (acoustic guitar)",
-        "respiratoryScore": 0.7747,
+        "respiratoryScore": 0.7097,
         "directnessScore": 0.5325,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -3007,7 +2849,7 @@
         "id": "clip_07",
         "group": "expected_unkawaii",
         "title": "Cat hissing aggressively",
-        "respiratoryScore": 0.9719,
+        "respiratoryScore": 0.8576,
         "directnessScore": 0.5376,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -3015,7 +2857,7 @@
         "id": "clip_08",
         "group": "expected_unkawaii",
         "title": "Periodic alarm / siren beep",
-        "respiratoryScore": 0.3382,
+        "respiratoryScore": 0.4339,
         "directnessScore": 0.7378,
         "voiceCompassLabel": "non_breath_signal"
       },
@@ -3023,7 +2865,7 @@
         "id": "clip_09",
         "group": "benign_real_audio",
         "title": "Red-winged Blackbird song",
-        "respiratoryScore": 0.6509,
+        "respiratoryScore": 0.5894,
         "directnessScore": 0.3754,
         "voiceCompassLabel": "distant_or_private_breath"
       },
@@ -3031,7 +2873,7 @@
         "id": "clip_10",
         "group": "expected_unkawaii",
         "title": "Synthetic perturbation of clip_05 (+60Hz/120Hz hum + 2-sample click @ 1.20s)",
-        "respiratoryScore": 0.8288,
+        "respiratoryScore": 0.7415,
         "directnessScore": 0.3387,
         "voiceCompassLabel": "distant_or_private_breath"
       },
@@ -3039,7 +2881,7 @@
         "id": "p1_baby",
         "group": "benign_real_audio",
         "title": "Mudchute farm lamb bleat",
-        "respiratoryScore": 0.5962,
+        "respiratoryScore": 0.7232,
         "directnessScore": 0.7516,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -3047,7 +2889,7 @@
         "id": "p1_adult",
         "group": "neutral_adult_animal",
         "title": "Mudchute farm adult sheep bleat",
-        "respiratoryScore": 0.9274,
+        "respiratoryScore": 0.8703,
         "directnessScore": 0.6725,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -3055,7 +2897,7 @@
         "id": "p2_baby",
         "group": "benign_real_audio",
         "title": "Young female cat meow",
-        "respiratoryScore": 0.7207,
+        "respiratoryScore": 0.8397,
         "directnessScore": 0.3749,
         "voiceCompassLabel": "distant_or_private_breath"
       },
@@ -3063,7 +2905,7 @@
         "id": "p2_adult",
         "group": "expected_unkawaii",
         "title": "Cat hissing aggressively",
-        "respiratoryScore": 0.9719,
+        "respiratoryScore": 0.8576,
         "directnessScore": 0.5376,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -3079,7 +2921,7 @@
         "id": "p3_adult",
         "group": "benign_real_audio",
         "title": "Adult male Georgian folk singing ('Chakrulo', 1957)",
-        "respiratoryScore": 1,
+        "respiratoryScore": 0.9897,
         "directnessScore": 0.9838,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -3087,7 +2929,7 @@
         "id": "p4_baby",
         "group": "benign_real_audio",
         "title": "Three-striped palm squirrel chirping",
-        "respiratoryScore": 0.7255,
+        "respiratoryScore": 0.7006,
         "directnessScore": 0.4735,
         "voiceCompassLabel": "distant_or_private_breath"
       },
@@ -3095,7 +2937,7 @@
         "id": "p4_adult",
         "group": "expected_unkawaii",
         "title": "Wild boar growling",
-        "respiratoryScore": 0.7582,
+        "respiratoryScore": 0.8606,
         "directnessScore": 0.8561,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -3103,7 +2945,7 @@
         "id": "p5_baby",
         "group": "benign_real_audio",
         "title": "Small dog bark",
-        "respiratoryScore": 1,
+        "respiratoryScore": 0.9351,
         "directnessScore": 0.977,
         "voiceCompassLabel": "addressed_breath"
       },
@@ -3111,7 +2953,7 @@
         "id": "p5_adult",
         "group": "expected_unkawaii",
         "title": "Giant canine deep growl",
-        "respiratoryScore": 0.9699,
+        "respiratoryScore": 0.8623,
         "directnessScore": 0.7049,
         "voiceCompassLabel": "addressed_breath"
       }
@@ -3162,7 +3004,7 @@
       "mpsRoughness30_150": 0.0148,
       "mpsRoughToSpeechRatio": 0.136,
       "subharmonicRatio": 0.0645,
-      "respiratoryScore": 1,
+      "respiratoryScore": 0.988,
       "directnessScore": 0.9648,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3186,7 +3028,7 @@
       "mpsRoughness30_150": 0.0146,
       "mpsRoughToSpeechRatio": 0.102,
       "subharmonicRatio": 0.0047,
-      "respiratoryScore": 1,
+      "respiratoryScore": 0.9872,
       "directnessScore": 0.9565,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3210,7 +3052,7 @@
       "mpsRoughness30_150": 0.0109,
       "mpsRoughToSpeechRatio": 0.064,
       "subharmonicRatio": 0.0957,
-      "respiratoryScore": 1,
+      "respiratoryScore": 0.949,
       "directnessScore": 0.9967,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3219,15 +3061,12 @@
       "utterance": "わたし、にほんご、ちょっとしゃべれます",
       "preset": "amae",
       "source": "poidowl/tokiko-axis/kuda.mjs",
-      "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
-      "coreTriggered": [
-        "F1_HARSH_EDGE"
-      ],
+      "coreTriggered": [],
       "shelfTriggered": [],
       "allTriggered": [
-        "F1_HARSH_EDGE",
         "F14_HELMHOLTZ_ROUGHNESS",
         "F23_ERRATIC_PITCH_WARBLE",
         "F26_INTERNAL_REBOUND_SHOCK"
@@ -3239,7 +3078,7 @@
       "mpsRoughness30_150": 0.0193,
       "mpsRoughToSpeechRatio": 0.134,
       "subharmonicRatio": 0.057,
-      "respiratoryScore": 0.9899,
+      "respiratoryScore": 0.967,
       "directnessScore": 0.9967,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3264,7 +3103,7 @@
       "mpsRoughness30_150": 0.0115,
       "mpsRoughToSpeechRatio": 0.06,
       "subharmonicRatio": 0.0629,
-      "respiratoryScore": 0.9895,
+      "respiratoryScore": 0.9467,
       "directnessScore": 0.9972,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3288,7 +3127,7 @@
       "mpsRoughness30_150": 0.0076,
       "mpsRoughToSpeechRatio": 0.071,
       "subharmonicRatio": 0.0687,
-      "respiratoryScore": 0.9927,
+      "respiratoryScore": 0.949,
       "directnessScore": 0.999,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3313,7 +3152,7 @@
       "mpsRoughness30_150": 0.0107,
       "mpsRoughToSpeechRatio": 0.091,
       "subharmonicRatio": 0.0277,
-      "respiratoryScore": 0.9998,
+      "respiratoryScore": 0.9535,
       "directnessScore": 0.9978,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3338,7 +3177,7 @@
       "mpsRoughness30_150": 0.0063,
       "mpsRoughToSpeechRatio": 0.052,
       "subharmonicRatio": 0.07,
-      "respiratoryScore": 1,
+      "respiratoryScore": 0.9715,
       "directnessScore": 0.9992,
       "voiceCompassLabel": "addressed_breath"
     }
@@ -3356,15 +3195,12 @@
       "artist": null,
       "sha256": "8bc5e5fc163cb658f1e3fc2571c86ab2dd2108e374a03d425a757e8f4ebee7e8",
       "sha256Match": true,
-      "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
-      "coreTriggered": [
-        "F5_ABRUPT_TAIL"
-      ],
+      "coreTriggered": [],
       "shelfTriggered": [],
       "allTriggered": [
-        "F5_ABRUPT_TAIL",
         "F24_CALCULATED_PITCH_LFO"
       ],
       "f0MedianHz": 206.41,
@@ -3374,7 +3210,7 @@
       "mpsRoughness30_150": 0.0093,
       "mpsRoughToSpeechRatio": 0.147,
       "subharmonicRatio": 0.1663,
-      "respiratoryScore": 0.7921,
+      "respiratoryScore": 0.9685,
       "directnessScore": 0.9688,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3406,7 +3242,7 @@
       "mpsRoughness30_150": 0.0282,
       "mpsRoughToSpeechRatio": 0.637,
       "subharmonicRatio": 0.0531,
-      "respiratoryScore": 0.9791,
+      "respiratoryScore": 0.9013,
       "directnessScore": 0.7833,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3441,7 +3277,7 @@
       "mpsRoughness30_150": 0.0481,
       "mpsRoughToSpeechRatio": 5.981,
       "subharmonicRatio": 0.124,
-      "respiratoryScore": 0.9853,
+      "respiratoryScore": 0.9397,
       "directnessScore": 0.7071,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3457,17 +3293,12 @@
       "artist": null,
       "sha256": "c12ad24a202c7efd644d23bdd6b45c702650f3f574a41d555e991bb381a7eb3c",
       "sha256Match": true,
-      "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
-      "coreTriggered": [
-        "F4_NO_COMMON_CAUSE",
-        "F5_ABRUPT_TAIL"
-      ],
+      "coreTriggered": [],
       "shelfTriggered": [],
       "allTriggered": [
-        "F4_NO_COMMON_CAUSE",
-        "F5_ABRUPT_TAIL",
         "F23_ERRATIC_PITCH_WARBLE"
       ],
       "f0MedianHz": 299.09,
@@ -3477,9 +3308,9 @@
       "mpsRoughness30_150": 0.0106,
       "mpsRoughToSpeechRatio": 0.356,
       "subharmonicRatio": 0.014,
-      "respiratoryScore": 0.474,
+      "respiratoryScore": 0.6321,
       "directnessScore": 0.9079,
-      "voiceCompassLabel": "non_breath_signal"
+      "voiceCompassLabel": "addressed_breath"
     },
     {
       "id": "clip_05",
@@ -3510,7 +3341,7 @@
       "mpsRoughness30_150": 0.0767,
       "mpsRoughToSpeechRatio": 5.668,
       "subharmonicRatio": 0.1215,
-      "respiratoryScore": 0.7747,
+      "respiratoryScore": 0.7097,
       "directnessScore": 0.5325,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3558,12 +3389,15 @@
       "artist": "Zabuhailo",
       "sha256": "49d152839c2ebbab44f5339f61c3fef71a1ea4f72f9c87ae0b2cc7633316b6b6",
       "sha256Match": true,
-      "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictCoreVeto": "REJECTED_UNKAWAII",
       "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
-      "coreTriggered": [],
+      "coreTriggered": [
+        "F1_HARSH_EDGE"
+      ],
       "shelfTriggered": [],
       "allTriggered": [
+        "F1_HARSH_EDGE",
         "F13_SUBBASS_RUMBLE",
         "F14_HELMHOLTZ_ROUGHNESS",
         "F23_ERRATIC_PITCH_WARBLE"
@@ -3575,7 +3409,7 @@
       "mpsRoughness30_150": 0.0301,
       "mpsRoughToSpeechRatio": 0.644,
       "subharmonicRatio": 0.1165,
-      "respiratoryScore": 0.9719,
+      "respiratoryScore": 0.8576,
       "directnessScore": 0.5376,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3595,7 +3429,6 @@
       "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
-        "F5_ABRUPT_TAIL",
         "F6_PHYSICAL_GLITCH"
       ],
       "shelfTriggered": [
@@ -3607,7 +3440,6 @@
         "F27_METRONOMIC_CADENCE"
       ],
       "allTriggered": [
-        "F5_ABRUPT_TAIL",
         "F6_PHYSICAL_GLITCH",
         "F7_FLAT_TOP_CLIPPING",
         "F9_MICRO_CLICK_DROPOUT",
@@ -3625,7 +3457,7 @@
       "mpsRoughness30_150": 0.2459,
       "mpsRoughToSpeechRatio": 8.099,
       "subharmonicRatio": 0.0007,
-      "respiratoryScore": 0.3382,
+      "respiratoryScore": 0.4339,
       "directnessScore": 0.7378,
       "voiceCompassLabel": "non_breath_signal"
     },
@@ -3645,15 +3477,11 @@
       "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
       "coreTriggered": [
-        "F1_HARSH_EDGE",
-        "F3_PURE_NOISE",
-        "F4_NO_COMMON_CAUSE"
+        "F1_HARSH_EDGE"
       ],
       "shelfTriggered": [],
       "allTriggered": [
         "F1_HARSH_EDGE",
-        "F3_PURE_NOISE",
-        "F4_NO_COMMON_CAUSE",
         "F14_HELMHOLTZ_ROUGHNESS",
         "F28_MAINS_HUM_DRONE"
       ],
@@ -3664,7 +3492,7 @@
       "mpsRoughness30_150": 0.02,
       "mpsRoughToSpeechRatio": 3.148,
       "subharmonicRatio": 0.0179,
-      "respiratoryScore": 0.6509,
+      "respiratoryScore": 0.5894,
       "directnessScore": 0.3754,
       "voiceCompassLabel": "distant_or_private_breath"
     },
@@ -3708,7 +3536,7 @@
       "mpsRoughness30_150": 0.0772,
       "mpsRoughToSpeechRatio": 13.26,
       "subharmonicRatio": 0.1285,
-      "respiratoryScore": 0.8288,
+      "respiratoryScore": 0.7415,
       "directnessScore": 0.3387,
       "voiceCompassLabel": "distant_or_private_breath"
     },
@@ -3724,17 +3552,12 @@
       "artist": "Secretlondon",
       "sha256": "19e229260bbd83c270db8f019be065d137ac1daacc627965433d995c50a65b67",
       "sha256Match": true,
-      "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
-      "coreTriggered": [
-        "F3_PURE_NOISE",
-        "F5_ABRUPT_TAIL"
-      ],
+      "coreTriggered": [],
       "shelfTriggered": [],
       "allTriggered": [
-        "F3_PURE_NOISE",
-        "F5_ABRUPT_TAIL",
         "F14_HELMHOLTZ_ROUGHNESS"
       ],
       "f0MedianHz": 0,
@@ -3744,7 +3567,7 @@
       "mpsRoughness30_150": 0.0195,
       "mpsRoughToSpeechRatio": 1.967,
       "subharmonicRatio": 0,
-      "respiratoryScore": 0.5962,
+      "respiratoryScore": 0.7232,
       "directnessScore": 0.7516,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3784,7 +3607,7 @@
       "mpsRoughness30_150": 0.0161,
       "mpsRoughToSpeechRatio": 4.718,
       "subharmonicRatio": 0.0499,
-      "respiratoryScore": 0.9274,
+      "respiratoryScore": 0.8703,
       "directnessScore": 0.6725,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3800,15 +3623,12 @@
       "artist": "George Miquilena",
       "sha256": "5b1d90a87248f9a32aea8a71f0c87e9d02223008d3e7d3952efc038d65653ab3",
       "sha256Match": true,
-      "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
-      "coreTriggered": [
-        "F5_ABRUPT_TAIL"
-      ],
+      "coreTriggered": [],
       "shelfTriggered": [],
       "allTriggered": [
-        "F5_ABRUPT_TAIL",
         "F12_MENACING_LOW_REGISTER",
         "F13_SUBBASS_RUMBLE",
         "F23_ERRATIC_PITCH_WARBLE"
@@ -3820,7 +3640,7 @@
       "mpsRoughness30_150": 0.0722,
       "mpsRoughToSpeechRatio": 3.619,
       "subharmonicRatio": 0.0575,
-      "respiratoryScore": 0.7207,
+      "respiratoryScore": 0.8397,
       "directnessScore": 0.3749,
       "voiceCompassLabel": "distant_or_private_breath"
     },
@@ -3836,12 +3656,15 @@
       "artist": "Zabuhailo",
       "sha256": "49d152839c2ebbab44f5339f61c3fef71a1ea4f72f9c87ae0b2cc7633316b6b6",
       "sha256Match": true,
-      "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictCoreVeto": "REJECTED_UNKAWAII",
       "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
-      "coreTriggered": [],
+      "coreTriggered": [
+        "F1_HARSH_EDGE"
+      ],
       "shelfTriggered": [],
       "allTriggered": [
+        "F1_HARSH_EDGE",
         "F13_SUBBASS_RUMBLE",
         "F14_HELMHOLTZ_ROUGHNESS",
         "F23_ERRATIC_PITCH_WARBLE"
@@ -3853,7 +3676,7 @@
       "mpsRoughness30_150": 0.0301,
       "mpsRoughToSpeechRatio": 0.644,
       "subharmonicRatio": 0.1165,
-      "respiratoryScore": 0.9719,
+      "respiratoryScore": 0.8576,
       "directnessScore": 0.5376,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3914,7 +3737,7 @@
       "mpsRoughness30_150": 0.0076,
       "mpsRoughToSpeechRatio": 0.102,
       "subharmonicRatio": 0.1106,
-      "respiratoryScore": 1,
+      "respiratoryScore": 0.9897,
       "directnessScore": 0.9838,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -3951,7 +3774,7 @@
       "mpsRoughness30_150": 0.0157,
       "mpsRoughToSpeechRatio": 0.061,
       "subharmonicRatio": 0.0669,
-      "respiratoryScore": 0.7255,
+      "respiratoryScore": 0.7006,
       "directnessScore": 0.4735,
       "voiceCompassLabel": "distant_or_private_breath"
     },
@@ -3967,18 +3790,15 @@
       "artist": "GrWolf1129",
       "sha256": "90748a4eeba290e56ea82c7fa9d6feda450600c70d13b2df419f7ede41e29ecd",
       "sha256Match": true,
-      "verdictCoreVeto": "REJECTED_UNKAWAII",
+      "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictShelfVeto": "REJECTED_UNKAWAII",
       "verdictVetoAll": "REJECTED_UNKAWAII",
-      "coreTriggered": [
-        "F5_ABRUPT_TAIL"
-      ],
+      "coreTriggered": [],
       "shelfTriggered": [
         "F17_HOLLOW_METALLIC_COMB",
         "F18_MUDDY_BOXINESS"
       ],
       "allTriggered": [
-        "F5_ABRUPT_TAIL",
         "F14_HELMHOLTZ_ROUGHNESS",
         "F17_HOLLOW_METALLIC_COMB",
         "F18_MUDDY_BOXINESS",
@@ -3991,7 +3811,7 @@
       "mpsRoughness30_150": 0.0192,
       "mpsRoughToSpeechRatio": 0.572,
       "subharmonicRatio": 0.1132,
-      "respiratoryScore": 0.7582,
+      "respiratoryScore": 0.8606,
       "directnessScore": 0.8561,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -4025,7 +3845,7 @@
       "mpsRoughness30_150": 0.028,
       "mpsRoughToSpeechRatio": 0.326,
       "subharmonicRatio": 0.0867,
-      "respiratoryScore": 1,
+      "respiratoryScore": 0.9351,
       "directnessScore": 0.977,
       "voiceCompassLabel": "addressed_breath"
     },
@@ -4041,12 +3861,15 @@
       "artist": "LokYYs",
       "sha256": "c5ce9734358e111a4f105c52fbc9c2ab0093782e30af34a2c3bdbd8112f74a78",
       "sha256Match": true,
-      "verdictCoreVeto": "SURVIVED_KAWAII_CANDIDATE",
+      "verdictCoreVeto": "REJECTED_UNKAWAII",
       "verdictShelfVeto": "SURVIVED_KAWAII_CANDIDATE",
       "verdictVetoAll": "REJECTED_UNKAWAII",
-      "coreTriggered": [],
+      "coreTriggered": [
+        "F1_HARSH_EDGE"
+      ],
       "shelfTriggered": [],
       "allTriggered": [
+        "F1_HARSH_EDGE",
         "F14_HELMHOLTZ_ROUGHNESS",
         "F23_ERRATIC_PITCH_WARBLE"
       ],
@@ -4057,7 +3880,7 @@
       "mpsRoughness30_150": 0.0341,
       "mpsRoughToSpeechRatio": 4.336,
       "subharmonicRatio": 0.0254,
-      "respiratoryScore": 0.9699,
+      "respiratoryScore": 0.8623,
       "directnessScore": 0.7049,
       "voiceCompassLabel": "addressed_breath"
     }

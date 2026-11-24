@@ -484,13 +484,28 @@ function buildMarkdownReport(summary) {
   } = summary;
 
   const lines = [];
-  lines.push("# yata v0.6 — Reproducible Real-Audio & Protected Shelf Audit (`RESULTS.md`)");
+  lines.push("# yata v0.8 — Reproducible Real-Audio & Protected Shelf Audit (`RESULTS.md`)");
   lines.push("");
   lines.push(`Generated: \`${generatedAt}\` by \`node bench/real_audio_audit/run_real_audio_audit.mjs\``);
   lines.push(`Manifest: [\`manifest.json\`](./manifest.json) (${realClipCount} trimmed 24kHz mono clips from 16 Wikimedia Commons sources with verified licenses + ${tokikoCount} \`tokiko-axis\` clips).`);
   lines.push("");
-  lines.push("> **Brutal Honesty First**: On synthetic unit tests, all 32 falsifiers pass 100%. On **real human/animal recordings and `tokiko-axis` Japanese speech**, running all 32 axes with unilateral veto power (`--policy veto_all`) causes a high false-positive rate. This report quantifies that exact gap across **`core_veto`** (default), **`shelf_veto`** (suspends veto on shelf-contested axes), and **`veto_all`**, reports **out-of-sample Leave-One-Out (LOO) & cross-domain generalization**, lists every `CONTESTED` axis, separates **LLM visual readability** from **detector precision/recall**, and evaluates the **v0.5 neuroscience DSP lenses** (Arnal `30–150 Hz` MPS roughness & nonlinear subharmonics) honestly on real audio.");
+  lines.push("> **Brutal Honesty First**: On synthetic unit tests, all 32 falsifiers pass 100%. On **real human/animal recordings and `tokiko-axis` Japanese speech**, running all 32 axes with unilateral veto power (`--policy veto_all`) causes a high false-positive rate. This report quantifies that exact gap across **`core_veto`** (default), **`shelf_veto`** (suspends veto on shelf-contested axes), and **`veto_all`**, breaks out **Public Domain / CC0-only** real clips separately from CC BY/BY-SA clips, reports **out-of-sample Leave-One-Out (LOO) & cross-domain generalization**, lists every `CONTESTED` axis, separates **LLM visual readability** from **detector precision/recall**, and evaluates the **v0.5 neuroscience DSP lenses** and **v0.6 Voice Compass** honestly on real audio.");
   lines.push("");
+
+  // Compute Public Domain / CC0-only benign real subset (deduped by SHA-256)
+  const pdCc0Seen = new Set();
+  const pdCc0Benign = [];
+  for (const c of perClipReal) {
+    if (c.auditGroup !== "benign_real_audio") continue;
+    if (!/(public domain|cc0)/i.test(String(c.license || ""))) continue;
+    const key = c.sha256 || c.id;
+    if (pdCc0Seen.has(key)) continue;
+    pdCc0Seen.add(key);
+    pdCc0Benign.push(c);
+  }
+  const pdCc0CoreSurvived = pdCc0Benign.filter((c) => c.coreTriggered.length === 0).length;
+  const pdCc0ShelfSurvived = pdCc0Benign.filter((c) => c.shelfTriggered.length === 0).length;
+  const pdCc0AllSurvived = pdCc0Benign.filter((c) => c.allTriggered.length === 0).length;
 
   // Section A
   lines.push("## A. False-Positive Rate (FPR): `core_veto` vs `shelf_veto` vs `veto_all`");
@@ -503,7 +518,10 @@ function buildMarkdownReport(summary) {
     `| **\`tokiko-axis\` Japanese Speech** (\`kawaii\`/\`amae\`/\`genki\` × 3) | ${tokikoAudit.shelfSize} | **${pct(tokikoAudit.shelfSurvivalRate.core6Survived, tokikoAudit.shelfSize)}** (${tokikoAudit.shelfSurvivalRate.core6Survived}/${tokikoAudit.shelfSize}; FPR ${pct(tokikoAudit.shelfSize - tokikoAudit.shelfSurvivalRate.core6Survived, tokikoAudit.shelfSize)}) | **${pct(shelfVetoSummary.tokikoSurvived, tokikoAudit.shelfSize)}** (${shelfVetoSummary.tokikoSurvived}/${tokikoAudit.shelfSize}; FPR ${pct(tokikoAudit.shelfSize - shelfVetoSummary.tokikoSurvived, tokikoAudit.shelfSize)}) | **${pct(tokikoAudit.shelfSurvivalRate.fullSurvived, tokikoAudit.shelfSize)}** (${tokikoAudit.shelfSurvivalRate.fullSurvived}/${tokikoAudit.shelfSize}; FPR ${pct(tokikoAudit.shelfSize - tokikoAudit.shelfSurvivalRate.fullSurvived, tokikoAudit.shelfSize)}) |`
   );
   lines.push(
-    `| **Benign Real Wikimedia Audio** (deduped by SHA-256) | ${benignRealAudit.shelfSize} | **${pct(benignRealAudit.shelfSurvivalRate.core6Survived, benignRealAudit.shelfSize)}** (${benignRealAudit.shelfSurvivalRate.core6Survived}/${benignRealAudit.shelfSize}; FPR ${pct(benignRealAudit.shelfSize - benignRealAudit.shelfSurvivalRate.core6Survived, benignRealAudit.shelfSize)}) | **${pct(shelfVetoSummary.benignRealSurvived, benignRealAudit.shelfSize)}** (${shelfVetoSummary.benignRealSurvived}/${benignRealAudit.shelfSize}; FPR ${pct(benignRealAudit.shelfSize - shelfVetoSummary.benignRealSurvived, benignRealAudit.shelfSize)}) | **${pct(benignRealAudit.shelfSurvivalRate.fullSurvived, benignRealAudit.shelfSize)}** (${benignRealAudit.shelfSurvivalRate.fullSurvived}/${benignRealAudit.shelfSize}; FPR ${pct(benignRealAudit.shelfSize - benignRealAudit.shelfSurvivalRate.fullSurvived, benignRealAudit.shelfSize)}) |`
+    `| **Benign Real Audio (PD / CC0 only)** (deduped) | ${pdCc0Benign.length} | **${pct(pdCc0CoreSurvived, pdCc0Benign.length)}** (${pdCc0CoreSurvived}/${pdCc0Benign.length}; FPR ${pct(pdCc0Benign.length - pdCc0CoreSurvived, pdCc0Benign.length)}) | **${pct(pdCc0ShelfSurvived, pdCc0Benign.length)}** (${pdCc0ShelfSurvived}/${pdCc0Benign.length}; FPR ${pct(pdCc0Benign.length - pdCc0ShelfSurvived, pdCc0Benign.length)}) | **${pct(pdCc0AllSurvived, pdCc0Benign.length)}** (${pdCc0AllSurvived}/${pdCc0Benign.length}; FPR ${pct(pdCc0Benign.length - pdCc0AllSurvived, pdCc0Benign.length)}) |`
+  );
+  lines.push(
+    `| **Benign Real Wikimedia Audio (All)** (deduped by SHA-256) | ${benignRealAudit.shelfSize} | **${pct(benignRealAudit.shelfSurvivalRate.core6Survived, benignRealAudit.shelfSize)}** (${benignRealAudit.shelfSurvivalRate.core6Survived}/${benignRealAudit.shelfSize}; FPR ${pct(benignRealAudit.shelfSize - benignRealAudit.shelfSurvivalRate.core6Survived, benignRealAudit.shelfSize)}) | **${pct(shelfVetoSummary.benignRealSurvived, benignRealAudit.shelfSize)}** (${shelfVetoSummary.benignRealSurvived}/${benignRealAudit.shelfSize}; FPR ${pct(benignRealAudit.shelfSize - shelfVetoSummary.benignRealSurvived, benignRealAudit.shelfSize)}) | **${pct(benignRealAudit.shelfSurvivalRate.fullSurvived, benignRealAudit.shelfSize)}** (${benignRealAudit.shelfSurvivalRate.fullSurvived}/${benignRealAudit.shelfSize}; FPR ${pct(benignRealAudit.shelfSize - benignRealAudit.shelfSurvivalRate.fullSurvived, benignRealAudit.shelfSize)}) |`
   );
   lines.push(
     `| **Combined Protected Shelf** (\`tokiko\` + Benign Real) | ${combinedShelfAudit.shelfSize} | **${pct(combinedShelfAudit.shelfSurvivalRate.core6Survived, combinedShelfAudit.shelfSize)}** (${combinedShelfAudit.shelfSurvivalRate.core6Survived}/${combinedShelfAudit.shelfSize}; FPR ${pct(combinedShelfAudit.shelfSize - combinedShelfAudit.shelfSurvivalRate.core6Survived, combinedShelfAudit.shelfSize)}) | **${pct(shelfVetoSummary.combinedSurvived, combinedShelfAudit.shelfSize)}** (${shelfVetoSummary.combinedSurvived}/${combinedShelfAudit.shelfSize}; FPR ${pct(combinedShelfAudit.shelfSize - shelfVetoSummary.combinedSurvived, combinedShelfAudit.shelfSize)}) | **${pct(combinedShelfAudit.shelfSurvivalRate.fullSurvived, combinedShelfAudit.shelfSize)}** (${combinedShelfAudit.shelfSurvivalRate.fullSurvived}/${combinedShelfAudit.shelfSize}; FPR ${pct(combinedShelfAudit.shelfSize - combinedShelfAudit.shelfSurvivalRate.fullSurvived, combinedShelfAudit.shelfSize)}) |`

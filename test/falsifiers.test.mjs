@@ -894,4 +894,77 @@ describe("M2: 32-Axis Falsifier Registry & Report Engine", () => {
       `Voiced autotune staircase should still trigger F25_AUTOTUNE_STAIRCASE (evidence: ${f25Auto.evidence})`
     );
   });
+
+  it("v0.8 regression: Core-6 ignores EOF-truncated excerpts (F5) and tonal high-pitch whistles (F3) while catching rough growl/hiss (F1)", () => {
+    // 1. Continuous warm voice cut at EOF -> tailTruncatedAtEof === 1 -> F5 must NOT trigger
+    const nCut = Math.round(SR * 0.8);
+    const eofCut = new Float32Array(nCut);
+    let ph = 0;
+    for (let i = 0; i < nCut; i++) {
+      const t = i / SR;
+      const env = Math.min(1, t / 0.08); // still sounding at EOF!
+      const f0 = 260 + 20 * Math.sin(2 * Math.PI * 1.5 * t);
+      ph += (2 * Math.PI * f0) / SR;
+      eofCut[i] = 0.45 * env * (0.7 * Math.sin(ph) + 0.25 * Math.sin(2 * ph));
+    }
+    const eofRep = analyzeSamples(eofCut, SR, { label: "eof_truncated_excerpt", policy: "core_veto" });
+    assert.equal(eofRep.features.tailTruncatedAtEof, 1);
+    assert.equal(getFalsifierResult(eofRep, "F5_ABRUPT_TAIL").triggered, false);
+
+    // 2. High-pitched tonal bird-like whistle (3200 Hz, above 900 Hz F0 tracker) -> low flatness -> F3 must NOT trigger
+    const nWhistle = Math.round(SR * 0.8);
+    const whistle = new Float32Array(nWhistle);
+    let phW = 0;
+    for (let i = 0; i < nWhistle; i++) {
+      const t = i / SR;
+      const env = smoothEnv(t, 0.8, 0.08, 0.16);
+      const freq = 3200 + 300 * Math.sin(2 * Math.PI * 3.0 * t);
+      phW += (2 * Math.PI * freq) / SR;
+      whistle[i] = 0.4 * env * Math.sin(phW);
+    }
+    const whistleRep = analyzeSamples(whistle, SR, { label: "tonal_bird_whistle", policy: "core_veto" });
+    assert.ok(whistleRep.features.meanSpectralFlatness < 0.25);
+    assert.equal(getFalsifierResult(whistleRep, "F3_PURE_NOISE").triggered, false);
+
+    // 3. F1_HARSH_EDGE detects aperiodic rough growl and rough hiss cues via feature contract
+    const f1 = DEFAULT_FALSIFIERS.find((x) => x.id === "F1_HARSH_EDGE");
+    const growlRes = f1.detect({
+      maxAttackSlope: 0.12,
+      maxAttackTimeSec: 0.2,
+      meanHfRatio: 0.03,
+      voicedRatio: 0.40,
+      meanVoicedHnrDb: 2.5,
+      meanRoughness: 0.62,
+      mpsRoughToSpeechRatio: 4.3,
+      subBassRatio: 0.09,
+    });
+    assert.equal(growlRes.triggered, true);
+    assert.match(growlRes.evidence, /roughGrowl/);
+
+    const hissRes = f1.detect({
+      maxAttackSlope: 0.33,
+      maxAttackTimeSec: 0.4,
+      meanHfRatio: 0.113,
+      voicedRatio: 0.37,
+      meanVoicedHnrDb: 12.0,
+      meanRoughness: 0.51,
+      mpsRoughToSpeechRatio: 0.64,
+      subBassRatio: 0.60,
+    });
+    assert.equal(hissRes.triggered, true);
+    assert.match(hissRes.evidence, /roughHiss/);
+
+    // 4. Soft speech plosive (attackSlope=0.42, gentle hfRatio=0.13) must NOT trigger F1
+    const plosiveRes = f1.detect({
+      maxAttackSlope: 0.421,
+      maxAttackTimeSec: 3.1,
+      meanHfRatio: 0.136,
+      voicedRatio: 0.78,
+      meanVoicedHnrDb: 11.6,
+      meanRoughness: 0.29,
+      mpsRoughToSpeechRatio: 0.13,
+      subBassRatio: 0.02,
+    });
+    assert.equal(plosiveRes.triggered, false);
+  });
 });

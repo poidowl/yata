@@ -619,12 +619,16 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
       Math.abs(frames[i + 1].rms - 2 * frames[i].rms + frames[i - 1].rms) / normMaxRms;
   }
 
-  // Tail window (exact v0.1 formula)
+  // Tail window (exact v0.1 formula) + EOF truncation guard
   let tailDecaySec = 0;
   let tailStartSec = 0;
   let tailEndSec = 0;
+  let tailTruncatedAtEof = 0;
   if (activeIndices.length >= 3) {
     const lastActive = activeIndices[activeIndices.length - 1];
+    if (frames.length > 0 && lastActive >= frames.length - 2) {
+      tailTruncatedAtEof = 1;
+    }
     let highIdx = lastActive;
     for (let i = lastActive; i >= activeIndices[0]; i--) {
       if (frames[i].rms >= maxRms * 0.65) {
@@ -859,6 +863,7 @@ function runCoreAnalysis(samplesInput, sampleRateInput, opts = {}) {
     maxAttackTimeSec,
     tailDecaySec,
     tailStartSec,
+    tailTruncatedAtEof,
     frameExtras,
     meanLogMag,
     specFrameCount,
@@ -909,6 +914,7 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     maxAttackTimeSec,
     tailDecaySec,
     tailStartSec,
+    tailTruncatedAtEof,
     frameExtras,
     meanLogMag,
     specFrameCount,
@@ -947,6 +953,12 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
       activeIndices.map((i) => frames[i].hfRatio)
     )
   );
+  const corrRmsCentroid = Math.abs(
+    pearson(
+      activeIndices.map((i) => frames[i].rms),
+      activeIndices.map((i) => frames[i].spectralCentroidHz)
+    )
+  );
   const corrRmsF0 =
     voicedFrameCount >= 4
       ? Math.abs(
@@ -956,7 +968,7 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
           )
         )
       : 0;
-  const commonCauseCoupling = Math.max(corrRmsHf, corrRmsF0);
+  const commonCauseCoupling = Math.max(corrRmsHf, corrRmsF0, corrRmsCentroid);
 
   // --- F9: Micro-clicks & short dropouts ---
   const rmsDiff = n > 1 ? Math.sqrt(diffSqAll / (n - 1)) : 0;
@@ -1374,6 +1386,7 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
     meanPauseSec: breath.meanPauseSec,
     longestContinuousSec: breath.longestContinuousSec,
     breathlessWallRatio: breath.breathlessWallRatio,
+    tailTruncatedAtEof,
   };
 
   // --- v0.6 Voice Compass ("sound produced to be heard by someone, using a respiratory organ") ---
@@ -1703,37 +1716,40 @@ export function computeVoiceCompass(frames, features = null, breathProfile = nul
   const lungSupport = clamp01(phraseLenScore * (1 - 0.45 * breathlessWallRatio) * metronomicPenalty);
 
   // 1b. Natural dynamic / breath arc ("時間の矢": smooth onset, natural taper, living micro-variation)
+  const tailTruncated = finite(feat.tailTruncatedAtEof, 0) >= 0.5;
   const onsetSmooth = 1 - clamp01((maxAttackSlope - 0.35) / 0.65);
-  const tailScore = clamp01(tailDecaySec / 0.12);
-  const swellScore = clamp01(activeRmsCv / 0.30);
+  const tailScore = tailTruncated ? 0.75 : clamp01(tailDecaySec / 0.16);
+  const swellScore = clamp01(activeRmsCv / 0.45);
   const organicShimmer = clamp01((shimmer - 0.008) / 0.035) * (1 - 0.5 * clamp01((shimmer - 0.45) / 0.55));
-  const organicJitter = clamp01((jitter - 0.0005) / 0.004) * (1 - 0.5 * clamp01((jitter - 0.08) / 0.12));
-  const microVarScore = Math.max(organicShimmer, organicJitter);
-  const gatePenalty = tailDecaySec < 0.015 ? 0.65 : 1;
+  const organicJitter = clamp01((jitter - 0.0005) / 0.004) * (1 - 0.7 * clamp01((jitter - 0.08) / 0.14));
+  const chaoticJitterDamp = 1 - 0.45 * clamp01((jitter - 0.10) / 0.15);
+  const microVarScore = Math.max(organicShimmer, organicJitter) * chaoticJitterDamp;
+  const gatePenalty = !tailTruncated && tailDecaySec < 0.015 ? 0.65 : 1;
   const breathArc = clamp01(
     (0.25 * onsetSmooth + 0.35 * tailScore + 0.18 * swellScore + 0.22 * microVarScore) * gatePenalty
   );
 
-  // 1c. Organic voiced-harmonic / breath coupling (distinct from pure sine beep or flat static)
-  const voicedSupport = clamp01(voicedRatio / 0.45);
+  // 1c. Organic voiced-harmonic / breath coupling (distinct from pure sine beep, unvoiced hiss, or flat static)
+  const voicedSupport = clamp01(voicedRatio / 0.75);
   const harmonicWarmth = 1 - clamp01((meanSpectralFlatness - 0.12) / 0.45);
-  const couplingSupport = clamp01(commonCauseCoupling / 0.45);
+  const couplingSupport = clamp01(commonCauseCoupling / 0.65);
   const sterileTonePenalty = clamp01((meanTop1PeakShare - 0.60) / 0.28);
   const pitchLockedMask =
-    voicedRatio > 0.4 && f0RangeSemitones >= 0 && f0RangeSemitones < 0.25
-      ? 0.2 + 0.8 * clamp01(f0RangeSemitones / 0.25)
+    voicedRatio > 0.4 && f0RangeSemitones >= 0 && f0RangeSemitones < 1.5
+      ? 0.35 + 0.65 * clamp01(f0RangeSemitones / 1.5)
       : 1;
   const rigidElectronicMask =
     voicedRatio > 0.4 && jitter < 0.0008 && shimmer < 0.01 ? 0.35 : 1;
   const organicPhonation = clamp01(
-    (0.42 * voicedSupport + 0.28 * harmonicWarmth + 0.30 * couplingSupport) *
+    (0.45 * voicedSupport + 0.25 * harmonicWarmth + 0.30 * couplingSupport) *
       (1 - 0.85 * sterileTonePenalty) *
       pitchLockedMask *
       rigidElectronicMask
   );
 
   const respiratoryScore = clamp01(
-    0.28 * lungSupport + 0.36 * breathArc + 0.36 * organicPhonation
+    (0.28 * lungSupport + 0.36 * breathArc + 0.36 * organicPhonation) *
+      (0.75 + 0.25 * pitchLockedMask)
   );
 
   // =========================================================================

@@ -40,18 +40,53 @@ export const ORIGINAL_6_FALSIFIERS = [
       const maxAttackSlope = num(f.maxAttackSlope);
       const maxAttackTimeSec = num(f.maxAttackTimeSec);
       const meanHfRatio = num(f.meanHfRatio);
-      const score = round3(maxAttackSlope * 0.6 + meanHfRatio * 0.4);
+      const voicedRatio = num(f.voicedRatio, 1);
+      const meanRoughness = num(f.meanRoughness, 0);
+      const meanVoicedHnrDb = num(f.meanVoicedHnrDb, 20);
+      const mpsRoughToSpeechRatio = num(f.mpsRoughToSpeechRatio, 0);
+      const subBassRatio = num(f.subBassRatio, 0);
+
+      const edgeScore = round3(maxAttackSlope * 0.6 + meanHfRatio * 0.4);
+      const hfNorm = meanHfRatio / Math.max(0.25, 1 - subBassRatio);
+      const isRoughHiss =
+        voicedRatio < 0.5 && meanRoughness > 0.45 && hfNorm > 0.22 && maxAttackSlope > 0.25;
+      const isAperiodicGrowl =
+        voicedRatio >= 0.25 &&
+        voicedRatio <= 0.75 &&
+        meanVoicedHnrDb < 4.5 &&
+        meanRoughness > 0.45 &&
+        mpsRoughToSpeechRatio > 2.0;
+
+      const hissScore = isRoughHiss ? round3(Math.min(1, 0.45 + meanRoughness * 0.4 + hfNorm * 0.3)) : 0;
+      const growlScore = isAperiodicGrowl
+        ? round3(Math.min(1, 0.45 + meanRoughness * 0.35 + Math.min(0.25, mpsRoughToSpeechRatio * 0.05)))
+        : 0;
+      const score = Math.max(edgeScore, hissScore, growlScore);
+
       const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.42);
-      const attackLimit = num(opts?.maxAttackSlope, 0.38);
+      const attackLimit = num(opts?.maxAttackSlope, 0.43);
+      const extremeAttackLimit = num(opts?.extremeAttackSlope, 0.55);
+      const minAttackHf = num(opts?.minAttackHfRatio, 0.18);
+      const sharpEdgeTriggered =
+        edgeScore > threshold ||
+        maxAttackSlope > extremeAttackLimit ||
+        (maxAttackSlope > attackLimit && meanHfRatio >= minAttackHf);
       const triggered = isNumericOverride
         ? score > threshold
-        : score > threshold || maxAttackSlope > attackLimit;
+        : sharpEdgeTriggered || isRoughHiss || isAperiodicGrowl;
+
+      let evidence = `attackSlope=${maxAttackSlope} @ ${maxAttackTimeSec}s, hfRatio=${meanHfRatio}`;
+      if (!sharpEdgeTriggered && isRoughHiss) {
+        evidence += `, roughHiss(rough=${meanRoughness}, hfNorm=${hfNorm.toFixed(2)}, voiced=${voicedRatio})`;
+      } else if (!sharpEdgeTriggered && isAperiodicGrowl) {
+        evidence += `, roughGrowl(hnr=${meanVoicedHnrDb}dB, rough=${meanRoughness}, mpsRatio=${mpsRoughToSpeechRatio})`;
+      }
       return {
         triggered,
         score,
         threshold,
-        evidence: `attackSlope=${maxAttackSlope} @ ${maxAttackTimeSec}s, hfRatio=${meanHfRatio}`,
-        hint: "Soften glottal attack curvature and deepen high-frequency spectral tilt.",
+        evidence,
+        hint: "Soften glottal attack curvature, reduce 30–150 Hz rough modulation, and deepen high-frequency spectral tilt.",
         where: { startSec: maxAttackTimeSec },
       };
     },
@@ -95,17 +130,26 @@ export const ORIGINAL_6_FALSIFIERS = [
     detect(f, override) {
       const activeFrameCount = num(f.activeFrameCount);
       const voicedRatio = num(f.voicedRatio);
-      const score = round3(1 - voicedRatio);
+      const hasFlatness = Number.isFinite(f?.meanSpectralFlatness);
+      const flatness = hasFlatness ? num(f.meanSpectralFlatness) : 1;
       const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.78);
       const minVoiced = num(opts?.minVoicedRatio, 0.22);
+      const minFlatness = num(opts?.minSpectralFlatness, 0.25);
+      const broadbandNoise = !hasFlatness || flatness >= minFlatness;
+      const score =
+        activeFrameCount === 0
+          ? 1
+          : broadbandNoise
+            ? round3(1 - voicedRatio)
+            : round3((1 - voicedRatio) * Math.min(1, flatness / minFlatness) * 0.7);
       const triggered = isNumericOverride
         ? score > threshold
-        : activeFrameCount === 0 || voicedRatio < minVoiced;
+        : activeFrameCount === 0 || (voicedRatio < minVoiced && broadbandNoise);
       return {
         triggered,
         score,
         threshold,
-        evidence: `voicedRatio=${voicedRatio} (activeFrames=${activeFrameCount})`,
+        evidence: `voicedRatio=${voicedRatio}, flatness=${round3(flatness)} (activeFrames=${activeFrameCount})`,
         hint: "Establish coherent periodic vocal-fold / resonant body structure.",
       };
     },
@@ -140,17 +184,22 @@ export const ORIGINAL_6_FALSIFIERS = [
       const activeFrameCount = num(f.activeFrameCount);
       const tailDecaySec = num(f.tailDecaySec);
       const tailStartSec = num(f.tailStartSec);
-      const score = round3(1 - Math.min(1, tailDecaySec / 0.14));
+      const tailTruncated = num(f.tailTruncatedAtEof, 0) >= 0.5;
+      const score = tailTruncated ? 0 : round3(1 - Math.min(1, tailDecaySec / 0.14));
       const { threshold, isNumericOverride, opts } = resolveThreshold(override, 0.61);
       const minTailSec = num(opts?.minTailDecaySec, 0.055);
-      const triggered = isNumericOverride
-        ? activeFrameCount >= 5 && score > threshold
-        : activeFrameCount >= 5 && tailDecaySec < minTailSec;
+      const triggered = tailTruncated
+        ? false
+        : isNumericOverride
+          ? activeFrameCount >= 5 && score > threshold
+          : activeFrameCount >= 5 && tailDecaySec < minTailSec;
       return {
         triggered,
         score,
         threshold,
-        evidence: `tailDecay=${tailDecaySec}s (from ${tailStartSec}s)`,
+        evidence: tailTruncated
+          ? `tailTruncatedAtEof (sound still active at clip end; tailDecay=${tailDecaySec}s)`
+          : `tailDecay=${tailDecaySec}s (from ${tailStartSec}s)`,
         hint: "Allow phrase tail to release gradually with breath/tension decay instead of hard cut-off.",
         where: {
           startSec: tailStartSec,
