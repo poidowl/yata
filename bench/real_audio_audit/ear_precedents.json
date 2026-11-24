@@ -32,17 +32,18 @@
       "note": "Owner blind 3-choice & 2-choice Mirror Audit (commit 245ed15): preferred original 5-0 (Tests #1-#3 naru kawaii/amae/genki, #5 ohayo kawaii, #6 ohayo genki)"
     },
     "F14_HELMHOLTZ_ROUGHNESS": {
-      "status": "ear_tie_observed",
+      "status": "ear_confirmed_boundary",
       "judge": "poidowl",
       "votes": {
-        "tie": 1
+        "confirmed": 2,
+        "priorTie": 1
       },
-      "scope": "tokiko_japanese_speech",
-      "testedCommit": "245ed15",
-      "condition": "v0.4 mirror_audit_demo.html Test #4 watashi/amae (2-choice: original vs 2.2kHz low-pass)",
+      "scope": "general_audio",
+      "testedCommit": "24b16da",
+      "condition": "v0.8 boundary ear check (f14_boundary_check.html): Bonjour 0.474 PASS vs Mozart choir 0.537 FAIL, and tokiko watashi kawaii 0.493 PASS vs amae 0.566 FAIL (thr=0.500)",
       "recordedAt": "2026-11-24",
       "evidenceDoc": "bench/real_audio_audit/MIRROR_AUDIT_VERDICT.md",
-      "note": "Mirror saw a difference on #4 watashi/amae, ear saw no reason to fix"
+      "note": "Owner ear-judge 2026-11-24 (v0.8 boundary check): confirmed F14@0.500 as useful filter — dropping heavy Mozart opera choir and separating tokiko kawaii vs amae is desirable. Prior v0.4 (245ed15) 2.2kHz low-pass tie on #4 watashi/amae preserved in votes.priorTie."
     },
     "F23_ERRATIC_PITCH_WARBLE": {
       "status": "ear_tie_observed",
