@@ -28,7 +28,24 @@ describe("real-voice gate tags", () => {
       assert.ok(!t2.includes(qid) && /QUARANTINED: \d+ hidden/.test(t2), "forced quarantined id must be hidden and counted");
     }
   });
+  it("tokiko_derived allows <= 10% real-voice rate and records real gateFires in gate.note", () => {
+    assert.ok(TOKIKO_DERIVED.F24_CALCULATED_PITCH_LFO, "F24 should be tokiko_derived (<=10% real, >=2/3 tokiko)");
+    assert.ok(TOKIKO_DERIVED.F37_DECOUPLED_HF_EXCITER);
+    assert.ok(TOKIKO_DERIVED.F38_SPECTRUM_PEAK_DULLNESS);
+    for (const [id, info] of Object.entries(TOKIKO_DERIVED)) {
+      assert.ok(info.gateFires / info.gateN <= 0.1, `${id} exceeds 10% real-voice rate`);
+      assert.ok(info.tokikoFires / info.tokikoN >= 2 / 3, `${id} below 2/3 tokiko rate`);
+    }
+    const sr = 24000;
+    const x = Float32Array.from({ length: sr }, (_, i) => 0.3 * Math.sin((2 * Math.PI * 300 * i) / sr));
+    const r = analyzeSamples(x, sr);
+    const f24 = r.falsifiers.find((f) => f.id === "F24_CALCULATED_PITCH_LFO");
+    assert.equal(f24.gate?.tag, "tokiko_derived");
+    const info24 = TOKIKO_DERIVED.F24_CALCULATED_PITCH_LFO;
+    assert.ok(f24.gate.note.startsWith(`${info24.gateFires}/${info24.gateN} real clips`), f24.gate.note);
+  });
 });
+
 
 describe("held-out hygiene", () => {
   const ho = json("heldout_pd_cc0_manifest.json").clips, tu = json("tuning_pd_cc0_manifest.json").clips;

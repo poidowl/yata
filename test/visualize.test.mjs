@@ -361,4 +361,92 @@ describe("M3: LLM Audio Vision (Text / SVG / PNG)", () => {
     assert.match(renderedCont, /\((9\d|100)%\)/);
     assert.match(renderedBrief, /\((1?\d|2[0-5])%\)/);
   });
+  it("v0.12.1: excludes quarantined diagnostics from SVG/PNG/ASCII micro+full and distinguishes diagnostics from vetoes", () => {
+    const diagReport = {
+      label: "sample",
+      verdict: "SURVIVED_KAWAII_CANDIDATE",
+      triggeredCount: 0,
+      totalFalsifiers: 3,
+      falsifiers: [
+        {
+          id: "F14_HELMHOLTZ_ROUGHNESS",
+          domain: "timbre",
+          triggered: true,
+          diagnostic: true,
+          score: 0.95,
+          threshold: 0.5,
+          evidence: "roughness=1.2",
+          hint: "smooth",
+          gate: { tag: "quarantined", note: "fires on 5/11 benign PD/CC0 real clips" },
+        },
+        {
+          id: "F37_DECOUPLED_HF_EXCITER",
+          domain: "spectral",
+          triggered: true,
+          diagnostic: true,
+          score: 0.72,
+          threshold: 0.5,
+          evidence: "hf=0.6",
+          hint: "blend",
+          gate: { tag: "tokiko_derived", note: "0/11 real clips vs 6/9 tokiko" },
+        },
+        {
+          id: "F1_HARSH_EDGE",
+          domain: "core",
+          triggered: false,
+          diagnostic: false,
+          score: 0.12,
+          threshold: 0.5,
+          evidence: "ok",
+          hint: "",
+        },
+      ],
+    };
+
+    const svgDiag = renderSvgVision(warmProfile, diagReport);
+    verifySvgString(svgDiag);
+    assert.doesNotMatch(svgDiag, /F14_HELMHOLTZ_ROUGHNESS/);
+    assert.match(svgDiag, /\[d\] F37_DECOUPLED_H/);
+    assert.match(svgDiag, /6\. Falsifier Scoreboard[\s\S]*#d97706/);
+    assert.doesNotMatch(svgDiag, /6\. Falsifier Scoreboard[\s\S]*#dc2626/);
+    assert.match(svgDiag, /0 veto, 1 diag, 1q hidden/);
+
+    const diffSvg = renderSvgDiff(warmProfile, clickProfile, cleanReport, diagReport);
+    verifySvgString(diffSvg);
+    assert.doesNotMatch(diffSvg, /F14_HELMHOLTZ_ROUGHNESS/);
+
+    const pngDiag = renderPngVision(warmProfile, diagReport);
+    verifyPngBuffer(pngDiag);
+    const diffPng = renderPngDiff(warmProfile, clickProfile, cleanReport, diagReport);
+    verifyPngBuffer(diffPng);
+
+    const micro = renderTextVision(warmProfile, diagReport, { mode: "micro", charset: "ascii" });
+    assert.ok(countLines(micro) <= 15);
+    assert.doesNotMatch(micro, /F14_HELMHOLTZ_ROUGHNESS/);
+    assert.match(micro, /\[d\] F37_DECOUPLED_HF_EXCITER/);
+    assert.doesNotMatch(micro, /\[!\] F37_DECOUPLED_HF_EXCITER/);
+    assert.match(micro, /1q hidden/);
+
+    const full = renderTextVision(warmProfile, diagReport, { mode: "full", charset: "ascii" });
+    assert.doesNotMatch(full, /F14_HELMHOLTZ_ROUGHNESS/);
+    assert.match(full, /\[d\] F37_DECOUPLED_HF_EXCITER \[TOKIKO-DERIVED\]/);
+    assert.match(full, /QUARANTINED: 1 hidden/);
+
+    // When a real veto also fires, veto renders in red [!] while diagnostic stays amber [d]
+    const vetoReport = {
+      label: "sample",
+      verdict: "REJECTED_UNKAWAII",
+      triggeredCount: 1,
+      totalFalsifiers: 3,
+      falsifiers: [
+        { ...diagReport.falsifiers[0] },
+        { ...diagReport.falsifiers[1] },
+        { ...diagReport.falsifiers[2], triggered: true, score: 0.88 },
+      ],
+    };
+    const svgVeto = renderSvgVision(warmProfile, vetoReport);
+    assert.match(svgVeto, /\[!\] F1_HARSH_EDGE/);
+    assert.match(svgVeto, /#dc2626/);
+    assert.match(svgVeto, /#d97706/);
+  });
 });

@@ -199,7 +199,7 @@ export function analyzeSamples(samples, sampleRate, options = {}) {
     const q = !CORE_FALSIFIER_IDS.has(fn.id) && QUARANTINED[fn.id];
     const t = !CORE_FALSIFIER_IDS.has(fn.id) && TOKIKO_DERIVED[fn.id];
     if (q) entry.gate = { tag: "quarantined", note: `fires on ${q.gateFires}/${q.gateN} benign PD/CC0 real clips` };
-    else if (t) entry.gate = { tag: "tokiko_derived", note: `0/${t.gateN} real clips vs ${t.tokikoFires}/${t.tokikoN} tokiko: measures tokiko-ness, not real-voice distance` };
+    else if (t) entry.gate = { tag: "tokiko_derived", note: `${t.gateFires ?? 0}/${t.gateN} real clips vs ${t.tokikoFires}/${t.tokikoN} tokiko: measures tokiko-ness, not real-voice distance` };
     return entry;
   });
 

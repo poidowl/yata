@@ -544,18 +544,26 @@ export function renderTextVision(profile, report = null, opts = {}) {
     lines.push(`BAND ${bandInline}`);
 
     if (rep.triggered.length === 0) {
-      lines.push(`OK: 0/${rep.totalFalsifiers} triggered (${rep.verdict})`);
+      const q = rep.quarantinedHidden ? ` (${rep.quarantinedHidden}q hidden)` : "";
+      lines.push(`OK: 0/${rep.totalFalsifiers} veto${q} (${rep.verdict})`);
     } else {
       const showCount = Math.min(3, rep.triggered.length);
       for (let i = 0; i < showCount; i++) {
         const f = rep.triggered[i];
         const w = formatWhere(f.where);
+        const sym = f.diagnostic ? "[d]" : "[!]";
         lines.push(
-          `[!] ${f.id} ${fmtNum(f.score, 2)} ${w ? `${w} ` : ""}${truncate(f.evidence, 42)}`.trim()
+          `${sym} ${f.id} ${fmtNum(f.score, 2)} ${w ? `${w} ` : ""}${truncate(f.evidence, 42)}`.trim()
         );
       }
-      if (rep.triggered.length > showCount) {
-        lines.push(`... +${rep.triggered.length - showCount} more triggered`);
+      const more = rep.triggered.length - showCount;
+      const q = rep.quarantinedHidden ? `${rep.quarantinedHidden}q hidden` : "";
+      if (more > 0 && q) {
+        lines.push(`... +${more} more, ${q}`);
+      } else if (more > 0) {
+        lines.push(`... +${more} more triggered`);
+      } else if (q) {
+        lines.push(`(${q})`);
       }
     }
     return lines.slice(0, 15).join("\n");
@@ -605,7 +613,8 @@ export function renderTextVision(profile, report = null, opts = {}) {
     // Budget remaining lines for falsifiers (max 32 total)
     const remaining = Math.max(1, 32 - lines.length);
     if (rep.triggered.length === 0) {
-      lines.push(`FALSIFIERS: [OK] 0/${rep.totalFalsifiers} triggered`);
+      const q = rep.quarantinedHidden ? ` (${rep.quarantinedHidden} quarantined hidden)` : "";
+      lines.push(`FALSIFIERS: [OK] 0/${rep.totalFalsifiers} veto${q}`);
       const runners = [...rep.falsifiers]
         .sort((a, b) => b.score - a.score)
         .slice(0, Math.min(2, remaining - 1));
@@ -711,16 +720,23 @@ export function renderTextVision(profile, report = null, opts = {}) {
     }
   }
 
-  lines.push(`FALSIFIERS (${rep.triggeredCount}/${rep.totalFalsifiers} triggered):`);
+  const fullDiag = rep.triggered.filter((f) => f.diagnostic).length;
+  const fullTotalDiag = fullDiag + (rep.quarantinedHidden || 0);
+  lines.push(`FALSIFIERS (${rep.triggeredCount}/${rep.totalFalsifiers} veto, ${fullTotalDiag} diagnostic):`);
   if (rep.triggered.length === 0) {
-    lines.push("  [OK] All falsifiers survived — SURVIVED_KAWAII_CANDIDATE");
+    lines.push("  [OK] No veto or visible diagnostic triggered — SURVIVED_KAWAII_CANDIDATE");
   } else {
     for (const f of rep.triggered) {
       const w = formatWhere(f.where);
-      lines.push(`  [!] ${f.id} [${f.domain}] score=${fmtNum(f.score, 2)} thr=${fmtNum(f.threshold, 2)} ${w}`.trim());
+      const sym = f.diagnostic ? "[d]" : "[!]";
+      const gateNote = f.gateTag === "tokiko_derived" ? " [TOKIKO-DERIVED]" : "";
+      lines.push(`  ${sym} ${f.id}${gateNote} [${f.domain}] score=${fmtNum(f.score, 2)} thr=${fmtNum(f.threshold, 2)} ${w}`.trim());
       if (f.evidence) lines.push(`      evidence: ${f.evidence}`);
       if (f.hint) lines.push(`      hint:     ${f.hint}`);
     }
+  }
+  if (rep.quarantinedHidden) {
+    lines.push(`QUARANTINED: ${rep.quarantinedHidden} hidden (fire on benign real voices; see json .gate)`);
   }
 
   const nearMiss = rep.falsifiers
