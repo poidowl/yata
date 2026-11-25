@@ -397,19 +397,31 @@ export function renderSvgVision(profile, report = null, opts = {}) {
   }
 
   // -------------------------------------------------------------------------
-  // Panel 6: Falsifier Scoreboard (Top 8 triggered-first)
+  // Panel 6: Falsifier Scoreboard (Top 8 veto-first; quarantined excluded)
   // -------------------------------------------------------------------------
-  parts.push(
-    panelBox(px1, py2, colW, rowH, "6. Falsifier Scoreboard", `${rep.triggeredCount}/${rep.totalFalsifiers} triggered`)
+  const visibleFalsifiers = rep.falsifiers.filter(
+    (f) => f.gateTag !== "quarantined" || (f.triggered && !f.diagnostic)
   );
+  const diagCount = visibleFalsifiers.filter((f) => f.triggered && f.diagnostic).length;
+  const qHidden = rep.quarantinedHidden || 0;
+  const sbSubtitle =
+    diagCount > 0 || qHidden > 0
+      ? `${rep.triggeredCount} veto, ${diagCount} diag${qHidden ? `, ${qHidden}q hidden` : ""}`
+      : `${rep.triggeredCount}/${rep.totalFalsifiers} veto`;
+  parts.push(panelBox(px1, py2, colW, rowH, "6. Falsifier Scoreboard", sbSubtitle));
   {
     const gx = px1 + 10;
     const gy = py2 + 28;
     const labelW = 148;
     const barX = gx + labelW;
     const barW = colW - labelW - 56;
-    const ranked = [...rep.falsifiers]
-      .sort((a, b) => Number(b.triggered) - Number(a.triggered) || b.score - a.score)
+    const ranked = [...visibleFalsifiers]
+      .sort(
+        (a, b) =>
+          Number(b.triggered && !b.diagnostic) - Number(a.triggered && !a.diagnostic) ||
+          Number(b.triggered) - Number(a.triggered) ||
+          b.score - a.score
+      )
       .slice(0, 8);
 
     if (ranked.length === 0) {
@@ -419,11 +431,15 @@ export function renderSvgVision(profile, report = null, opts = {}) {
       const barH = Math.max(8, Math.min(12, step - 4));
       ranked.forEach((f, i) => {
         const y = gy + i * step;
-        const fill = f.triggered ? "#dc2626" : "#64748b";
+        const isVeto = f.triggered && !f.diagnostic;
+        const isDiag = f.triggered && f.diagnostic;
+        const fill = isVeto ? "#dc2626" : isDiag ? "#d97706" : "#64748b";
+        const textFill = isVeto ? "#991b1b" : isDiag ? "#92400e" : "#374151";
+        const prefix = isVeto ? "[!] " : isDiag ? "[d] " : "";
         const wFill = clamp(f.score, 0, 1) * barW;
         const thrX = barX + clamp(f.threshold, 0, 1) * barW;
         parts.push(
-          `<text x="${n1(gx)}" y="${n1(y + barH - 1)}" font-size="9.5" fill="${f.triggered ? "#991b1b" : "#374151"}">${escXml(truncate(f.id, 22))}</text>`
+          `<text x="${n1(gx)}" y="${n1(y + barH - 1)}" font-size="9.5" fill="${textFill}">${escXml(truncate(prefix + f.id, 22))}</text>`
         );
         parts.push(`<rect x="${n1(barX)}" y="${n1(y)}" width="${n1(barW)}" height="${n1(barH)}" rx="2" fill="#f1f5f9"/>`);
         parts.push(`<rect x="${n1(barX)}" y="${n1(y)}" width="${n1(wFill)}" height="${n1(barH)}" rx="2" fill="${fill}"/>`);
@@ -615,20 +631,35 @@ export function renderSvgDiff(profileA, profileB, reportA = null, reportB = null
     const mapB = new Map(repB.falsifiers.map((f) => [f.id, f]));
     const ids = [...new Set([...mapA.keys(), ...mapB.keys()])];
     const rows = ids
+      .filter((id) => {
+        const a = mapA.get(id);
+        const b = mapB.get(id);
+        const vetoA = Boolean(a?.triggered && !a?.diagnostic);
+        const vetoB = Boolean(b?.triggered && !b?.diagnostic);
+        if (vetoA || vetoB) return true;
+        return a?.gateTag !== "quarantined" && b?.gateTag !== "quarantined";
+      })
       .map((id) => {
         const a = mapA.get(id);
         const b = mapB.get(id);
         const sA = a?.score ?? 0;
         const sB = b?.score ?? 0;
+        const anyVeto = Boolean((a?.triggered && !a?.diagnostic) || (b?.triggered && !b?.diagnostic));
         return {
           id,
           sA,
           sB,
           delta: sB - sA,
+          anyVeto,
           anyTrig: Boolean(a?.triggered || b?.triggered),
         };
       })
-      .sort((x, y) => Number(y.anyTrig) - Number(x.anyTrig) || Math.abs(y.delta) - Math.abs(x.delta))
+      .sort(
+        (x, y) =>
+          Number(y.anyVeto) - Number(x.anyVeto) ||
+          Number(y.anyTrig) - Number(x.anyTrig) ||
+          Math.abs(y.delta) - Math.abs(x.delta)
+      )
       .slice(0, 8);
 
     if (rows.length === 0) {

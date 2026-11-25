@@ -338,25 +338,31 @@ export function renderPngVision(profile, report = null, opts = {}) {
   }
 
   // -------------------------------------------------------------------------
-  // Panel 6: Falsifier Scoreboard
+  // Panel 6: Falsifier Scoreboard (veto-first; quarantined excluded)
   // -------------------------------------------------------------------------
-  drawPanelFrame(
-    canvas,
-    px1,
-    py2,
-    colW,
-    rowH,
-    "6. Falsifier Scoreboard",
-    `${rep.triggeredCount}/${rep.totalFalsifiers} trig`
+  const visibleFalsifiers = rep.falsifiers.filter(
+    (f) => f.gateTag !== "quarantined" || (f.triggered && !f.diagnostic)
   );
+  const diagCount = visibleFalsifiers.filter((f) => f.triggered && f.diagnostic).length;
+  const qHidden = rep.quarantinedHidden || 0;
+  const sbSub =
+    diagCount > 0 || qHidden > 0
+      ? `${rep.triggeredCount}v/${diagCount}d${qHidden ? `/${qHidden}q` : ""}`
+      : `${rep.triggeredCount}/${rep.totalFalsifiers} veto`;
+  drawPanelFrame(canvas, px1, py2, colW, rowH, "6. Falsifier Scoreboard", sbSub);
   {
     const gx = px1 + 8;
     const gy = py2 + 24;
     const labelW = 140;
     const barX = gx + labelW;
     const barW = Math.max(40, colW - labelW - 54);
-    const ranked = [...rep.falsifiers]
-      .sort((a, b) => Number(b.triggered) - Number(a.triggered) || b.score - a.score)
+    const ranked = [...visibleFalsifiers]
+      .sort(
+        (a, b) =>
+          Number(b.triggered && !b.diagnostic) - Number(a.triggered && !a.diagnostic) ||
+          Number(b.triggered) - Number(a.triggered) ||
+          b.score - a.score
+      )
       .slice(0, 8);
 
     if (ranked.length === 0) {
@@ -366,9 +372,14 @@ export function renderPngVision(profile, report = null, opts = {}) {
       const barH = Math.max(7, Math.min(11, step - 4));
       ranked.forEach((f, i) => {
         const y = gy + i * step;
-        canvas.drawText(gx, y + 1, truncate(f.id, 22), f.triggered ? C_RED : C_TEXT, 1, "left");
+        const isVeto = f.triggered && !f.diagnostic;
+        const isDiag = f.triggered && f.diagnostic;
+        const txtCol = isVeto ? C_RED : isDiag ? C_AMBER : C_TEXT;
+        const barCol = isVeto ? C_RED : isDiag ? C_AMBER : C_SLATE;
+        const prefix = isVeto ? "[!] " : isDiag ? "[d] " : "";
+        canvas.drawText(gx, y + 1, truncate(prefix + f.id, 22), txtCol, 1, "left");
         canvas.fillRect(barX, y, barW, barH, C_BAR_BG);
-        canvas.fillRect(barX, y, clamp(f.score, 0, 1) * barW, barH, f.triggered ? C_RED : C_SLATE);
+        canvas.fillRect(barX, y, clamp(f.score, 0, 1) * barW, barH, barCol);
         const thrX = barX + clamp(f.threshold, 0, 1) * barW;
         canvas.drawLine(thrX, y - 1, thrX, y + barH + 1, C_TEXT, 1);
         canvas.drawText(barX + barW + 5, y + 1, f.score.toFixed(2), C_TEXT, 1, "left");
@@ -584,14 +595,28 @@ export function renderPngDiff(profileA, profileB, reportA = null, reportB = null
     const mapB = new Map(repB.falsifiers.map((f) => [f.id, f]));
     const ids = [...new Set([...mapA.keys(), ...mapB.keys()])];
     const rows = ids
+      .filter((id) => {
+        const a = mapA.get(id);
+        const b = mapB.get(id);
+        const vetoA = Boolean(a?.triggered && !a?.diagnostic);
+        const vetoB = Boolean(b?.triggered && !b?.diagnostic);
+        if (vetoA || vetoB) return true;
+        return a?.gateTag !== "quarantined" && b?.gateTag !== "quarantined";
+      })
       .map((id) => {
         const a = mapA.get(id);
         const b = mapB.get(id);
         const sA = a?.score ?? 0;
         const sB = b?.score ?? 0;
-        return { id, sA, sB, delta: sB - sA, anyTrig: Boolean(a?.triggered || b?.triggered) };
+        const anyVeto = Boolean((a?.triggered && !a?.diagnostic) || (b?.triggered && !b?.diagnostic));
+        return { id, sA, sB, delta: sB - sA, anyVeto, anyTrig: Boolean(a?.triggered || b?.triggered) };
       })
-      .sort((x, y) => Number(y.anyTrig) - Number(x.anyTrig) || Math.abs(y.delta) - Math.abs(x.delta))
+      .sort(
+        (x, y) =>
+          Number(y.anyVeto) - Number(x.anyVeto) ||
+          Number(y.anyTrig) - Number(x.anyTrig) ||
+          Math.abs(y.delta) - Math.abs(x.delta)
+      )
       .slice(0, 8);
 
     if (rows.length === 0) {
