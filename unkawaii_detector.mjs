@@ -25,6 +25,11 @@ import { fileURLToPath } from "node:url";
 
 import { decodeWavBuffer, encodeWavBuffer } from "./src/wav.mjs";
 import {
+  computeBicoherence,
+  computeScatteringTexture,
+  computePermutationEntropy,
+} from "./src/dsp.mjs";
+import {
   extractFeatures,
   extractAudioProfile,
   extractSegmentTimeline,
@@ -112,6 +117,9 @@ export {
   // v0.12 extensions
   computeSoundKind,
   computePeacockProfile,
+  computeBicoherence,
+  computeScatteringTexture,
+  computePermutationEntropy,
 };
 
 // ============================================================================

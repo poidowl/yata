@@ -16,6 +16,9 @@ import {
   computeModulationDft,
   computeMpsRoughness,
   computeSubharmonicRatio,
+  computeBicoherence,
+  computeScatteringTexture,
+  computePermutationEntropy,
   pearson,
   median,
   percentile,
@@ -1874,6 +1877,12 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
   // --- v0.6 Breath & Pause Profile ---
   const breath = computeBreathPauseProfile(frames, durationSec);
 
+  // --- v0.12 Pure-JS Mathematical Lenses (non-veto) ---
+  const bico = computeBicoherence(core.norm, core.sampleRate, frames, hopSec);
+  const scat = computeScatteringTexture(dbMat, frames, hopSec);
+  const f0PermEntropy = computePermutationEntropy(voicedFrames.map((f) => f.f0));
+  const rmsPermEntropy = computePermutationEntropy(activeRmsVals);
+
   const featuresObj = {
     // === 16 v0.1 backward-compatible scalar keys ===
     sampleRate: core.sampleRate,
@@ -2024,6 +2033,14 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
 
     // === v0.11 High-Frequency Auditory-Filter Phase Graininess (F65) ===
     hfBandWaveKurt: roundTo(hfBandWaveKurt, 3),
+
+    // === v0.12 Pure-JS Mathematical Lenses (non-veto) ===
+    bicoherenceMean: roundTo(bico.bicoherenceMean, 4),
+    bicoherenceStd: roundTo(bico.bicoherenceStd, 4),
+    scatteringSilkRatio: roundTo(scat.scatteringSilkRatio, 4),
+    scatteringCoMod: roundTo(scat.scatteringCoMod, 4),
+    f0PermEntropy: roundTo(f0PermEntropy, 4),
+    rmsPermEntropy: roundTo(rmsPermEntropy, 4),
   };
 
   // --- v0.6 Voice Compass ("sound produced to be heard by someone, using a respiratory organ") ---

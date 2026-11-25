@@ -1210,3 +1210,275 @@ export function percentile(arr, p) {
 export function median(arr) {
   return percentile(arr, 0.5);
 }
+
+/**
+ * Normalized Bicoherence (3rd-order cumulant / quadratic phase coupling across
+ * fundamental harmonic triplets (h1, h2, h1+h2)).
+ * Measures whether harmonics share genuine nonlinear physical phase coupling
+ * (organic vocal-fold/string vibration) vs decoupled noise or rigid zero-phase lock.
+ *
+ * Reference: Kim & Powers (1979), "Digital Bispectral Analysis and Its Applications
+ * to Nonlinear Wave Interactions", IEEE Trans. Plasma Sci. 7(2), 120–131.
+ *
+ * @param {Float32Array|ArrayLike<number>} samples
+ * @param {number} sampleRate
+ * @param {Array<object>} frames
+ * @param {number} hopSec
+ * @returns {{ bicoherenceMean: number, bicoherenceStd: number, usedFrames: number }}
+ */
+export function computeBicoherence(samples, sampleRate, frames, hopSec) {
+  const n = samples?.length ?? 0;
+  if (n < 1024 || sampleRate < 8000 || !Array.isArray(frames) || frames.length < 4) {
+    return { bicoherenceMean: 0, bicoherenceStd: 0, usedFrames: 0 };
+  }
+  const voicedIdx = [];
+  for (let i = 0; i < frames.length; i++) {
+    const fr = frames[i];
+    if (fr && fr.voiced && fr.f0 >= 65 && fr.f0 <= 700 && fr.rms >= 0.025) {
+      voicedIdx.push(i);
+    }
+  }
+  if (voicedIdx.length < 4) {
+    return { bicoherenceMean: 0, bicoherenceStd: 0, usedFrames: voicedIdx.length };
+  }
+
+  // Subsample up to 36 voiced frames evenly for speed (~1.5 ms)
+  const maxFrames = 36;
+  const stride = Math.max(1, Math.floor(voicedIdx.length / maxFrames));
+  const picked = [];
+  for (let i = 0; i < voicedIdx.length && picked.length < maxFrames; i += stride) {
+    picked.push(voicedIdx[i]);
+  }
+
+  const N = 1024;
+  const half = N >> 1;
+  const win = hannWindow(N);
+  const re = new Float64Array(N);
+  const im = new Float64Array(N);
+
+  // 5 core harmonic triplets: (1,1->2), (1,2->3), (1,3->4), (2,2->4), (2,3->5)
+  const triplets = [
+    [1, 1, 2],
+    [1, 2, 3],
+    [1, 3, 4],
+    [2, 2, 4],
+    [2, 3, 5],
+  ];
+  const numRe = new Float64Array(triplets.length);
+  const numIm = new Float64Array(triplets.length);
+  const den12 = new Float64Array(triplets.length);
+  const den3 = new Float64Array(triplets.length);
+  const counts = new Int32Array(triplets.length);
+
+  for (const fi of picked) {
+    const fr = frames[fi];
+    const center = Math.round((fr.timeSec ?? fi * hopSec) * sampleRate);
+    const start = center - (N >> 1);
+    if (start < 0 || start + N > n) continue;
+    for (let i = 0; i < N; i++) {
+      re[i] = samples[start + i] * win[i];
+      im[i] = 0;
+    }
+    fftRadix2(re, im);
+
+    const f0Bin = (fr.f0 * N) / sampleRate;
+    for (let ti = 0; ti < triplets.length; ti++) {
+      const [h1, h2, h3] = triplets[ti];
+      const b1 = Math.round(h1 * f0Bin);
+      const b2 = Math.round(h2 * f0Bin);
+      const b3 = Math.round(h3 * f0Bin);
+      if (b1 < 1 || b2 < 1 || b3 >= half - 1) continue;
+
+      // Local peak-bin snap (+-1 bin) to handle slight F0 pitch-bin offset
+      const snap = (b) => {
+        let best = b;
+        let bestM = re[b] * re[b] + im[b] * im[b];
+        for (const d of [-1, 1]) {
+          const k = b + d;
+          if (k >= 1 && k < half) {
+            const m = re[k] * re[k] + im[k] * im[k];
+            if (m > bestM) {
+              bestM = m;
+              best = k;
+            }
+          }
+        }
+        return best;
+      };
+      const k1 = snap(b1);
+      const k2 = snap(b2);
+      const k3 = snap(b3);
+
+      const x1r = re[k1], x1i = im[k1];
+      const x2r = re[k2], x2i = im[k2];
+      const x3r = re[k3], x3i = im[k3];
+      // p12 = X(k1) * X(k2)
+      const p12r = x1r * x2r - x1i * x2i;
+      const p12i = x1r * x2i + x1i * x2r;
+      // bispec = p12 * conj(X(k3))
+      const br = p12r * x3r + p12i * x3i;
+      const bi = p12i * x3r - p12r * x3i;
+      numRe[ti] += br;
+      numIm[ti] += bi;
+      den12[ti] += p12r * p12r + p12i * p12i;
+      den3[ti] += x3r * x3r + x3i * x3i;
+      counts[ti]++;
+    }
+  }
+
+  const b2Vals = [];
+  for (let ti = 0; ti < triplets.length; ti++) {
+    if (counts[ti] >= 4 && den12[ti] > 1e-18 && den3[ti] > 1e-18) {
+      const magSq = numRe[ti] * numRe[ti] + numIm[ti] * numIm[ti];
+      const b2 = Math.max(0, Math.min(1, magSq / (den12[ti] * den3[ti])));
+      b2Vals.push(b2);
+    }
+  }
+  if (b2Vals.length === 0) {
+    return { bicoherenceMean: 0, bicoherenceStd: 0, usedFrames: picked.length };
+  }
+  const mean = b2Vals.reduce((a, b) => a + b, 0) / b2Vals.length;
+  const variance = b2Vals.reduce((a, b) => a + (b - mean) * (b - mean), 0) / b2Vals.length;
+  return {
+    bicoherenceMean: mean,
+    bicoherenceStd: Math.sqrt(variance),
+    usedFrames: picked.length,
+  };
+}
+
+/**
+ * 2nd-order Wavelet-Scattering-inspired Modulation Texture (Mallat 2012) computed
+ * directly on the already-extracted 48-band Mel spectrogram (zero extra audio FFT).
+ * Separates sub-band envelopes (mid vocal core vs high air/silk band) into smooth
+ * 4–16 Hz modulation vs grainy 20–45 Hz modulation, plus mid-high co-modulation.
+ *
+ * @param {Array<Float32Array>} dbMat - Mel spectrogram dB matrix (frames x 48)
+ * @param {Array<object>} frames
+ * @param {number} hopSec
+ * @returns {{ scatteringSilkRatio: number, scatteringCoMod: number }}
+ */
+export function computeScatteringTexture(dbMat, frames, hopSec) {
+  if (!Array.isArray(dbMat) || dbMat.length < 16 || !Array.isArray(frames) || hopSec <= 0) {
+    return { scatteringSilkRatio: 0, scatteringCoMod: 0 };
+  }
+  const F = dbMat.length;
+  const nBands = dbMat[0]?.length ?? 0;
+  if (nBands < 44) return { scatteringSilkRatio: 0, scatteringCoMod: 0 };
+
+  const midEnv = new Float64Array(F);
+  const hiEnv = new Float64Array(F);
+  let midMean = 0;
+  let hiMean = 0;
+  for (let i = 0; i < F; i++) {
+    const row = dbMat[i];
+    let m = 0;
+    for (let b = 10; b <= 24; b++) m += Math.pow(10, row[b] / 20);
+    m /= 15;
+    let h = 0;
+    for (let b = 28; b <= 43; b++) h += Math.pow(10, row[b] / 20);
+    h /= 16;
+    midEnv[i] = m;
+    hiEnv[i] = h;
+    midMean += m;
+    hiMean += h;
+  }
+  midMean /= F;
+  hiMean /= F;
+  if (midMean < 1e-6 || hiMean < 1e-6) {
+    return { scatteringSilkRatio: 0, scatteringCoMod: 0 };
+  }
+
+  // Zero-mean normalized envelopes -> radix-2 modulation FFT
+  let M = 1;
+  while (M < F) M <<= 1;
+  if (M < 32) M = 32;
+  const mRe = new Float64Array(M);
+  const mIm = new Float64Array(M);
+  const hRe = new Float64Array(M);
+  const hIm = new Float64Array(M);
+  for (let i = 0; i < F; i++) {
+    const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (F - 1));
+    mRe[i] = ((midEnv[i] - midMean) / midMean) * w;
+    hRe[i] = ((hiEnv[i] - hiMean) / hiMean) * w;
+  }
+  fftRadix2(mRe, mIm);
+  fftRadix2(hRe, hIm);
+
+  const fsMod = 1 / hopSec; // ~100 Hz
+  const binHz = fsMod / M;
+  const half = M >> 1;
+
+  let hiSmooth = 0; // 4..16 Hz
+  let hiGrain = 0;  // 20..45 Hz
+  let coNum = 0;
+  let coDenM = 0;
+  let coDenH = 0;
+
+  for (let k = 1; k < half; k++) {
+    const hz = k * binHz;
+    const mp = mRe[k] * mRe[k] + mIm[k] * mIm[k];
+    const hp = hRe[k] * hRe[k] + hIm[k] * hIm[k];
+    if (hz >= 4 && hz <= 16) {
+      hiSmooth += hp;
+      coNum += Math.sqrt(mp * hp);
+      coDenM += mp;
+      coDenH += hp;
+    } else if (hz >= 20 && hz <= Math.min(45, fsMod * 0.48)) {
+      hiGrain += hp;
+    }
+  }
+
+  const scatteringSilkRatio = hiSmooth + hiGrain > 1e-12 ? hiSmooth / (hiSmooth + hiGrain) : 0;
+  const scatteringCoMod =
+    coDenM > 1e-12 && coDenH > 1e-12
+      ? Math.max(0, Math.min(1, coNum / Math.sqrt(coDenM * coDenH)))
+      : 0;
+
+  return { scatteringSilkRatio, scatteringCoMod };
+}
+
+/**
+ * Normalized Bandt-Pompe (2002) Permutation Entropy of order m=3 (6 ordinal patterns).
+ * Returns value in [0, 1]: 0 = strictly monotonic/periodic, 1 = white-noise chaos,
+ * ~0.65–0.85 = organic "edge-of-chaos" expressive contour.
+ *
+ * Reference: Bandt, C. & Pompe, B. (2002). "Permutation Entropy: A Natural Complexity
+ * Measure for Time Series." Physical Review Letters, 88(17), 174102.
+ *
+ * @param {ArrayLike<number>} seq
+ * @returns {number} Normalized permutation entropy in [0, 1]
+ */
+export function computePermutationEntropy(seq) {
+  const n = seq?.length ?? 0;
+  if (n < 6) return 0;
+  const counts = new Int32Array(6);
+  let total = 0;
+  for (let i = 0; i + 2 < n; i++) {
+    const a = seq[i];
+    const b = seq[i + 1];
+    const c = seq[i + 2];
+    if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) continue;
+    let code = 0;
+    if (a <= b) {
+      if (b <= c) code = 0;      // a <= b <= c
+      else if (a <= c) code = 1; // a <= c < b
+      else code = 2;             // c < a <= b
+    } else {
+      if (a <= c) code = 3;      // b < a <= c
+      else if (b <= c) code = 4; // b <= c < a
+      else code = 5;             // c < b < a
+    }
+    counts[code]++;
+    total++;
+  }
+  if (total < 4) return 0;
+  let H = 0;
+  for (let k = 0; k < 6; k++) {
+    if (counts[k] > 0) {
+      const p = counts[k] / total;
+      H -= p * Math.log(p);
+    }
+  }
+  return Math.max(0, Math.min(1, H / Math.log(6)));
+}
+
