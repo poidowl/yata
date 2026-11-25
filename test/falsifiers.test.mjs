@@ -1287,4 +1287,51 @@ describe("M2: 64-Axis Falsifier Registry & Report Engine", () => {
     assert.equal(byId("F65_HF_PHASE_GRAININESS").detect({ ...cleanSpeech, hfBandWaveKurt: 3.12 }).triggered, false);
     assert.equal(byId("F65_HF_PHASE_GRAININESS").detect({ ...cleanSpeech, hfBandWaveKurt: 3.78 }).triggered, true);
   });
+  it("v0.12.1: F65 uses ~21ms sampleRate-scaled window across 16k/24k/48k and marks low-F0 speech unobservable", () => {
+    const synthVoice = (sr, f0, dispersed) => {
+      const durSec = 1.2;
+      const n = Math.round(sr * durSec);
+      const out = new Float32Array(n);
+      const maxH = Math.min(24, Math.floor((sr * 0.45) / f0));
+      const phases = Array.from({ length: maxH + 1 }, (_, h) =>
+        dispersed ? (Math.PI * h * h) / Math.max(1, maxH) : 0
+      );
+      for (let i = 0; i < n; i++) {
+        const t = i / sr;
+        const env = (0.65 + 0.35 * Math.sin(2 * Math.PI * 5 * t)) * Math.min(1, i / (0.04 * sr), (n - i) / (0.04 * sr));
+        let v = 0;
+        for (let h = 1; h <= maxH; h++) {
+          const hz = h * f0;
+          const amp = h === 1 ? 0.55 : hz >= 1200 && hz <= 4200 ? 0.22 / Math.sqrt(h) : 0.14 / h;
+          v += amp * Math.cos(2 * Math.PI * hz * t + phases[h]);
+        }
+        out[i] = 0.25 * env * v;
+      }
+      return out;
+    };
+
+    for (const sr of [16000, 24000, 48000]) {
+      const pulseRep = analyzeSamples(synthVoice(sr, 220, false), sr, { policy: "core_veto" });
+      const f65Pulse = getFalsifierResult(pulseRep, "F65_HF_PHASE_GRAININESS");
+      assert.ok(pulseRep.features.hfBandWaveKurtCount >= 4, `sr=${sr} count=${pulseRep.features.hfBandWaveKurtCount}`);
+      assert.equal(f65Pulse.observed, true, `sr=${sr}`);
+      assert.equal(f65Pulse.observability, "observed", `sr=${sr}`);
+      assert.equal(f65Pulse.triggered, true, `sr=${sr} kurt=${pulseRep.features.hfBandWaveKurt}`);
+
+      const dispRep = analyzeSamples(synthVoice(sr, 220, true), sr, { policy: "core_veto" });
+      const f65Disp = getFalsifierResult(dispRep, "F65_HF_PHASE_GRAININESS");
+      assert.ok(dispRep.features.hfBandWaveKurtCount >= 4, `sr=${sr} disp count`);
+      assert.equal(f65Disp.observed, true, `sr=${sr} disp`);
+      assert.equal(f65Disp.triggered, false, `sr=${sr} disp kurt=${dispRep.features.hfBandWaveKurt}`);
+    }
+
+    // Low-F0 voiced speech (<155 Hz): eligible speech metrics are satisfied, but 0 vowel-core windows -> observed:false
+    const lowRep = analyzeSamples(synthVoice(24000, 110, false), 24000, { policy: "core_veto" });
+    const f65Low = getFalsifierResult(lowRep, "F65_HF_PHASE_GRAININESS");
+    assert.equal(lowRep.features.hfBandWaveKurtCount, 0);
+    assert.equal(f65Low.observed, false);
+    assert.equal(f65Low.observability, "unobservable");
+    assert.equal(f65Low.triggered, false);
+    assert.equal(f65Low.score, 0);
+  });
 });

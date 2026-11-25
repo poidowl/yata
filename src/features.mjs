@@ -1471,7 +1471,9 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
   // specifically on voiced, non-sibilant vowel-core frames (f0 >= 155 Hz, hfRatio < 0.35) so
   // low-F0 male glottal-period gaps (~8ms) and voiceless plosive/sibilant bursts do not false-trigger.
   let hfBandWaveKurt = 3.0;
-  if (n >= 512 && sampleRate >= 8000 && maxRms > 1e-4 && frames.length > 0) {
+  let hfBandWaveKurtCount = 0;
+  const f65Win = Math.max(128, Math.round(sampleRate * 0.021)); // ~21 ms regardless of sampleRate (504 @ 24 kHz)
+  if (n >= f65Win && sampleRate >= 8000 && maxRms > 1e-4 && frames.length > 0) {
     const fc = 2400;
     const Q = 0.8;
     const w0 = (2 * Math.PI * fc) / sampleRate;
@@ -1489,8 +1491,8 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
       bp[i] = yi;
       bx2 = bx1; bx1 = xi; by2 = by1; by1 = yi;
     }
-    const win = 512;
-    const step = 256;
+    const win = f65Win;
+    const step = Math.max(64, Math.round(win * 0.5));
     const hfRmsThr = Math.max(0.012, maxRms * 0.04);
     const kVals = [];
     for (let s = 0; s + win <= n; s += step) {
@@ -1514,6 +1516,7 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
       }
       kVals.push(m4 / win);
     }
+    hfBandWaveKurtCount = kVals.length;
     if (kVals.length >= 4) {
       kVals.sort((a, b) => a - b);
       hfBandWaveKurt = kVals[Math.floor(kVals.length / 2)];
@@ -2033,6 +2036,7 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
 
     // === v0.11 High-Frequency Auditory-Filter Phase Graininess (F65) ===
     hfBandWaveKurt: roundTo(hfBandWaveKurt, 3),
+    hfBandWaveKurtCount,
 
     // === v0.12 Pure-JS Mathematical Lenses (non-veto) ===
     bicoherenceMean: roundTo(bico.bicoherenceMean, 4),
