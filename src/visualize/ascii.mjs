@@ -649,7 +649,7 @@ export function renderTextVision(profile, report = null, opts = {}) {
     `STATS: peak=${fmtNum(stats.peak, 3)} | rms=${fmtNum(stats.rmsDb, 1)}dB | F0=${Math.round(stats.medF0)}Hz | HNR=${fmtNum(stats.meanHnr, 1)}dB | meanHF=${fmtNum(stats.meanHf, 3)} | MPS30-150=${fmtNum(stats.mpsRough, 3)} | SUBH=${fmtNum(stats.subh, 3)}`
   );
   lines.push(
-    `VOICE COMPASS: KIND=${stats.soundKind} | RESP=${fmtNum(stats.respiratoryScore, 2)} DIR=${fmtNum(stats.directnessScore, 2)} [${stats.voiceCompassLabel}] | SAN=${fmtNum(stats.sanitizationScore, 2)}`
+    `VOICE COMPASS: RESP=${fmtNum(stats.respiratoryScore, 2)} DIR=${fmtNum(stats.directnessScore, 2)} [${stats.voiceCompassLabel}] | SAN=${fmtNum(stats.sanitizationScore, 2)} | KIND=${stats.soundKind}`
   );
   lines.push(
     `PEACOCK: silk=${fmtNum(stats.peacock.silk, 2)} intimacy=${fmtNum(stats.peacock.intimacy, 2)} dandy=${fmtNum(stats.peacock.dandy, 2)} fragile=${fmtNum(stats.peacock.fragile, 2)} alive=${fmtNum(stats.peacock.alive, 2)}`
