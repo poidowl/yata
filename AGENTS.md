@@ -47,9 +47,13 @@ yata は「明らかにアカン音」を見つける道具です。**点数そ�
 
 ## 現在の見張りメモ（オブザーバー引き継ぎ用・2026-11-24）
 
-- **現行安定版**: `main`（`v0.11.0` — 65軸直交ミラー `F1`–`F65`）
-- **最新開発ブランチ**: `dev/v0.11`（`main` へマージ済み）
-  - **実装済み（v0.2 → v0.11）**:
+- **現行安定版**: `main`（`v0.12.0` — 65軸直交ミラー `F1`–`F65` + Sound Kind / Peacock 5羽根 / 純JS数学3レンズ）
+- **最新開発ブランチ**: `dev/v0.12`（`main` へマージ済み）
+  - **実装済み（v0.2 → v0.12）**:
+    - **v0.12 PD/CC0 日本語実音ゲート拡充 & 非拒否レンズ群**:
+      - Archive.org LibriVox の PD/CC0 日本語朗読で tuning 4本・held-out 2本を拡充し、`src/falsifiers/gate.mjs` を再生成（`n=11`）。`F65`（`hfBandWaveKurt`）を有声母音核中央値（`f0 >= 155 Hz`, `hfRatio < 0.35`）へ改善し誤爆率 `1/11` で `tokiko_derived` 卒業。
+      - `computeSoundKind`（`music`/`speech`/`whisper`/`ambient_fx`/`silent`）と `computePeacockProfile`（非拒否5羽根自由度マップ：`silk`/`intimacy`/`dandy`/`fragile`/`alive`）を追加し、`--view compact/full` へ配線。
+      - 純JS・ゼロ依存の3数学レンズ（非拒否）を追加：`computeBicoherence`（正規化バイコヒーレンス）、`computeScatteringTexture`（Mel上の2次ウェーブレット散乱変調テクスチャ）、`computePermutationEntropy`（Bandt–Pompe $m=3$ 順列エントロピー）。
     - 65軸検出器（`F1`–`F65`）の階層分離：**Core-6（`ORIGINAL_6_FALSIFIERS`）**／**診断ツールボックス（`TOOLBOX_FALSIFIERS`: F7–F65 から直交軸を除く58軸）**／**直交軸マップ（`ORTHOGONAL_AXES`: `F30` ステレオ逆相）**
     - **判定ポリシー（既定 = `core_veto`）**: `--policy core_veto|shelf_veto|veto_all`
       - `core_veto`（コード既定値）: 基本6軸のみでハード拒否し、ツールボックス軸は診断ヒントとして非拒否で併記
