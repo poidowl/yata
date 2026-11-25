@@ -2064,6 +2064,16 @@ export function extractFeatures(samples, sampleRate, opts = {}) {
   const sanitization = computeSanitizationIndex(featuresObj, breath);
   featuresObj.sanitizationScore = sanitization.sanitizationScore;
 
+  // --- v0.12 Sound Kind (music/speech/whisper/ambient_fx) & Peacock 5-Feather Lens (non-veto) ---
+  const kindInfo = computeSoundKind(frames, featuresObj);
+  featuresObj.musicalityScore = kindInfo.musicalityScore;
+  const peacock = computePeacockProfile(featuresObj, kindInfo);
+  featuresObj.peacockSilk = peacock.silk;
+  featuresObj.peacockIntimacy = peacock.intimacy;
+  featuresObj.peacockDandy = peacock.dandy;
+  featuresObj.peacockFragile = peacock.fragile;
+  featuresObj.peacockAlive = peacock.alive;
+
   return featuresObj;
 }
 
@@ -2726,3 +2736,163 @@ export function extractSegmentTimeline(profile, samples, sampleRate, opts = { wi
     segments,
   };
 }
+
+/**
+ * Sound Kind classifier (non-veto): distinguishes music (sustained pitch plateaus &
+ * stable timbre), voiced speech, soft whisper (unvoiced 4–16 Hz speech modulation),
+ * ambient/FX, and silence — zero extra FFT.
+ *
+ * @param {Array<object>} frames
+ * @param {object} features
+ * @returns {{
+ *   soundKind: "music" | "speech" | "whisper" | "ambient_fx" | "silent",
+ *   musicalityScore: number,
+ *   pitchPlateauRatio: number,
+ * }}
+ */
+export function computeSoundKind(frames, features) {
+  const feat = features && typeof features === "object" ? features : null;
+  const activeFrames = feat ? finite(feat.activeFrameCount, 0) : 0;
+  const peak = feat ? finite(feat.peak, 0) : 0;
+  if (!feat || activeFrames <= 0 || peak < 1e-4) {
+    return { soundKind: "silent", musicalityScore: 0, pitchPlateauRatio: 0 };
+  }
+
+  let pairs = 0;
+  let steady = 0;
+  if (Array.isArray(frames) && frames.length >= 2) {
+    for (let i = 1; i < frames.length; i++) {
+      const cur = frames[i];
+      const prev = frames[i - 1];
+      if (cur && prev && cur.voiced && prev.voiced && cur.f0 > 50 && prev.f0 > 50) {
+        pairs++;
+        const dSemi = Math.abs(12 * Math.log2(cur.f0 / prev.f0));
+        if (dSemi < 0.25) steady++;
+      }
+    }
+  }
+  const pitchPlateauRatio = pairs >= 5 ? steady / pairs : 0;
+  const mfccV = finite(feat.mfccVelMean, 1.2);
+  const mps4 = finite(feat.activeMpsSpeech4_16, finite(feat.mpsSpeech4_16, 0));
+  const voicedRatio = finite(feat.voicedRatio, 0);
+
+  const musicalityScore =
+    voicedRatio >= 0.35
+      ? clamp01(
+          0.45 * clamp01((pitchPlateauRatio - 0.55) / 0.35) +
+            0.35 * clamp01((1.15 - mfccV) / 0.65) +
+            0.20 * clamp01((0.14 - mps4) / 0.10)
+        )
+      : 0;
+
+  let soundKind = "ambient_fx";
+  if (musicalityScore >= 0.55) soundKind = "music";
+  else if (voicedRatio >= 0.35) soundKind = "speech";
+  else if (mps4 >= 0.08) soundKind = "whisper";
+
+  return {
+    soundKind,
+    musicalityScore: roundTo(musicalityScore, 4),
+    pitchPlateauRatio: roundTo(pitchPlateauRatio, 4),
+  };
+}
+
+/**
+ * Peacock 5-Feather Vocal Artistry Profile (non-veto freedom map, v0.12).
+ * Maps existing acoustic features onto 5 orthogonal artistic dimensions rather than
+ * collapsing diverse vocal charms into a single scalar:
+ *   - silk     (色艶): low 30–150 Hz roughness ratio, clear harmonic focus, smooth HF phase
+ *   - intimacy (親密/セクシー): close warm proximity, expressive pause elasticity, low strain
+ *   - dandy    (ダンディ): deep low register + rich 80–200 Hz chest body
+ *   - fragile  (儚さ): delicate breath/air, unvoiced softness, light dynamic contrast
+ *   - alive    (生身): Voice Compass presence (RESP x DIR) x unpolished living texture (1 - SAN)
+ *
+ * @param {object} features
+ * @param {{ soundKind?: string, musicalityScore?: number } | null} [soundKindInfo]
+ * @returns {{
+ *   silk: number,
+ *   intimacy: number,
+ *   dandy: number,
+ *   fragile: number,
+ *   alive: number,
+ *   dominantFeather: "silk" | "intimacy" | "dandy" | "fragile" | "alive" | "silent",
+ * }}
+ */
+export function computePeacockProfile(features, soundKindInfo = null) {
+  const feat = features && typeof features === "object" ? features : null;
+  const activeFrames = feat ? finite(feat.activeFrameCount, 0) : 0;
+  const peak = feat ? finite(feat.peak, 0) : 0;
+  if (!feat || activeFrames <= 0 || peak < 1e-4 || soundKindInfo?.soundKind === "silent") {
+    return { silk: 0, intimacy: 0, dandy: 0, fragile: 0, alive: 0, dominantFeather: "silent" };
+  }
+
+  const mpsRatio = finite(feat.mpsRoughToSpeechRatio, 1.0);
+  const top1 = finite(feat.meanTop1PeakShare, 0.5);
+  const hfKurt = finite(feat.hfBandWaveKurt, 3.0);
+  const prox = finite(feat.proximityBoomRatio, 0.5);
+  const pauseCv = finite(feat.pauseDurCv, 0.5);
+  const mpsRough = finite(feat.mpsRoughness30_150, 0.05);
+  const medF0 = finite(feat.medianF0, 210);
+  const bodyDb = finite(feat.bodyBand80_200Db, -55);
+  const air = finite(feat.highAirRatio, 0);
+  const voiced = finite(feat.voicedRatio, 0);
+  const rmsCv = finite(feat.activeRmsCv, 0.3);
+  const resp = finite(feat.respiratoryScore, 0);
+  const dir = finite(feat.directnessScore, 0);
+  const san = finite(feat.sanitizationScore, 0);
+
+  const silk = roundTo(
+    clamp01(
+      0.50 * clamp01(1 - (mpsRatio - 0.08) / 1.1) +
+        0.30 * clamp01((top1 - 0.5) / 0.3) +
+        0.20 * clamp01(1 - Math.max(0, hfKurt - 3.0) / 1.2)
+    ),
+    4
+  );
+  const intimacy = roundTo(
+    clamp01(
+      0.45 * clamp01((prox - 0.45) / 0.4) +
+        0.35 * clamp01((pauseCv - 0.4) / 1.2) +
+        0.20 * clamp01(1 - mpsRough / 0.12)
+    ),
+    4
+  );
+  const dandy = roundTo(
+    clamp01(
+      0.55 * clamp01((210 - (medF0 > 0 ? medF0 : 210)) / 100) +
+        0.45 * clamp01((bodyDb + 55) / 28)
+    ),
+    4
+  );
+  const fragile = roundTo(
+    clamp01(
+      0.45 * clamp01(air / 0.2) +
+        0.30 * clamp01(1 - voiced) +
+        0.25 * clamp01((rmsCv - 0.25) / 0.5)
+    ),
+    4
+  );
+  const alive = roundTo(
+    clamp01(0.50 * Math.sqrt(Math.max(0, resp * dir)) + 0.50 * (1 - san)),
+    4
+  );
+
+  const entries = [
+    ["silk", silk],
+    ["intimacy", intimacy],
+    ["dandy", dandy],
+    ["fragile", fragile],
+    ["alive", alive],
+  ];
+  entries.sort((a, b) => b[1] - a[1]);
+
+  return {
+    silk,
+    intimacy,
+    dandy,
+    fragile,
+    alive,
+    dominantFeather: entries[0][0],
+  };
+}
+

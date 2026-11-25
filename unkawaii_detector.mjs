@@ -31,6 +31,8 @@ import {
   computeBreathPauseProfile,
   computeVoiceCompass,
   computeSanitizationIndex,
+  computeSoundKind,
+  computePeacockProfile,
 } from "./src/features.mjs";
 import {
   ORIGINAL_6_FALSIFIERS,
@@ -107,6 +109,9 @@ export {
   computeSanitizationIndex,
   analyzeDialogue,
   renderDialogueMap,
+  // v0.12 extensions
+  computeSoundKind,
+  computePeacockProfile,
 };
 
 // ============================================================================

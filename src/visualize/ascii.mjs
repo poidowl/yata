@@ -407,6 +407,26 @@ function computeSummaryStats(prof, rep) {
   const respiratoryScore = clamp(finite(rep.features?.respiratoryScore, 0), 0, 1);
   const directnessScore = clamp(finite(rep.features?.directnessScore, 0), 0, 1);
   const sanitizationScore = clamp(finite(rep.features?.sanitizationScore, 0), 0, 1);
+  const musicalityScore = clamp(finite(rep.features?.musicalityScore, 0), 0, 1);
+  const voicedRatio = clamp(finite(rep.features?.voicedRatio, 0), 0, 1);
+  const mps4 = finite(rep.features?.activeMpsSpeech4_16, finite(rep.features?.mpsSpeech4_16, 0));
+  const soundKind =
+    peak < 1e-4 || frames.length === 0
+      ? "silent"
+      : musicalityScore >= 0.55
+        ? "music"
+        : voicedRatio >= 0.35
+          ? "speech"
+          : mps4 >= 0.08
+            ? "whisper"
+            : "ambient_fx";
+  const peacock = {
+    silk: clamp(finite(rep.features?.peacockSilk, 0), 0, 1),
+    intimacy: clamp(finite(rep.features?.peacockIntimacy, 0), 0, 1),
+    dandy: clamp(finite(rep.features?.peacockDandy, 0), 0, 1),
+    fragile: clamp(finite(rep.features?.peacockFragile, 0), 0, 1),
+    alive: clamp(finite(rep.features?.peacockAlive, 0), 0, 1),
+  };
   const voiceCompassLabel =
     respiratoryScore >= 0.5 && directnessScore >= 0.5
       ? "addressed_breath"
@@ -427,6 +447,9 @@ function computeSummaryStats(prof, rep) {
     directnessScore,
     sanitizationScore,
     voiceCompassLabel,
+    soundKind,
+    musicalityScore,
+    peacock,
   };
 }
 
@@ -543,7 +566,9 @@ export function renderTextVision(profile, report = null, opts = {}) {
   // -------------------------------------------------------------------------
   if (mode === "compact") {
     const lines = [];
-    const compassTag = `RESP=${fmtNum(stats.respiratoryScore, 2)} DIR=${fmtNum(stats.directnessScore, 2)} [${stats.voiceCompassLabel}] SAN=${fmtNum(stats.sanitizationScore, 2)}`;
+    const pp = stats.peacock;
+    const peacockTag = `PEACOCK: silk=${fmtNum(pp.silk, 2)} sexy=${fmtNum(pp.intimacy, 2)} dandy=${fmtNum(pp.dandy, 2)} frag=${fmtNum(pp.fragile, 2)} alive=${fmtNum(pp.alive, 2)}`;
+    const compassTag = `KIND=${stats.soundKind} RESP=${fmtNum(stats.respiratoryScore, 2)} DIR=${fmtNum(stats.directnessScore, 2)} [${stats.voiceCompassLabel}] SAN=${fmtNum(stats.sanitizationScore, 2)} | ${peacockTag}`;
     lines.push(`=== YATA VISION [${rep.label}] ===`);
     lines.push(
       `VERDICT: ${rep.verdict} (${rep.triggeredCount}/${rep.totalFalsifiers}) | dur=${fmtNum(prof.durationSec, 2)}s sr=${prof.sampleRate}Hz | pk=${fmtNum(stats.peak, 2)} rms=${fmtNum(stats.rmsDb, 1)}dB F0=${Math.round(stats.medF0)}Hz HNR=${fmtNum(stats.meanHnr, 1)}dB MPS30-150=${fmtNum(stats.mpsRough, 2)} SUBH=${fmtNum(stats.subh, 2)}`
@@ -624,7 +649,10 @@ export function renderTextVision(profile, report = null, opts = {}) {
     `STATS: peak=${fmtNum(stats.peak, 3)} | rms=${fmtNum(stats.rmsDb, 1)}dB | F0=${Math.round(stats.medF0)}Hz | HNR=${fmtNum(stats.meanHnr, 1)}dB | meanHF=${fmtNum(stats.meanHf, 3)} | MPS30-150=${fmtNum(stats.mpsRough, 3)} | SUBH=${fmtNum(stats.subh, 3)}`
   );
   lines.push(
-    `VOICE COMPASS: RESP=${fmtNum(stats.respiratoryScore, 2)} DIR=${fmtNum(stats.directnessScore, 2)} [${stats.voiceCompassLabel}] | SAN=${fmtNum(stats.sanitizationScore, 2)}`
+    `VOICE COMPASS: KIND=${stats.soundKind} | RESP=${fmtNum(stats.respiratoryScore, 2)} DIR=${fmtNum(stats.directnessScore, 2)} [${stats.voiceCompassLabel}] | SAN=${fmtNum(stats.sanitizationScore, 2)}`
+  );
+  lines.push(
+    `PEACOCK: silk=${fmtNum(stats.peacock.silk, 2)} intimacy=${fmtNum(stats.peacock.intimacy, 2)} dandy=${fmtNum(stats.peacock.dandy, 2)} fragile=${fmtNum(stats.peacock.fragile, 2)} alive=${fmtNum(stats.peacock.alive, 2)}`
   );
   lines.push(
     win.active
